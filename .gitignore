@@ -1,0 +1,55 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Claude Code (per-user only)
+.claude/settings.local.json
+.claude/.cache/
+
+# Unreal Engine — build outputs (any depth)
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+
+# Unreal Engine — auto-generated project / VS files
+*.sln
+*.VC.db
+*.VC.opendb
+*.opensdf
+*.sdf
+
+# Crash dumps
+*.dmp
+*.dmp.zip
+
+# Node.js
+node_modules/
+*.log
+dist/
+build/
+coverage/
+.nyc_output/
+
+# Env (commit only .env.example)
+.env
+.env.local
+.env.*.local
+
+# Builds output — keep placeholder only
+Builds/Client/*
+!Builds/Client/.gitkeep
+Builds/Server/*
+!Builds/Server/.gitkeep
+
+# Stray
+$null
