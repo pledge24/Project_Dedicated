@@ -51,32 +51,33 @@ Project_Dedicated/
 
 ## Conventions
 
-> TODO: 코드 스타일, 네이밍, 커밋 컨벤션 결정 후 채우기.
-
-- C++ — Unreal 표준(접두어 `U`/`A`/`F`/`E`, PascalCase)
-- JS — TBD (ESLint 설정 추가 시 결정)
-- Commit — TBD
+- **백엔드 4-레이어** — `network → handler → service → repository`
+  - `network` — Express 라우터, ws 업그레이드 분기
+  - `handler` — 요청/메시지 파싱, 응답 직렬화 (서비스 호출만)
+  - `service` — 비즈니스 로직, 트랜잭션 경계
+  - `repository` — DB 쿼리만 (mysql2 직접 호출은 여기에서만)
+- **JS 스타일** — TS 미도입. JSDoc 타입 주석으로 핵심 함수/공개 API 시그니처 문서화.
+- **C++** — Unreal 표준 접두어(`U`/`A`/`F`/`E`), PascalCase
+- **Commit** — TBD (당분간 한국어 짧은 동사형 메시지 유지)
 
 ---
 
 ## Build & Run
 
-> TODO: 명령 확정 후 채우기.
-
-- **언리얼 클라**: TBD
-- **Dedicated Server 빌드**: TBD (`D1Server.Target.cs` 추가 필요)
-- **Backend 실행**: TBD (`npm run dev`)
-- **DB 마이그레이션**: TBD
+- **언리얼 클라/에디터** — `D1/D1.uproject` 더블클릭, 또는
+  `"<UE_INSTALL>/Engine/Binaries/Win64/UnrealEditor.exe" "<repo>/D1/D1.uproject"`
+- **Dedicated Server 빌드** — TBD (`D1Server.Target.cs` 추가 후 확정 — Week1 Day1–2)
+- **Backend 실행** — TBD (`Backend/package.json` 작성 후 확정 — Week1 Day5–6, 예정: `cd Backend && npm run dev`)
+- **DB 마이그레이션** — TBD (도구 미선택)
 
 ---
 
 ## Key Rules
 
-> 본격 개발 전 채우기. 우선순위 높은 항목 먼저:
-
 - **서버 권위 모델** — 매치 결과는 DS만 백엔드로 전송 (서버 토큰 검증). 클라 직접 POST 금지.
 - **시크릿 관리** — `.env`는 절대 커밋 금지. `.env.example`만 커밋.
 - **비밀번호** — 평문 저장 금지, bcrypt 해싱 필수.
+- **JWT** — 만료 시간/위변조 검증 필수. 시크릿은 `.env`에서 로드.
 - **Rate Limit** — 로그인/매치 결과 엔드포인트는 `express-rate-limit` 적용.
 
 ---
