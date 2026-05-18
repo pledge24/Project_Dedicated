@@ -12,25 +12,6 @@
 void AD1PlayerController::BeginPlay()
 {
 	Super::BeginPlay();
-
-	// only spawn touch controls on local player controllers
-	if (ShouldUseTouchControls() && IsLocalPlayerController())
-	{
-		// spawn the mobile controls widget
-		MobileControlsWidget = CreateWidget<UUserWidget>(this, MobileControlsWidgetClass);
-
-		if (MobileControlsWidget)
-		{
-			// add the controls to the player screen
-			MobileControlsWidget->AddToPlayerScreen(0);
-
-		} else {
-
-			UE_LOG(LogD1, Error, TEXT("Could not spawn mobile controls widget."));
-
-		}
-
-	}
 }
 
 void AD1PlayerController::SetupInputComponent()
@@ -47,21 +28,11 @@ void AD1PlayerController::SetupInputComponent()
 			{
 				Subsystem->AddMappingContext(CurrentContext, 0);
 			}
-
-			// only add these IMCs if we're not using mobile touch input
-			if (!ShouldUseTouchControls())
+			
+			for (UInputMappingContext* CurrentContext : MobileExcludedMappingContexts)
 			{
-				for (UInputMappingContext* CurrentContext : MobileExcludedMappingContexts)
-				{
-					Subsystem->AddMappingContext(CurrentContext, 0);
-				}
+				Subsystem->AddMappingContext(CurrentContext, 0);
 			}
 		}
 	}
-}
-
-bool AD1PlayerController::ShouldUseTouchControls() const
-{
-	// are we on a mobile platform? Should we force touch?
-	return SVirtualJoystick::ShouldDisplayTouchInterface() || bForceTouchControls;
 }

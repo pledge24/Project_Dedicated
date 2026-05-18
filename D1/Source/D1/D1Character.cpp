@@ -52,7 +52,7 @@ AD1Character::AD1Character()
 
 void AD1Character::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-	// Set up action bindings
+	// Set up action bindings/
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
 		// Jumping
