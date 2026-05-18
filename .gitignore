@@ -10,9 +10,10 @@ desktop.ini
 *.suo
 *.user
 
-# Claude Code (per-user only)
-.claude/settings.local.json
-.claude/.cache/
+# Claude Code — 도구 설정/캐시는 어느 깊이에 있든 전부 ignore
+# (CLAUDE.md는 프로젝트 가이드라인 문서라 별도 유지)
+**/.claude/
+**/.mcp.json
 
 # Unreal Engine — build outputs (any depth)
 Binaries/
