@@ -11,9 +11,12 @@ desktop.ini
 *.user
 
 # Claude Code — 도구 설정/캐시는 어느 깊이에 있든 전부 ignore
-# (CLAUDE.md는 프로젝트 가이드라인 문서라 별도 유지)
 **/.claude/
 **/.mcp.json
+
+# 개발/작업용 md 문서는 추적하지 않음 (README만 예외)
+*.md
+!**/README.md
 
 # Unreal Engine — build outputs (any depth)
 Binaries/
