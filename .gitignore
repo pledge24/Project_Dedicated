@@ -51,5 +51,14 @@ Builds/Client/*
 Builds/Server/*
 !Builds/Server/.gitkeep
 
+# Third-party Unreal plugins (externally managed — see PROJECT_PLAN.md MCP 섹션)
+D1/Plugins/Monolith/
+
+# Unreal Engine — packaging output (Package Project 결과, GitHub 100MB 한도 초과 파일 포함)
+D1/Package/
+
+# Unreal Content — 개인 확인용 에셋 (로컬 PC 전용, Git/LFS 양쪽 모두 제외)
+D1/Content/Externals/
+
 # Stray
 $null
