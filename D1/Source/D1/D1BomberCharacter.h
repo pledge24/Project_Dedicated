@@ -13,4 +13,10 @@ class AD1BomberCharacter : public AD1Character
 
 public:
 	AD1BomberCharacter();
+
+	/** Top-down: ignore controller rotation, move along world axes. */
+	virtual void DoMove(float Right, float Forward) override;
+
+	/** Top-down: disable look input from controllers. */
+	virtual void DoLook(float Yaw, float Pitch) override;
 };

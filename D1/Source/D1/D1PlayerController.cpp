@@ -7,11 +7,12 @@
 #include "InputMappingContext.h"
 #include "Blueprint/UserWidget.h"
 #include "D1.h"
+#include "D1MapCameraManager.h"
 #include "Widgets/Input/SVirtualJoystick.h"
 
-void AD1PlayerController::BeginPlay()
+AD1PlayerController::AD1PlayerController()
 {
-	Super::BeginPlay();
+	PlayerCameraManagerClass = AD1MapCameraManager::StaticClass();
 }
 
 void AD1PlayerController::SetupInputComponent()
