@@ -18,6 +18,9 @@ desktop.ini
 *.md
 !**/README.md
 
+# 작업 보고서/디자인 문서 등은 로컬에만 (README 외 추적 X)
+docs/
+
 # Unreal Engine — build outputs (any depth)
 Binaries/
 DerivedDataCache/
