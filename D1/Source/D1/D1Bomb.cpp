@@ -14,6 +14,7 @@
 #include "D1BomberGameState.h"
 #include "D1BomberGridLibrary.h"
 #include "D1BomberPlayerState.h"
+#include "D1ExplosionFX.h"
 
 AD1Bomb::AD1Bomb()
 {
@@ -59,6 +60,28 @@ void AD1Bomb::BeginPlay()
 	{
 		DetonationServerTime = GetWorld()->GetTimeSeconds() + FuseSeconds;
 		GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, FuseSeconds, false);
+	}
+
+	// Run on BOTH server and clients so each side's capsule sweep (including
+	// client-side movement prediction) treats overlapping characters as
+	// passing through this bomb until they leave its area.
+	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
+	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
+
+	TArray<AActor*> Overlapping;
+	UKismetSystemLibrary::BoxOverlapActors(this, GetActorLocation(),
+		FVector(50.f, 50.f, 100.f),
+		ObjectTypes,
+		AD1BomberCharacter::StaticClass(),
+		TArray<AActor*>(),
+		Overlapping);
+
+	for (AActor* A : Overlapping)
+	{
+		if (AD1BomberCharacter* BC = Cast<AD1BomberCharacter>(A))
+		{
+			BC->AddIgnoredBomb(this);
+		}
 	}
 }
 
@@ -157,10 +180,19 @@ void AD1Bomb::DoExplode()
 
 void AD1Bomb::MulticastOnExploded_Implementation(const TArray<FIntPoint>& AffectedCells)
 {
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
 	for (const FIntPoint& Cell : AffectedCells)
 	{
 		const FVector Center = UD1BomberGridLibrary::CellToWorldCenter(Cell, 50.f);
-		DrawDebugBox(GetWorld(), Center, FVector(45.f, 45.f, 45.f), FColor::Orange, false, 0.6f);
+		World->SpawnActor<AD1ExplosionFX>(AD1ExplosionFX::StaticClass(), Center, FRotator::ZeroRotator, Params);
 	}
 }
 

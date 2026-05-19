@@ -45,6 +45,12 @@ public:
 	/** Server-only: called by AD1Bomb when it detonates so the owner can place again. */
 	void NotifyBombDestroyed(AD1Bomb* Bomb);
 
+	/** Server-only: register a bomb that the character is currently overlapping.
+	 *  As long as the character stays in the bomb's cell, the capsule treats
+	 *  the bomb as non-blocking. Once the character leaves the cell, the Tick
+	 *  cleanup re-enables blocking so the bomb can't be re-entered. */
+	void AddIgnoredBomb(AD1Bomb* Bomb);
+
 protected:
 	UFUNCTION(Server, Reliable)
 	void ServerTryPlaceBomb();
