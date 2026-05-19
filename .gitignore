@@ -62,7 +62,9 @@ D1/Plugins/Monolith/
 D1/Package/
 
 # Unreal Content — 개인 확인용 에셋 (로컬 PC 전용, Git/LFS 양쪽 모두 제외)
-D1/Content/Externals/
+D1/Content/External/
+D1/Content/__ExternalActors__/External/
+D1/Content/__ExternalObjects__/External/
 
 # Stray
 $null
