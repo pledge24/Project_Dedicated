@@ -43,19 +43,83 @@ void AD1BomberGameMode::PopulateWallData()
 	UE_LOG(LogD1, Log, TEXT("BomberGameMode: populated %d wall cells"), Cells.Num());
 }
 
+void AD1BomberGameMode::EnsureAliveListInitialized()
+{
+	if (AlivePlayerStates.Num() > 0)
+	{
+		return;
+	}
+	if (AGameStateBase* GSB = GameState)
+	{
+		for (APlayerState* PS : GSB->PlayerArray)
+		{
+			if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
+			{
+				if (B->bIsAlive)
+				{
+					AlivePlayerStates.Add(B);
+				}
+			}
+		}
+	}
+}
+
 void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 {
-	// Implemented in Step 7. Stub for now.
-	if (DeadPS)
+	if (bMatchEnded || !DeadPS)
 	{
-		UE_LOG(LogD1, Log, TEXT("Player died: %s (Lives=%d)"),
-			*DeadPS->GetPlayerName(), DeadPS->Lives);
+		return;
+	}
+
+	EnsureAliveListInitialized();
+
+	if (DeadPS->Placement <= 0)
+	{
+		// Placement equals the count of still-alive (including this dying one).
+		DeadPS->Placement = AlivePlayerStates.Num();
+		AlivePlayerStates.Remove(DeadPS);
+		UE_LOG(LogD1, Log, TEXT("Player died: %s Placement=%d Remaining=%d"),
+			*DeadPS->GetPlayerName(), DeadPS->Placement, AlivePlayerStates.Num());
+	}
+
+	if (AlivePlayerStates.Num() <= 1)
+	{
+		AD1BomberPlayerState* Winner = (AlivePlayerStates.Num() == 1)
+			? AlivePlayerStates[0].Get()
+			: DeadPS;
+		EndMatchWithWinner(Winner);
 	}
 }
 
 void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS)
 {
-	// Implemented in Step 7. Stub for now.
+	if (bMatchEnded)
+	{
+		return;
+	}
+	bMatchEnded = true;
+
+	if (WinnerPS && WinnerPS->Placement <= 0)
+	{
+		WinnerPS->Placement = 1;
+	}
+
+	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
+	{
+		GS->MatchPhase = EBomberMatchPhase::Finished;
+	}
+
+	UE_LOG(LogD1, Log, TEXT("Match ended. Winner=%s (Placement=%d)"),
+		WinnerPS ? *WinnerPS->GetPlayerName() : TEXT("(none)"),
+		WinnerPS ? WinnerPS->Placement : 0);
+
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		if (APlayerController* PC = It->Get())
+		{
+			PC->DisableInput(PC);
+		}
+	}
 }
 
 AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)

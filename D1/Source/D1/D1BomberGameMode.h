@@ -27,6 +27,12 @@ private:
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> UsedStarts;
 
+	UPROPERTY()
+	TArray<TObjectPtr<AD1BomberPlayerState>> AlivePlayerStates;
+
+	bool bMatchEnded = false;
+
 	void PopulateWallData();
 	void EndMatchWithWinner(AD1BomberPlayerState* WinnerPS);
+	void EnsureAliveListInitialized();
 };
