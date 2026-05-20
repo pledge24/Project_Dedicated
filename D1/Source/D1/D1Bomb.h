@@ -46,6 +46,9 @@ protected:
 
 	void DoExplode();
 
+	/** Server-only: queue a near-instant detonation when caught in another bomb's explosion. */
+	void TriggerChainDetonation();
+
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastOnExploded(const TArray<FIntPoint>& AffectedCells);
 
@@ -54,4 +57,7 @@ protected:
 
 private:
 	FTimerHandle FuseTimerHandle;
+
+	bool bIsExploding = false;
+	bool bChainScheduled = false;
 };

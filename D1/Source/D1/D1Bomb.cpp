@@ -4,6 +4,7 @@
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "DrawDebugHelpers.h"
+#include "EngineUtils.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Kismet/KismetSystemLibrary.h"
@@ -97,12 +98,41 @@ void AD1Bomb::DoExplode()
 		return;
 	}
 
+	if (bIsExploding)
+	{
+		return;
+	}
+	bIsExploding = true;
+	GetWorldTimerManager().ClearTimer(FuseTimerHandle);
+
 	AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
 	const FIntPoint Origin = UD1BomberGridLibrary::WorldToCell(GetActorLocation());
 
 	TArray<FIntPoint> Cells;
 	UD1BomberGridLibrary::EnumerateCrossCells(GS, Origin, Range, Cells);
 	Cells.Insert(Origin, 0);
+
+	{
+		TSet<FIntPoint> CellSet(Cells);
+		for (TActorIterator<AD1Bomb> It(GetWorld()); It; ++It)
+		{
+			AD1Bomb* Other = *It;
+			if (!IsValid(Other) || Other == this)
+			{
+				continue;
+			}
+			if (Other->bIsExploding || Other->bChainScheduled)
+			{
+				continue;
+			}
+
+			const FIntPoint OtherCell = UD1BomberGridLibrary::WorldToCell(Other->GetActorLocation());
+			if (CellSet.Contains(OtherCell))
+			{
+				Other->TriggerChainDetonation();
+			}
+		}
+	}
 
 	AD1BomberGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AD1BomberGameMode>() : nullptr;
 
@@ -176,6 +206,18 @@ void AD1Bomb::DoExplode()
 	}
 
 	Destroy();
+}
+
+void AD1Bomb::TriggerChainDetonation()
+{
+	if (!HasAuthority() || bIsExploding || bChainScheduled)
+	{
+		return;
+	}
+
+	bChainScheduled = true;
+	GetWorldTimerManager().ClearTimer(FuseTimerHandle);
+	GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, 0.05f, false);
 }
 
 void AD1Bomb::MulticastOnExploded_Implementation(const TArray<FIntPoint>& AffectedCells)

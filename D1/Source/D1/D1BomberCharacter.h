@@ -3,14 +3,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "D1Character.h"
+#include "GameFramework/Character.h"
 #include "D1BomberCharacter.generated.h"
 
 class UInputAction;
+struct FInputActionValue;
 class AD1Bomb;
 
 UCLASS(abstract)
-class AD1BomberCharacter : public AD1Character
+class AD1BomberCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
@@ -23,10 +24,11 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	/** Top-down: project input onto camera-yaw axes. */
-	virtual void DoMove(float Right, float Forward) override;
+	UFUNCTION(BlueprintCallable, Category = "Input")
+	void DoMove(float Right, float Forward);
 
-	/** Top-down: disable look input from controllers. */
-	virtual void DoLook(float Yaw, float Pitch) override;
+	UPROPERTY(EditAnywhere, Category = "Input")
+	TObjectPtr<UInputAction> MoveAction;
 
 	UPROPERTY(EditAnywhere, Category = "Input")
 	TObjectPtr<UInputAction> PlaceBombAction;
@@ -34,24 +36,23 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	TSubclassOf<AD1Bomb> BombClass;
 
+	/** Max number of this player's bombs that can exist in the world simultaneously. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bomber", meta = (ClampMin = "1"))
+	int32 MaxBombCount = 1;
+
 	bool IsInvulnerable() const { return bIsInvulnerable; }
 
-	/** Server-only. */
+	/** ---------------------
+	 *		Server-Only
+	 * ---------------------*/
 	void StartInvulnerability(float Duration);
-
-	/** Server-only: clean up after own death (mesh hide, collision off). */
 	void HandleDeath();
-
-	/** Server-only: called by AD1Bomb when it detonates so the owner can place again. */
 	void NotifyBombDestroyed(AD1Bomb* Bomb);
-
-	/** Server-only: register a bomb that the character is currently overlapping.
-	 *  As long as the character stays in the bomb's cell, the capsule treats
-	 *  the bomb as non-blocking. Once the character leaves the cell, the Tick
-	 *  cleanup re-enables blocking so the bomb can't be re-entered. */
 	void AddIgnoredBomb(AD1Bomb* Bomb);
 
 protected:
+	void OnMoveInput(const FInputActionValue& Value);
+
 	UFUNCTION(Server, Reliable)
 	void ServerTryPlaceBomb();
 
@@ -62,10 +63,13 @@ protected:
 	void OnRep_Invulnerable();
 
 	UPROPERTY()
-	TWeakObjectPtr<AD1Bomb> ActiveBomb;
+	TArray<TWeakObjectPtr<AD1Bomb>> ActiveBombs;
 
 	UPROPERTY()
 	TSet<TWeakObjectPtr<AD1Bomb>> IgnoredBombs;
+
+	/** Server-only: prune destroyed bombs and return current active count. */
+	int32 GetActiveBombCount();
 
 private:
 	FTimerHandle InvulnTimerHandle;

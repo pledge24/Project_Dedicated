@@ -1,13 +1,13 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "D1BomberCharacter.h"
-#include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
+#include "EngineUtils.h"
 #include "EnhancedInputComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
-#include "GameFramework/SpringArmComponent.h"
+#include "InputActionValue.h"
 #include "Net/UnrealNetwork.h"
 
 #include "D1.h"
@@ -23,22 +23,24 @@ AD1BomberCharacter::AD1BomberCharacter()
 	bIsInvulnerable = false;
 	bBlinkVisible = true;
 
-	// Parent class still owns SpringArm/FollowCamera. We keep them around but
-	// the PlayerController switches ViewTarget to a level-placed top-down
-	// camera in BeginPlay, so this character's camera is never used.
-	if (UCameraComponent* Cam = GetFollowCamera())
+	// Top-down: controller never rotates the character; movement steers it.
+	bUseControllerRotationPitch = false;
+	bUseControllerRotationYaw = false;
+	bUseControllerRotationRoll = false;
+
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
-		Cam->bAutoActivate = false;
-	}
-	if (USpringArmComponent* Boom = GetCameraBoom())
-	{
-		Boom->bDoCollisionTest = false;
-		Boom->bUsePawnControlRotation = false;
+		Move->bOrientRotationToMovement = true;
+		Move->RotationRate = FRotator(0.f, 500.f, 0.f);
+		Move->MaxWalkSpeed = 500.f;
+		Move->MinAnalogWalkSpeed = 20.f;
+		Move->BrakingDecelerationWalking = 2000.f;
 	}
 
 	// Players never collide with each other.
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{
+		Capsule->InitCapsuleSize(42.f, 96.f);
 		Capsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
 	}
 }
@@ -60,6 +62,7 @@ void AD1BomberCharacter::Tick(float DeltaSeconds)
 void AD1BomberCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	
 	DOREPLIFETIME(AD1BomberCharacter, bIsInvulnerable);
 }
 
@@ -69,11 +72,21 @@ void AD1BomberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
 	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
+		if (MoveAction)
+		{
+			EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AD1BomberCharacter::OnMoveInput);
+		}
 		if (PlaceBombAction)
 		{
 			EIC->BindAction(PlaceBombAction, ETriggerEvent::Started, this, &AD1BomberCharacter::ServerTryPlaceBomb);
 		}
 	}
+}
+
+void AD1BomberCharacter::OnMoveInput(const FInputActionValue& Value)
+{
+	const FVector2D Axis = Value.Get<FVector2D>();
+	DoMove(Axis.X, Axis.Y);
 }
 
 void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
@@ -82,7 +95,7 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 	{
 		return;
 	}
-	if (ActiveBomb.IsValid())
+	if (GetActiveBombCount() >= MaxBombCount)
 	{
 		return;
 	}
@@ -114,6 +127,25 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 		return;
 	}
 
+	// One bomb per cell — block stacking on top of any existing bomb in the
+	// world, not just our own. Two characters can occupy the same cell
+	// (pawn-vs-pawn collision is disabled) and both can be in a bomb's
+	// IgnoredBombs set, so without this check two players could double-stack.
+	for (TActorIterator<AD1Bomb> It(GetWorld()); It; ++It)
+	{
+		const AD1Bomb* Existing = *It;
+		if (!IsValid(Existing))
+		{
+			continue;
+		}
+		if (UD1BomberGridLibrary::WorldToCell(Existing->GetActorLocation()) == Cell)
+		{
+			return;
+		}
+	}
+
+	// ============ VALIDATION END =============
+
 	const FVector SpawnLoc = UD1BomberGridLibrary::CellToWorldCenter(Cell, 50.f);
 	FActorSpawnParameters Params;
 	Params.Owner = this;
@@ -126,10 +158,22 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 	}
 
 	Bomb->Initialize(PS);
-	ActiveBomb = Bomb;
+	ActiveBombs.Add(Bomb);
 	// The bomb itself registers every overlapping character (owner included)
 	// into their IgnoredBombs set during its BeginPlay, so we don't need to do
 	// that here. We only track the active bomb slot.
+}
+
+int32 AD1BomberCharacter::GetActiveBombCount()
+{
+	for (int32 i = ActiveBombs.Num() - 1; i >= 0; --i)
+	{
+		if (!ActiveBombs[i].IsValid())
+		{
+			ActiveBombs.RemoveAtSwap(i);
+		}
+	}
+	return ActiveBombs.Num();
 }
 
 void AD1BomberCharacter::UpdateIgnoredBombs()
@@ -184,6 +228,11 @@ void AD1BomberCharacter::UpdateIgnoredBombs()
 
 void AD1BomberCharacter::AddIgnoredBomb(AD1Bomb* Bomb)
 {
+	/** Server-only: register a bomb that the character is currently overlapping.
+	 *  As long as the character stays in the bomb's cell, the capsule treats
+	 *  the bomb as non-blocking. Once the character leaves the cell, the Tick
+	 *  cleanup re-enables blocking so the bomb can't be re-entered. */
+	
 	if (!Bomb)
 	{
 		return;
@@ -197,10 +246,12 @@ void AD1BomberCharacter::AddIgnoredBomb(AD1Bomb* Bomb)
 
 void AD1BomberCharacter::NotifyBombDestroyed(AD1Bomb* Bomb)
 {
-	if (ActiveBomb.Get() == Bomb)
+	// called by AD1Bomb when it detonates so the owner's slot frees up.
+	ActiveBombs.RemoveAll([Bomb](const TWeakObjectPtr<AD1Bomb>& W)
 	{
-		ActiveBomb.Reset();
-	}
+		return !W.IsValid() || W.Get() == Bomb;
+	});
+
 	if (Bomb)
 	{
 		IgnoredBombs.Remove(Bomb);
@@ -262,6 +313,7 @@ void AD1BomberCharacter::TickBlink()
 
 void AD1BomberCharacter::HandleDeath()
 {
+	// clean up after own death (mesh hide, collision off)
 	if (USkeletalMeshComponent* SK = GetMesh())
 	{
 		SK->SetVisibility(false);
@@ -298,7 +350,3 @@ void AD1BomberCharacter::DoMove(float Right, float Forward)
 	}
 }
 
-void AD1BomberCharacter::DoLook(float /*Yaw*/, float /*Pitch*/)
-{
-	// Top-down camera is fixed; no per-player look.
-}
