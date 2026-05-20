@@ -69,5 +69,9 @@ D1/Content/External/
 D1/Content/__ExternalActors__/External/
 D1/Content/__ExternalObjects__/External/
 
+# Editor Python 스크립트 폴더 — 폴더만 유지, 내용은 추적 X
+D1/Content/Python/*
+!D1/Content/Python/.gitkeep
+
 # Stray
 $null
