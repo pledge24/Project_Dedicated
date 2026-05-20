@@ -10,8 +10,8 @@ class UInputMappingContext;
 class UUserWidget;
 
 /**
- *  Basic PlayerController class for a third person game.
- *  Camera selection is delegated to AD1MapCameraManager.
+ *  봄버맨 PlayerController.
+ *  카메라 선택은 AD1MapCameraManager에 위임.
  */
 UCLASS(abstract)
 class AD1PlayerController : public APlayerController
@@ -23,14 +23,14 @@ public:
 
 protected:
 
-	/** Input Mapping Contexts */
+	/** 입력 매핑 컨텍스트 */
 	UPROPERTY(EditAnywhere, Category ="Input|Input Mappings")
 	TArray<UInputMappingContext*> DefaultMappingContexts;
 
-	/** Input Mapping Contexts */
+	/** 입력 매핑 컨텍스트 */
 	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")
 	TArray<UInputMappingContext*> MobileExcludedMappingContexts;
 
-	/** Input mapping context setup */
+	/** 입력 매핑 컨텍스트 설정 */
 	virtual void SetupInputComponent() override;
 };

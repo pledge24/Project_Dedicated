@@ -20,7 +20,7 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	/** Server-only: link owning player. */
+	/** 서버 전용: 폭탄 소유자 연결. */
 	void Initialize(AD1BomberPlayerState* InOwner);
 
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
@@ -46,7 +46,7 @@ protected:
 
 	void DoExplode();
 
-	/** Server-only: queue a near-instant detonation when caught in another bomb's explosion. */
+	/** 서버 전용: 다른 폭탄에 휘말렸을 때 거의 즉시 폭발하도록 예약. */
 	void TriggerChainDetonation();
 
 	UFUNCTION(NetMulticast, Reliable)

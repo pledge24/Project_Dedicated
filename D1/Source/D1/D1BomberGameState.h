@@ -27,7 +27,7 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_MatchPhase, BlueprintReadOnly, Category = "Bomber")
 	EBomberMatchPhase MatchPhase;
 
-	/** Replicated wall cells. Small set (~64), TArray + Contains is fine. */
+	/** 복제되는 벽 셀 목록. ~64개라 TArray + Contains로 충분. */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
 	TArray<FIntPoint> WallCells;
 

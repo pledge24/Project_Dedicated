@@ -23,5 +23,5 @@ bool AD1BomberGameState::IsWallCell(const FIntPoint& Cell) const
 
 void AD1BomberGameState::OnRep_MatchPhase()
 {
-	// Hook for client-side reaction (UI, input disable). Used in Step 7.
+	// 클라측 반응 자리 (UI, 입력 차단 등).
 }

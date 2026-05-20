@@ -5,7 +5,7 @@
 
 AD1MapCameraManager::AD1MapCameraManager()
 {
-	// Defaults inherited from APlayerCameraManager are fine.
+	// APlayerCameraManager 기본값 그대로.
 }
 
 void AD1MapCameraManager::UpdateViewTarget(FTViewTarget& OutVT, float DeltaTime)

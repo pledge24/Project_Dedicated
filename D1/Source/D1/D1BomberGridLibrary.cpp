@@ -59,8 +59,8 @@ void UD1BomberGridLibrary::BuildDefaultWallCells(TArray<FIntPoint>& OutWallCells
 {
 	OutWallCells.Reset();
 
-	// Outer ring sits ON the boundary cells (X=0, X=GridWidth-1, Y=0, Y=GridHeight-1).
-	// Matches the AD1WallBlock actors placed in MP_Test.
+	// 외벽은 경계 셀(X=0/GridWidth-1, Y=0/GridHeight-1)에 위치.
+	// MP_Test에 배치된 AD1WallBlock 액터들과 동일 좌표.
 	for (int32 X = 0; X < GridWidth; ++X)
 	{
 		OutWallCells.Add(FIntPoint(X, 0));
@@ -72,7 +72,7 @@ void UD1BomberGridLibrary::BuildDefaultWallCells(TArray<FIntPoint>& OutWallCells
 		OutWallCells.Add(FIntPoint(GridWidth - 1, Y));
 	}
 
-	// Interior even-coord pillars: X in {2,4,6,8,10}, Y in {2,4,6,8,10,12}
+	// 내부 기둥: 짝수 좌표 (X∈{2,4,6,8,10}, Y∈{2,4,6,8,10,12})
 	for (int32 X = 2; X < GridWidth - 1; X += 2)
 	{
 		for (int32 Y = 2; Y < GridHeight - 1; Y += 2)

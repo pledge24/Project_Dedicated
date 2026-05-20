@@ -20,7 +20,7 @@ public:
 	virtual void BeginPlay() override;
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
-	/** Server-only: register that a player died, assign placement, end match if 1 alive. */
+	/** 서버 전용: 플레이어 사망 등록, 등수 부여, 1명 남으면 매치 종료. */
 	void NotifyPlayerDied(AD1BomberPlayerState* DeadPS);
 
 private:

@@ -25,7 +25,7 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
 	int32 Placement;
 
-	/** Server-only: drop a heart. Returns true if this hit killed the player. */
+	/** 서버 전용: 하트 1개 깎음. 사망 시 true 반환. */
 	bool ApplyHit();
 
 protected:

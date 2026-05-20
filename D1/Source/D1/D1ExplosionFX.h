@@ -9,9 +9,9 @@
 class UStaticMeshComponent;
 
 /**
- *  Short-lived visual effect actor for a single explosion cell.
- *  Spawned client-side via NetMulticast from AD1Bomb on explode.
- *  Expands quickly then destroys itself.
+ *  한 폭발 셀용 단기 비주얼 액터.
+ *  AD1Bomb의 NetMulticast로 클라 측에서 스폰.
+ *  빠르게 부풀었다가 자동 소멸.
  */
 UCLASS()
 class AD1ExplosionFX : public AActor

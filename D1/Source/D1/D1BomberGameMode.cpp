@@ -75,7 +75,7 @@ void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 
 	if (DeadPS->Placement <= 0)
 	{
-		// Placement equals the count of still-alive (including this dying one).
+		// 등수 = 죽는 시점의 생존자 수(자기 포함).
 		DeadPS->Placement = AlivePlayerStates.Num();
 		AlivePlayerStates.Remove(DeadPS);
 		UE_LOG(LogD1, Log, TEXT("Player died: %s Placement=%d Remaining=%d"),

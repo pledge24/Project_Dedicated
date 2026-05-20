@@ -37,5 +37,5 @@ bool AD1BomberPlayerState::ApplyHit()
 
 void AD1BomberPlayerState::OnRep_Lives()
 {
-	// Hook for UI updates on clients. Bind from HUD/UMG in later step.
+	// 클라 UI 갱신 자리. 추후 HUD/UMG에서 바인딩.
 }

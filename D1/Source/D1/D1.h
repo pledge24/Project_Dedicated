@@ -5,9 +5,9 @@
 #include "CoreMinimal.h"
 #include "Engine/EngineTypes.h"
 
-/** Main log category used across the project */
+/** 프로젝트 전역 로그 카테고리 */
 DECLARE_LOG_CATEGORY_EXTERN(LogD1, Log, All);
 
-/** Custom collision channel for bombs.
- *  Configured in DefaultEngine.ini under [/Script/Engine.CollisionProfile] with Name="Bomb". */
+/** 폭탄 전용 충돌 채널.
+ *  DefaultEngine.ini의 [/Script/Engine.CollisionProfile]에 Name="Bomb"로 설정됨. */
 #define ECC_Bomb ECC_GameTraceChannel1

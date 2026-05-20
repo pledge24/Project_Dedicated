@@ -7,9 +7,8 @@
 #include "D1MapCameraManager.generated.h"
 
 /**
- *  Forces ViewTarget to the level-placed CameraActor tagged with MapCameraTag,
- *  every frame. Bypasses possession races that would otherwise revert ViewTarget
- *  to the pawn's camera component.
+ *  매 프레임 ViewTarget을 MapCameraTag 태그가 붙은 레벨 CameraActor로 강제.
+ *  Possession 경쟁으로 ViewTarget이 폰 카메라로 되돌아가는 걸 막음.
  */
 UCLASS()
 class AD1MapCameraManager : public APlayerCameraManager

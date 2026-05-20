@@ -63,9 +63,8 @@ void AD1Bomb::BeginPlay()
 		GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, FuseSeconds, false);
 	}
 
-	// Run on BOTH server and clients so each side's capsule sweep (including
-	// client-side movement prediction) treats overlapping characters as
-	// passing through this bomb until they leave its area.
+	// 서버/클라 양쪽에서 실행. 양쪽 캡슐 스윕(클라 이동 예측 포함)이
+	// 폭탄 셀에 들어와 있는 캐릭터는 셀을 벗어나기 전까지 통과로 처리되도록.
 	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
 	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
 
@@ -193,7 +192,7 @@ void AD1Bomb::DoExplode()
 
 	MulticastOnExploded(Cells);
 
-	// Free the owner's bomb slot.
+	// 소유자 폭탄 슬롯 회수.
 	if (OwningPlayerState)
 	{
 		if (APawn* Pawn = OwningPlayerState->GetPawn())
@@ -240,5 +239,5 @@ void AD1Bomb::MulticastOnExploded_Implementation(const TArray<FIntPoint>& Affect
 
 void AD1Bomb::OnRep_DetonationServerTime()
 {
-	// Placeholder for client-side countdown VFX (mesh pulse, sound, etc.).
+	// 클라 카운트다운 VFX(메시 펄스, 사운드 등) 자리.
 }

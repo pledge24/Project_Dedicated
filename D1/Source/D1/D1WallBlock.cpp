@@ -21,8 +21,7 @@ AD1WallBlock::AD1WallBlock()
 	MeshComp->SetupAttachment(RootComponent);
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	// /Engine/BasicShapes/Cube is 100 cm; center pivot. Set relative scale so the
-	// mesh exactly covers the 100x100x100 cell.
+	// /Engine/BasicShapes/Cube는 100cm, 피벗 중앙. 셀(100x100x100)에 딱 맞춤.
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshAsset(
 		TEXT("/Engine/BasicShapes/Cube.Cube"));
 	if (CubeMeshAsset.Succeeded())

@@ -23,7 +23,7 @@ AD1BomberCharacter::AD1BomberCharacter()
 	bIsInvulnerable = false;
 	bBlinkVisible = true;
 
-	// Top-down: controller never rotates the character; movement steers it.
+	// 탑다운: 컨트롤러 회전 안 씀, 이동이 캐릭터 방향을 결정.
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
@@ -37,7 +37,7 @@ AD1BomberCharacter::AD1BomberCharacter()
 		Move->BrakingDecelerationWalking = 2000.f;
 	}
 
-	// Players never collide with each other.
+	// 캐릭터끼리 충돌 안 함.
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{
 		Capsule->InitCapsuleSize(42.f, 96.f);
@@ -54,8 +54,8 @@ void AD1BomberCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	// Run on both server and clients so each side's capsule sweep matches.
-	// (Client-side movement prediction has its own MoveIgnoreActors list.)
+	// 서버/클라 양쪽에서 실행해 양쪽 캡슐 스윕이 일치하도록.
+	// (클라 이동 예측은 자체 MoveIgnoreActors 리스트를 따로 가짐.)
 	UpdateIgnoredBombs();
 }
 
@@ -127,10 +127,9 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 		return;
 	}
 
-	// One bomb per cell — block stacking on top of any existing bomb in the
-	// world, not just our own. Two characters can occupy the same cell
-	// (pawn-vs-pawn collision is disabled) and both can be in a bomb's
-	// IgnoredBombs set, so without this check two players could double-stack.
+	// 한 셀에 폭탄 하나 룰 — 자기 것뿐 아니라 월드 전역의 모든 폭탄을 검사.
+	// 캐릭터-캐릭터 충돌이 꺼져 있어 두 명이 같은 셀에 설 수 있고 둘 다
+	// 폭탄 IgnoredBombs에 들어갈 수 있어서, 자기 슬롯만 보면 두 폭탄이 겹친다.
 	for (TActorIterator<AD1Bomb> It(GetWorld()); It; ++It)
 	{
 		const AD1Bomb* Existing = *It;
@@ -144,7 +143,7 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 		}
 	}
 
-	// ============ VALIDATION END =============
+	// ============ 검증 종료 =============
 
 	const FVector SpawnLoc = UD1BomberGridLibrary::CellToWorldCenter(Cell, 50.f);
 	FActorSpawnParameters Params;
@@ -159,9 +158,8 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 
 	Bomb->Initialize(PS);
 	ActiveBombs.Add(Bomb);
-	// The bomb itself registers every overlapping character (owner included)
-	// into their IgnoredBombs set during its BeginPlay, so we don't need to do
-	// that here. We only track the active bomb slot.
+	// 폭탄이 BeginPlay에서 겹친 캐릭터(소유자 포함)를 모두 IgnoredBombs에 등록함.
+	// 여기선 슬롯만 추적.
 }
 
 int32 AD1BomberCharacter::GetActiveBombCount()
@@ -189,11 +187,9 @@ void AD1BomberCharacter::UpdateIgnoredBombs()
 		return;
 	}
 
-	// "Out of bomb area" check: the capsule must be fully clear of the bomb's
-	// box collision before we re-enable blocking. Using horizontal distance
-	// against (capsule radius + bomb half-extent + small margin) so when we
-	// flip IgnoreActorWhenMoving back to false, the capsule is not still
-	// penetrating the box (which would cause a snap-out).
+	// "폭탄 영역 벗어남" 판정: 캡슐이 폭탄 박스 콜리전 밖으로 완전히 나간 뒤에야
+	// 차단을 다시 켠다. 캡슐 반지름 + 박스 반폭 + 여유 거리로 계산해서,
+	// IgnoreActorWhenMoving을 false로 되돌릴 때 캡슐이 박스에 끼어 튕겨나가는 거 방지.
 	const float CapRadius = Cap->GetScaledCapsuleRadius();
 	const float BombHalfExtent = 50.f; // bomb cell footprint, see AD1Bomb
 	const float ExitMargin = 5.f;
@@ -228,10 +224,9 @@ void AD1BomberCharacter::UpdateIgnoredBombs()
 
 void AD1BomberCharacter::AddIgnoredBomb(AD1Bomb* Bomb)
 {
-	/** Server-only: register a bomb that the character is currently overlapping.
-	 *  As long as the character stays in the bomb's cell, the capsule treats
-	 *  the bomb as non-blocking. Once the character leaves the cell, the Tick
-	 *  cleanup re-enables blocking so the bomb can't be re-entered. */
+	/** 서버 전용: 지금 겹치고 있는 폭탄을 등록.
+	 *  같은 셀에 있는 동안 캡슐이 폭탄을 통과시키고,
+	 *  셀을 벗어나면 Tick 정리에서 차단 복원해 재진입 막음. */
 	
 	if (!Bomb)
 	{
@@ -246,7 +241,7 @@ void AD1BomberCharacter::AddIgnoredBomb(AD1Bomb* Bomb)
 
 void AD1BomberCharacter::NotifyBombDestroyed(AD1Bomb* Bomb)
 {
-	// called by AD1Bomb when it detonates so the owner's slot frees up.
+	// 폭탄이 터지면서 호출 — 소유자 슬롯 회수.
 	ActiveBombs.RemoveAll([Bomb](const TWeakObjectPtr<AD1Bomb>& W)
 	{
 		return !W.IsValid() || W.Get() == Bomb;
@@ -313,7 +308,7 @@ void AD1BomberCharacter::TickBlink()
 
 void AD1BomberCharacter::HandleDeath()
 {
-	// clean up after own death (mesh hide, collision off)
+	// 사망 정리 (메시 숨김, 충돌 끔)
 	if (USkeletalMeshComponent* SK = GetMesh())
 	{
 		SK->SetVisibility(false);

@@ -23,7 +23,7 @@ public:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	/** Top-down: project input onto camera-yaw axes. */
+	/** 탑다운: 입력을 카메라 yaw 축으로 투영. */
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoMove(float Right, float Forward);
 
@@ -36,14 +36,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	TSubclassOf<AD1Bomb> BombClass;
 
-	/** Max number of this player's bombs that can exist in the world simultaneously. */
+	/** 동시에 월드에 둘 수 있는 폭탄 최대 개수. */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber", meta = (ClampMin = "1"))
 	int32 MaxBombCount = 1;
 
 	bool IsInvulnerable() const { return bIsInvulnerable; }
 
 	/** ---------------------
-	 *		Server-Only
+	 *		서버 전용
 	 * ---------------------*/
 	void StartInvulnerability(float Duration);
 	void HandleDeath();
@@ -68,7 +68,7 @@ protected:
 	UPROPERTY()
 	TSet<TWeakObjectPtr<AD1Bomb>> IgnoredBombs;
 
-	/** Server-only: prune destroyed bombs and return current active count. */
+	/** 서버 전용: 죽은 weak ptr 정리 후 활성 폭탄 수 반환. */
 	int32 GetActiveBombCount();
 
 private:
