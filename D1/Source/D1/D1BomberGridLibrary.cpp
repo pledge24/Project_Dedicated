@@ -59,23 +59,23 @@ void UD1BomberGridLibrary::BuildDefaultWallCells(TArray<FIntPoint>& OutWallCells
 {
 	OutWallCells.Reset();
 
-	// Outer ring sits one cell OUTSIDE the playable 13x11 grid so the entire
-	// floor area is walkable. Includes corner cells.
-	for (int32 X = -1; X <= GridWidth; ++X)
+	// Outer ring sits ON the boundary cells (X=0, X=GridWidth-1, Y=0, Y=GridHeight-1).
+	// Matches the AD1WallBlock actors placed in MP_Test.
+	for (int32 X = 0; X < GridWidth; ++X)
 	{
-		OutWallCells.Add(FIntPoint(X, -1));
-		OutWallCells.Add(FIntPoint(X, GridHeight));
+		OutWallCells.Add(FIntPoint(X, 0));
+		OutWallCells.Add(FIntPoint(X, GridHeight - 1));
 	}
-	for (int32 Y = 0; Y < GridHeight; ++Y)
+	for (int32 Y = 1; Y < GridHeight - 1; ++Y)
 	{
-		OutWallCells.Add(FIntPoint(-1, Y));
-		OutWallCells.Add(FIntPoint(GridWidth, Y));
+		OutWallCells.Add(FIntPoint(0, Y));
+		OutWallCells.Add(FIntPoint(GridWidth - 1, Y));
 	}
 
-	// Interior odd-coord pillars: x in {1,3,5,7,9,11}, y in {1,3,5,7,9}
-	for (int32 X = 1; X < GridWidth; X += 2)
+	// Interior even-coord pillars: X in {2,4,6,8,10}, Y in {2,4,6,8,10,12}
+	for (int32 X = 2; X < GridWidth - 1; X += 2)
 	{
-		for (int32 Y = 1; Y < GridHeight; Y += 2)
+		for (int32 Y = 2; Y < GridHeight - 1; Y += 2)
 		{
 			OutWallCells.Add(FIntPoint(X, Y));
 		}
