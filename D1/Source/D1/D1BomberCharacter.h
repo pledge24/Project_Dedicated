@@ -16,7 +16,7 @@ class AD1BomberCharacter : public ACharacter
 	GENERATED_BODY()
 
 public:
-	AD1BomberCharacter();
+	AD1BomberCharacter(const FObjectInitializer& ObjectInitializer);
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;

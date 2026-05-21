@@ -12,11 +12,14 @@
 
 #include "D1.h"
 #include "D1Bomb.h"
+#include "D1BomberCharacterMovementComponent.h"
 #include "D1BomberGameState.h"
 #include "D1BomberGridLibrary.h"
 #include "D1BomberPlayerState.h"
 
-AD1BomberCharacter::AD1BomberCharacter()
+AD1BomberCharacter::AD1BomberCharacter(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<UD1BomberCharacterMovementComponent>(
+		ACharacter::CharacterMovementComponentName))
 {
 	PrimaryActorTick.bCanEverTick = true;
 
