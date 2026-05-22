@@ -32,7 +32,13 @@ private:
 
 	bool bMatchEnded = false;
 
+	/** 매치 제한시간 만료 콜백용 타이머. */
+	FTimerHandle MatchTimerHandle;
+
 	void PopulateWallData();
 	void EndMatchWithWinner(AD1BomberPlayerState* WinnerPS);
 	void EnsureAliveListInitialized();
+
+	/** 매치 시간 만료 → 매치 종료. placement 룰은 v2에서 정의. */
+	void OnMatchTimeExpired();
 };

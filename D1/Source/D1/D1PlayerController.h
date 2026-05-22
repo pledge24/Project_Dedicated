@@ -31,6 +31,16 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")
 	TArray<UInputMappingContext*> MobileExcludedMappingContexts;
 
+	/** 인게임 HUD 위젯 클래스. BP에서 WBP_BomberHUD 지정. */
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> HUDClass;
+
 	/** 입력 매핑 컨텍스트 설정 */
 	virtual void SetupInputComponent() override;
+
+	virtual void BeginPlay() override;
+
+private:
+	UPROPERTY()
+	TObjectPtr<UUserWidget> HUDWidget;
 };

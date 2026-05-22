@@ -31,8 +31,20 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
 	TArray<FIntPoint> WallCells;
 
+	/** 매치 시작 서버 시각(초). GameMode가 Playing 진입 시 기록. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Match")
+	float MatchStartServerTime;
+
+	/** 매치 제한 시간(초). 기본 5분. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Match")
+	float MatchDurationSec;
+
 	UFUNCTION(BlueprintPure, Category = "Bomber")
 	bool IsWallCell(const FIntPoint& Cell) const;
+
+	/** 남은 매치 시간(초). 클라/서버 공용. UMG가 Tick에서 폴링용. */
+	UFUNCTION(BlueprintPure, Category = "Bomber|Match")
+	float GetRemainingTimeSec() const;
 
 protected:
 	UFUNCTION()

@@ -15,6 +15,22 @@ AD1PlayerController::AD1PlayerController()
 	PlayerCameraManagerClass = AD1MapCameraManager::StaticClass();
 }
 
+void AD1PlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// 로컬 컨트롤러에만 HUD 위젯 부착.
+	// AddToPlayerScreen: 자기 LocalPlayer 영역에만 그려짐(멀티 LocalPlayer/Split Screen 안전).
+	if (IsLocalController() && HUDClass && !HUDWidget)
+	{
+		HUDWidget = CreateWidget<UUserWidget>(this, HUDClass);
+		if (HUDWidget)
+		{
+			HUDWidget->AddToPlayerScreen();
+		}
+	}
+}
+
 void AD1PlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();

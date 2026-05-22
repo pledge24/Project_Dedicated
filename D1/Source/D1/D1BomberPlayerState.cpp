@@ -8,6 +8,7 @@ AD1BomberPlayerState::AD1BomberPlayerState()
 	Lives = 3;
 	bIsAlive = true;
 	Placement = 0;
+	PlayerSlotIndex = -1;
 }
 
 void AD1BomberPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -17,6 +18,7 @@ void AD1BomberPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(AD1BomberPlayerState, Lives);
 	DOREPLIFETIME(AD1BomberPlayerState, bIsAlive);
 	DOREPLIFETIME(AD1BomberPlayerState, Placement);
+	DOREPLIFETIME(AD1BomberPlayerState, PlayerSlotIndex);
 }
 
 bool AD1BomberPlayerState::ApplyHit()

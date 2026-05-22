@@ -23,8 +23,25 @@ void AD1BomberGameMode::BeginPlay()
 
 	if (AD1BomberGameState* BomberGS = GetGameState<AD1BomberGameState>())
 	{
+		BomberGS->MatchStartServerTime = BomberGS->GetServerWorldTimeSeconds();
 		BomberGS->MatchPhase = EBomberMatchPhase::Playing;
+
+		// 매치 제한시간 만료 콜백.
+		GetWorldTimerManager().SetTimer(
+			MatchTimerHandle, this, &AD1BomberGameMode::OnMatchTimeExpired,
+			BomberGS->MatchDurationSec, /*bLoop=*/false);
 	}
+}
+
+void AD1BomberGameMode::OnMatchTimeExpired()
+{
+	if (bMatchEnded)
+	{
+		return;
+	}
+	UE_LOG(LogD1, Log, TEXT("Match time expired -> ending match"));
+	// placement 룰은 추후 정의. 일단 종료만.
+	EndMatchWithWinner(nullptr);
 }
 
 void AD1BomberGameMode::PopulateWallData()
@@ -129,8 +146,16 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 	TArray<AActor*> AllStarts;
 	UGameplayStatics::GetAllActorsOfClass(this, APlayerStart::StaticClass(), AllStarts);
 
-	for (AActor* Start : AllStarts)
+	// 액터 이름 알파벳 정렬 — 슬롯 인덱스 일관성 확보.
+	AllStarts.Sort([](const AActor& A, const AActor& B)
 	{
+		return A.GetName() < B.GetName();
+	});
+
+	for (int32 i = 0; i < AllStarts.Num(); ++i)
+	{
+		AActor* Start = AllStarts[i];
+
 		bool bAlreadyUsed = false;
 		for (const TWeakObjectPtr<AActor>& Used : UsedStarts)
 		{
@@ -140,12 +165,39 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 				break;
 			}
 		}
-
-		if (!bAlreadyUsed)
+		if (bAlreadyUsed)
 		{
-			UsedStarts.Add(Start);
-			return Start;
+			continue;
 		}
+
+		// 슬롯 인덱스 결정: PlayerStartTag가 "0"~"3"이면 그 값, 아니면 정렬 인덱스.
+		int32 SlotIndex = i;
+		if (APlayerStart* PS = Cast<APlayerStart>(Start))
+		{
+			const FString TagStr = PS->PlayerStartTag.ToString();
+			if (TagStr.IsNumeric())
+			{
+				const int32 Parsed = FCString::Atoi(*TagStr);
+				if (Parsed >= 0 && Parsed <= 3)
+				{
+					SlotIndex = Parsed;
+				}
+			}
+		}
+
+		// PlayerState에 슬롯 부여.
+		if (Player)
+		{
+			if (AD1BomberPlayerState* BomberPS = Player->GetPlayerState<AD1BomberPlayerState>())
+			{
+				BomberPS->PlayerSlotIndex = SlotIndex;
+				UE_LOG(LogD1, Log, TEXT("Assigned PlayerSlotIndex=%d to %s (Start=%s)"),
+					SlotIndex, *BomberPS->GetPlayerName(), *Start->GetName());
+			}
+		}
+
+		UsedStarts.Add(Start);
+		return Start;
 	}
 
 	return Super::ChoosePlayerStart_Implementation(Player);

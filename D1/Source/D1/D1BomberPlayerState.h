@@ -25,6 +25,10 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
 	int32 Placement;
 
+	/** 0~3. UI 카드 위치/테두리 색상 결정. GameMode가 ChoosePlayerStart에서 부여. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
+	int32 PlayerSlotIndex;
+
 	/** 서버 전용: 하트 1개 깎음. 사망 시 true 반환. */
 	bool ApplyHit();
 

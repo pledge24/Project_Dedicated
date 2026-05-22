@@ -21,6 +21,9 @@ desktop.ini
 # 작업 보고서/디자인 문서 등은 로컬에만 (README 외 추적 X)
 docs/
 
+# UI 참조 이미지(스크린샷/목업 등) — 로컬에만
+Ref/
+
 # Unreal Engine — build outputs (any depth)
 Binaries/
 DerivedDataCache/
