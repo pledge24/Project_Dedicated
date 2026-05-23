@@ -65,8 +65,51 @@ void AD1BomberCharacter::Tick(float DeltaSeconds)
 void AD1BomberCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	
+
 	DOREPLIFETIME(AD1BomberCharacter, bIsInvulnerable);
+}
+
+void AD1BomberCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	RefreshPlayerStateBinding();
+}
+
+void AD1BomberCharacter::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+	RefreshPlayerStateBinding();
+}
+
+void AD1BomberCharacter::RefreshPlayerStateBinding()
+{
+	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
+	if (!PS || BoundPlayerState.Get() == PS)
+	{
+		return;
+	}
+
+	if (AD1BomberPlayerState* Prev = BoundPlayerState.Get())
+	{
+		Prev->OnAliveStateChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
+	}
+	PS->OnAliveStateChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
+	BoundPlayerState = PS;
+
+	// 늦게 합류한 클라가 이미 사망 상태를 받았을 때 즉시 반영.
+	if (!PS->bIsAlive)
+	{
+		OnPlayerAliveStateChanged();
+	}
+}
+
+void AD1BomberCharacter::OnPlayerAliveStateChanged()
+{
+	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
+	if (PS && !PS->bIsAlive)
+	{
+		HandleDeath();
+	}
 }
 
 void AD1BomberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

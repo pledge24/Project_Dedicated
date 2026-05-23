@@ -177,7 +177,8 @@ void AD1Bomb::DoExplode()
 
 			if (bKilled)
 			{
-				BC->HandleDeath();
+				// 캐릭터 사망 정리는 PS의 OnAliveStateChanged 바인딩이 처리.
+				// (서버 측은 ApplyHit가 OnRep_bIsAlive를 수동 호출해 델리게이트가 즉시 발화.)
 				if (GM)
 				{
 					GM->NotifyPlayerDied(PS);
