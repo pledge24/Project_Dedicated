@@ -6,6 +6,9 @@
 #include "GameFramework/PlayerState.h"
 #include "D1BomberPlayerState.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLivesChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAliveStateChanged);
+
 UCLASS()
 class AD1BomberPlayerState : public APlayerState
 {
@@ -19,7 +22,7 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_Lives, BlueprintReadOnly, Category = "Bomber")
 	int32 Lives;
 
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
+	UPROPERTY(ReplicatedUsing = OnRep_bIsAlive, BlueprintReadOnly, Category = "Bomber")
 	bool bIsAlive;
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
@@ -29,10 +32,21 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
 	int32 PlayerSlotIndex;
 
+	/** Lives 값이 클라에 복제됐을 때 브로드캐스트. UI 바인딩용. */
+	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
+	FOnLivesChanged OnLivesChanged;
+
+	/** bIsAlive 값이 클라에 복제됐을 때 브로드캐스트. UI 바인딩용. */
+	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
+	FOnAliveStateChanged OnAliveStateChanged;
+
 	/** 서버 전용: 하트 1개 깎음. 사망 시 true 반환. */
 	bool ApplyHit();
 
 protected:
 	UFUNCTION()
 	void OnRep_Lives();
+
+	UFUNCTION()
+	void OnRep_bIsAlive();
 };

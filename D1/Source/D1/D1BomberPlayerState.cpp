@@ -29,9 +29,12 @@ bool AD1BomberPlayerState::ApplyHit()
 	}
 
 	Lives = FMath::Max(0, Lives - 1);
+	OnRep_Lives(); // 서버 자기 자신 UI 갱신 (Listen Server 대응)
+
 	if (Lives <= 0)
 	{
 		bIsAlive = false;
+		OnRep_bIsAlive(); // 서버 자기 자신 UI 갱신 (Listen Server 대응)
 		return true;
 	}
 	return false;
@@ -39,5 +42,10 @@ bool AD1BomberPlayerState::ApplyHit()
 
 void AD1BomberPlayerState::OnRep_Lives()
 {
-	// 클라 UI 갱신 자리. 추후 HUD/UMG에서 바인딩.
+	OnLivesChanged.Broadcast();
+}
+
+void AD1BomberPlayerState::OnRep_bIsAlive()
+{
+	OnAliveStateChanged.Broadcast();
 }
