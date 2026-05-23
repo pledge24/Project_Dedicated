@@ -51,6 +51,13 @@ AD1BomberCharacter::AD1BomberCharacter(const FObjectInitializer& ObjectInitializ
 void AD1BomberCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// PossessedBy/OnRep_PlayerState가 BeginPlay 전에 와서 PS는 잡혔지만 컴포넌트(특히 WidgetComponent)가
+	// 아직 init 안 됐을 수 있다. 여기서 한 번 더 ready 신호를 발화해 BP가 안전하게 위젯에 접근하게 함.
+	if (BoundPlayerState.IsValid())
+	{
+		OnPlayerStateReady();
+	}
 }
 
 void AD1BomberCharacter::Tick(float DeltaSeconds)
@@ -95,6 +102,13 @@ void AD1BomberCharacter::RefreshPlayerStateBinding()
 	}
 	PS->OnAliveStateChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
 	BoundPlayerState = PS;
+
+	// BP가 PS 확보 시점을 받게 함 (이름표 UI 등). BeginPlay 전에는 컴포넌트가 아직 init 안 됐을 수 있어
+	// 신호를 미루고, BeginPlay에서 다시 한 번 발화한다.
+	if (HasActorBegunPlay())
+	{
+		OnPlayerStateReady();
+	}
 
 	// 늦게 합류한 클라가 이미 사망 상태를 받았을 때 즉시 반영.
 	if (!PS->bIsAlive)

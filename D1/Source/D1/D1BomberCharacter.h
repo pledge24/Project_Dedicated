@@ -71,6 +71,10 @@ protected:
 	UFUNCTION()
 	void OnPlayerAliveStateChanged();
 
+	/** PS가 (서버·클라 모두) 처음 확보된 시점에 한 번 호출. BP에서 이름표 등 UI 푸시용. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Bomber|Events", meta = (DisplayName = "On Player State Ready"))
+	void OnPlayerStateReady();
+
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AD1Bomb>> ActiveBombs;
 
