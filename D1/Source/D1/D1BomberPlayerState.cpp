@@ -49,3 +49,9 @@ void AD1BomberPlayerState::OnRep_bIsAlive()
 {
 	OnAliveStateChanged.Broadcast();
 }
+
+void AD1BomberPlayerState::OnRep_PlayerName()
+{
+	Super::OnRep_PlayerName();
+	OnPlayerNameChanged.Broadcast();
+}

@@ -99,8 +99,10 @@ void AD1BomberCharacter::RefreshPlayerStateBinding()
 	if (AD1BomberPlayerState* Prev = BoundPlayerState.Get())
 	{
 		Prev->OnAliveStateChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
+		Prev->OnPlayerNameChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
 	}
 	PS->OnAliveStateChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
+	PS->OnPlayerNameChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
 	BoundPlayerState = PS;
 
 	// BP가 PS 확보 시점을 받게 함 (이름표 UI 등). BeginPlay 전에는 컴포넌트가 아직 init 안 됐을 수 있어
@@ -123,6 +125,16 @@ void AD1BomberCharacter::OnPlayerAliveStateChanged()
 	if (PS && !PS->bIsAlive)
 	{
 		HandleDeath();
+	}
+}
+
+void AD1BomberCharacter::OnPlayerNameRefreshed()
+{
+	// 이름이 늦게 들어오는 케이스(Listen Server 호스트 자기 PS 포함) 대응:
+	// BP의 OnPlayerStateReady를 재호출해 이름표 SetText를 다시 트리거.
+	if (HasActorBegunPlay())
+	{
+		OnPlayerStateReady();
 	}
 }
 

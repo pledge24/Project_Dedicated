@@ -8,6 +8,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLivesChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAliveStateChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerNameChanged);
 
 UCLASS()
 class AD1BomberPlayerState : public APlayerState
@@ -40,6 +41,12 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
 	FOnAliveStateChanged OnAliveStateChanged;
 
+	/** PlayerName이 바뀌었을 때 브로드캐스트. 이름표 UI 갱신용.
+	 *  엔진 SetPlayerName이 Listen Server에서도 OnRep_PlayerName을 수동 호출하므로
+	 *  서버 자기 자신 PS도 트리거됨 (Dedicated Server는 UI 없으니 무관). */
+	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
+	FOnPlayerNameChanged OnPlayerNameChanged;
+
 	/** 서버 전용: 하트 1개 깎음. 사망 시 true 반환. */
 	bool ApplyHit();
 
@@ -49,4 +56,6 @@ protected:
 
 	UFUNCTION()
 	void OnRep_bIsAlive();
+
+	virtual void OnRep_PlayerName() override;
 };

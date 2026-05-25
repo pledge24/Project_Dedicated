@@ -49,7 +49,7 @@ public:
 	void HandleDeath();
 
 	/** ---------------------
-	 *		서버 전용
+	 *		Server Only
 	 * ---------------------*/
 	void StartInvulnerability(float Duration);
 	void NotifyBombDestroyed(AD1Bomb* Bomb);
@@ -71,7 +71,11 @@ protected:
 	UFUNCTION()
 	void OnPlayerAliveStateChanged();
 
-	/** PS가 (서버·클라 모두) 처음 확보된 시점에 한 번 호출. BP에서 이름표 등 UI 푸시용. */
+	/** PS의 OnPlayerNameChanged 바인딩 핸들러. 이름표 재푸시 위해 OnPlayerStateReady 재호출. */
+	UFUNCTION()
+	void OnPlayerNameRefreshed();
+
+	/** PS가 (서버·클라 모두) 처음 확보된 시점 + 이름이 갱신될 때마다 호출. BP에서 이름표 등 UI 푸시용. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Bomber|Events", meta = (DisplayName = "On Player State Ready"))
 	void OnPlayerStateReady();
 
