@@ -90,7 +90,6 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	TSubclassOf<AD1Bomb> BombClass;
 
-	/** 동시에 월드에 둘 수 있는 폭탄 최대 개수. */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber", meta = (ClampMin = "1"))
 	int32 MaxBombCount = 1;
 
