@@ -38,14 +38,26 @@ void AD1BomberGameState::RemovePlayerState(APlayerState* PlayerState)
 	MarkPlayerCardsDirty();
 }
 
-void AD1BomberGameState::MarkPlayerCardsDirty()
-{
-	OnPlayerCardsDirty.Broadcast();
-}
-
 bool AD1BomberGameState::IsWallCell(const FIntPoint& Cell) const
 {
 	return WallCells.Contains(Cell);
+}
+
+float AD1BomberGameState::GetRemainingTimeSec() const
+{
+	// 시작 전: 풀 시간.
+	if (MatchPhase == EBomberMatchPhase::Waiting)
+	{
+		return MatchDurationSec;
+	}
+	// 종료 후: 0.
+	if (MatchPhase == EBomberMatchPhase::Finished)
+	{
+		return 0.0f;
+	}
+
+	const float Elapsed = GetServerWorldTimeSeconds() - MatchStartServerTime;
+	return FMath::Clamp(MatchDurationSec - Elapsed, 0.0f, MatchDurationSec);
 }
 
 TArray<AD1BomberPlayerState*> AD1BomberGameState::GetPlayerStatesBySlot() const
@@ -66,24 +78,13 @@ TArray<AD1BomberPlayerState*> AD1BomberGameState::GetPlayerStatesBySlot() const
 			BySlot[Idx] = BomberPS;
 		}
 	}
+	
 	return BySlot;
 }
 
-float AD1BomberGameState::GetRemainingTimeSec() const
+void AD1BomberGameState::MarkPlayerCardsDirty()
 {
-	// 시작 전: 풀 시간.
-	if (MatchPhase == EBomberMatchPhase::Waiting)
-	{
-		return MatchDurationSec;
-	}
-	// 종료 후: 0.
-	if (MatchPhase == EBomberMatchPhase::Finished)
-	{
-		return 0.0f;
-	}
-
-	const float Elapsed = GetServerWorldTimeSeconds() - MatchStartServerTime;
-	return FMath::Clamp(MatchDurationSec - Elapsed, 0.0f, MatchDurationSec);
+	OnPlayerCardsDirty.Broadcast();
 }
 
 void AD1BomberGameState::OnRep_MatchPhase()
