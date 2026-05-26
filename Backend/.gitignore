@@ -1,0 +1,6 @@
+# 비밀
+.env
+
+# Node (루트 .gitignore에도 있지만 명시적으로 둠)
+node_modules/
+*.log
