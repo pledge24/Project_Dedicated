@@ -40,6 +40,12 @@ bool AD1BomberPlayerState::ApplyHit()
 	return false;
 }
 
+void AD1BomberPlayerState::OnRep_PlayerName()
+{
+	Super::OnRep_PlayerName();
+	OnPlayerNameChanged.Broadcast();
+}
+
 void AD1BomberPlayerState::OnRep_Lives()
 {
 	OnLivesChanged.Broadcast();
@@ -48,10 +54,4 @@ void AD1BomberPlayerState::OnRep_Lives()
 void AD1BomberPlayerState::OnRep_bIsAlive()
 {
 	OnAliveStateChanged.Broadcast();
-}
-
-void AD1BomberPlayerState::OnRep_PlayerName()
-{
-	Super::OnRep_PlayerName();
-	OnPlayerNameChanged.Broadcast();
 }

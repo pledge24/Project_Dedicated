@@ -18,15 +18,15 @@ class AD1MapCameraManager : public APlayerCameraManager
 public:
 	AD1MapCameraManager();
 
-	UPROPERTY(EditDefaultsOnly, Category = "Bomber|Camera")
-	FName MapCameraTag = TEXT("MapViewCamera");
-
 protected:
 	virtual void UpdateViewTarget(FTViewTarget& OutVT, float DeltaTime) override;
 
 private:
+	AActor* ResolveMapCamera();
+
+	UPROPERTY(EditDefaultsOnly, Category = "Bomber|Camera")
+	FName MapCameraTag = TEXT("MapViewCamera");
+
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AActor> CachedCamera;
-
-	AActor* ResolveMapCamera();
 };

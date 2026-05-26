@@ -16,4 +16,6 @@ UCLASS()
 class UD1BomberCharacterMovementComponent : public UCharacterMovementComponent
 {
 	GENERATED_BODY()
+
+public:
 };

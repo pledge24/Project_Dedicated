@@ -6,8 +6,8 @@
 #include "GameFramework/Actor.h"
 #include "D1WallBlock.generated.h"
 
-class UStaticMeshComponent;
 class UBoxComponent;
+class UStaticMeshComponent;
 
 UCLASS()
 class AD1WallBlock : public AActor

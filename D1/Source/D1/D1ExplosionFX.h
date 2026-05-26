@@ -23,6 +23,13 @@ public:
 
 	virtual void Tick(float DeltaSeconds) override;
 
+protected:
+	virtual void BeginPlay() override;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UStaticMeshComponent> MeshComp;
+
+private:
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
 	float Lifetime;
 
@@ -32,12 +39,5 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
 	float PeakScale;
 
-protected:
-	virtual void BeginPlay() override;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UStaticMeshComponent> MeshComp;
-
-private:
 	float Elapsed;
 };

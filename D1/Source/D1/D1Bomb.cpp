@@ -53,6 +53,11 @@ void AD1Bomb::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 	DOREPLIFETIME(AD1Bomb, DetonationServerTime);
 }
 
+void AD1Bomb::Initialize(AD1BomberPlayerState* InOwner)
+{
+	OwningPlayerState = InOwner;
+}
+
 void AD1Bomb::BeginPlay()
 {
 	Super::BeginPlay();
@@ -85,9 +90,27 @@ void AD1Bomb::BeginPlay()
 	}
 }
 
-void AD1Bomb::Initialize(AD1BomberPlayerState* InOwner)
+void AD1Bomb::MulticastOnExploded_Implementation(const TArray<FIntPoint>& AffectedCells)
 {
-	OwningPlayerState = InOwner;
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	for (const FIntPoint& Cell : AffectedCells)
+	{
+		const FVector Center = UD1BomberGridLibrary::CellToWorldCenter(Cell, 50.f);
+		World->SpawnActor<AD1ExplosionFX>(AD1ExplosionFX::StaticClass(), Center, FRotator::ZeroRotator, Params);
+	}
+}
+
+void AD1Bomb::OnRep_DetonationServerTime()
+{
+	// 클라 카운트다운 VFX(메시 펄스, 사운드 등) 자리.
 }
 
 void AD1Bomb::DoExplode()
@@ -218,27 +241,4 @@ void AD1Bomb::TriggerChainDetonation()
 	bChainScheduled = true;
 	GetWorldTimerManager().ClearTimer(FuseTimerHandle);
 	GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, 0.05f, false);
-}
-
-void AD1Bomb::MulticastOnExploded_Implementation(const TArray<FIntPoint>& AffectedCells)
-{
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	for (const FIntPoint& Cell : AffectedCells)
-	{
-		const FVector Center = UD1BomberGridLibrary::CellToWorldCenter(Cell, 50.f);
-		World->SpawnActor<AD1ExplosionFX>(AD1ExplosionFX::StaticClass(), Center, FRotator::ZeroRotator, Params);
-	}
-}
-
-void AD1Bomb::OnRep_DetonationServerTime()
-{
-	// 클라 카운트다운 VFX(메시 펄스, 사운드 등) 자리.
 }

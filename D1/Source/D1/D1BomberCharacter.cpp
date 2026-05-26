@@ -69,6 +69,23 @@ void AD1BomberCharacter::Tick(float DeltaSeconds)
 	UpdateIgnoredBombs();
 }
 
+void AD1BomberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	{
+		if (MoveAction)
+		{
+			EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AD1BomberCharacter::OnMoveInput);
+		}
+		if (PlaceBombAction)
+		{
+			EIC->BindAction(PlaceBombAction, ETriggerEvent::Started, this, &AD1BomberCharacter::ServerTryPlaceBomb);
+		}
+	}
+}
+
 void AD1BomberCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -88,77 +105,90 @@ void AD1BomberCharacter::OnRep_PlayerState()
 	RefreshPlayerStateBinding();
 }
 
-void AD1BomberCharacter::RefreshPlayerStateBinding()
+void AD1BomberCharacter::DoMove(float Right, float Forward)
 {
-	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
-	if (!PS || BoundPlayerState.Get() == PS)
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (PC && PC->PlayerCameraManager)
+	{
+		const FRotator CamRot = PC->PlayerCameraManager->GetCameraRotation();
+		const FRotator YawOnly(0.f, CamRot.Yaw, 0.f);
+		const FVector Fwd = FRotationMatrix(YawOnly).GetUnitAxis(EAxis::X);
+		const FVector Rgt = FRotationMatrix(YawOnly).GetUnitAxis(EAxis::Y);
+		AddMovementInput(Fwd, Forward);
+		AddMovementInput(Rgt, Right);
+		return;
+	}
+	if (GetController() != nullptr)
+	{
+		AddMovementInput(FVector::ForwardVector, Forward);
+		AddMovementInput(FVector::RightVector, Right);
+	}
+}
+
+void AD1BomberCharacter::HandleDeath()
+{
+	// 사망 정리 (메시 숨김, 충돌 끔)
+	if (USkeletalMeshComponent* SK = GetMesh())
+	{
+		SK->SetVisibility(false);
+	}
+	if (UCapsuleComponent* Cap = GetCapsuleComponent())
+	{
+		Cap->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->DisableMovement();
+	}
+	GetWorldTimerManager().ClearTimer(InvulnTimerHandle);
+	GetWorldTimerManager().ClearTimer(BlinkTimerHandle);
+}
+
+void AD1BomberCharacter::StartInvulnerability(float Duration)
+{
+	if (!HasAuthority())
 	{
 		return;
 	}
-
-	if (AD1BomberPlayerState* Prev = BoundPlayerState.Get())
-	{
-		Prev->OnAliveStateChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
-		Prev->OnPlayerNameChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
-	}
-	PS->OnAliveStateChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
-	PS->OnPlayerNameChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
-	BoundPlayerState = PS;
-
-	// BP가 PS 확보 시점을 받게 함 (이름표 UI 등). BeginPlay 전에는 컴포넌트가 아직 init 안 됐을 수 있어
-	// 신호를 미루고, BeginPlay에서 다시 한 번 발화한다.
-	if (HasActorBegunPlay())
-	{
-		OnPlayerStateReady();
-	}
-
-	// 늦게 합류한 클라가 이미 사망 상태를 받았을 때 즉시 반영.
-	if (!PS->bIsAlive)
-	{
-		OnPlayerAliveStateChanged();
-	}
+	bIsInvulnerable = true;
+	GetWorldTimerManager().SetTimer(InvulnTimerHandle, this,
+		&AD1BomberCharacter::EndInvulnerability, Duration, false);
+	OnRep_Invulnerable();
 }
 
-void AD1BomberCharacter::OnPlayerAliveStateChanged()
+void AD1BomberCharacter::NotifyBombDestroyed(AD1Bomb* Bomb)
 {
-	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
-	if (PS && !PS->bIsAlive)
+	// 폭탄이 터지면서 호출 — 소유자 슬롯 회수.
+	ActiveBombs.RemoveAll([Bomb](const TWeakObjectPtr<AD1Bomb>& W)
 	{
-		HandleDeath();
-	}
-}
+		return !W.IsValid() || W.Get() == Bomb;
+	});
 
-void AD1BomberCharacter::OnPlayerNameRefreshed()
-{
-	// 이름이 늦게 들어오는 케이스(Listen Server 호스트 자기 PS 포함) 대응:
-	// BP의 OnPlayerStateReady를 재호출해 이름표 SetText를 다시 트리거.
-	if (HasActorBegunPlay())
+	if (Bomb)
 	{
-		OnPlayerStateReady();
-	}
-}
-
-void AD1BomberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
-	{
-		if (MoveAction)
+		IgnoredBombs.Remove(Bomb);
+		if (UCapsuleComponent* Cap = GetCapsuleComponent())
 		{
-			EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AD1BomberCharacter::OnMoveInput);
-		}
-		if (PlaceBombAction)
-		{
-			EIC->BindAction(PlaceBombAction, ETriggerEvent::Started, this, &AD1BomberCharacter::ServerTryPlaceBomb);
+			Cap->IgnoreActorWhenMoving(Bomb, false);
 		}
 	}
 }
 
-void AD1BomberCharacter::OnMoveInput(const FInputActionValue& Value)
+void AD1BomberCharacter::AddIgnoredBomb(AD1Bomb* Bomb)
 {
-	const FVector2D Axis = Value.Get<FVector2D>();
-	DoMove(Axis.X, Axis.Y);
+	/** 서버 전용: 지금 겹치고 있는 폭탄을 등록.
+	 *  같은 셀에 있는 동안 캡슐이 폭탄을 통과시키고,
+	 *  셀을 벗어나면 Tick 정리에서 차단 복원해 재진입 막음. */
+
+	if (!Bomb)
+	{
+		return;
+	}
+	IgnoredBombs.Add(Bomb);
+	if (UCapsuleComponent* Cap = GetCapsuleComponent())
+	{
+		Cap->IgnoreActorWhenMoving(Bomb, true);
+	}
 }
 
 void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
@@ -234,6 +264,49 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 	// 여기선 슬롯만 추적.
 }
 
+void AD1BomberCharacter::OnRep_Invulnerable()
+{
+	if (bIsInvulnerable)
+	{
+		bBlinkVisible = true;
+		GetWorldTimerManager().SetTimer(BlinkTimerHandle, this,
+			&AD1BomberCharacter::TickBlink, 0.1f, true);
+	}
+	else
+	{
+		GetWorldTimerManager().ClearTimer(BlinkTimerHandle);
+		if (USkeletalMeshComponent* SK = GetMesh())
+		{
+			SK->SetVisibility(true);
+		}
+	}
+}
+
+void AD1BomberCharacter::OnPlayerAliveStateChanged()
+{
+	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
+	if (PS && !PS->bIsAlive)
+	{
+		HandleDeath();
+	}
+}
+
+void AD1BomberCharacter::OnPlayerNameRefreshed()
+{
+	// 이름이 늦게 들어오는 케이스(Listen Server 호스트 자기 PS 포함) 대응:
+	// BP의 OnPlayerStateReady를 재호출해 이름표 SetText를 다시 트리거.
+	if (HasActorBegunPlay())
+	{
+		OnPlayerStateReady();
+	}
+}
+
+void AD1BomberCharacter::OnMoveInput(const FInputActionValue& Value)
+{
+	const FVector2D Axis = Value.Get<FVector2D>();
+	DoMove(Axis.X, Axis.Y);
+}
+
 int32 AD1BomberCharacter::GetActiveBombCount()
 {
 	for (int32 i = ActiveBombs.Num() - 1; i >= 0; --i)
@@ -244,6 +317,25 @@ int32 AD1BomberCharacter::GetActiveBombCount()
 		}
 	}
 	return ActiveBombs.Num();
+}
+
+void AD1BomberCharacter::EndInvulnerability()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	bIsInvulnerable = false;
+	OnRep_Invulnerable();
+}
+
+void AD1BomberCharacter::TickBlink()
+{
+	bBlinkVisible = !bBlinkVisible;
+	if (USkeletalMeshComponent* SK = GetMesh())
+	{
+		SK->SetVisibility(bBlinkVisible);
+	}
 }
 
 void AD1BomberCharacter::UpdateIgnoredBombs()
@@ -294,126 +386,33 @@ void AD1BomberCharacter::UpdateIgnoredBombs()
 	}
 }
 
-void AD1BomberCharacter::AddIgnoredBomb(AD1Bomb* Bomb)
+void AD1BomberCharacter::RefreshPlayerStateBinding()
 {
-	/** 서버 전용: 지금 겹치고 있는 폭탄을 등록.
-	 *  같은 셀에 있는 동안 캡슐이 폭탄을 통과시키고,
-	 *  셀을 벗어나면 Tick 정리에서 차단 복원해 재진입 막음. */
-	
-	if (!Bomb)
+	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
+	if (!PS || BoundPlayerState.Get() == PS)
 	{
 		return;
 	}
-	IgnoredBombs.Add(Bomb);
-	if (UCapsuleComponent* Cap = GetCapsuleComponent())
+
+	if (AD1BomberPlayerState* Prev = BoundPlayerState.Get())
 	{
-		Cap->IgnoreActorWhenMoving(Bomb, true);
+		Prev->OnAliveStateChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
+		Prev->OnPlayerNameChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
+	}
+	PS->OnAliveStateChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
+	PS->OnPlayerNameChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
+	BoundPlayerState = PS;
+
+	// BP가 PS 확보 시점을 받게 함 (이름표 UI 등). BeginPlay 전에는 컴포넌트가 아직 init 안 됐을 수 있어
+	// 신호를 미루고, BeginPlay에서 다시 한 번 발화한다.
+	if (HasActorBegunPlay())
+	{
+		OnPlayerStateReady();
+	}
+
+	// 늦게 합류한 클라가 이미 사망 상태를 받았을 때 즉시 반영.
+	if (!PS->bIsAlive)
+	{
+		OnPlayerAliveStateChanged();
 	}
 }
-
-void AD1BomberCharacter::NotifyBombDestroyed(AD1Bomb* Bomb)
-{
-	// 폭탄이 터지면서 호출 — 소유자 슬롯 회수.
-	ActiveBombs.RemoveAll([Bomb](const TWeakObjectPtr<AD1Bomb>& W)
-	{
-		return !W.IsValid() || W.Get() == Bomb;
-	});
-
-	if (Bomb)
-	{
-		IgnoredBombs.Remove(Bomb);
-		if (UCapsuleComponent* Cap = GetCapsuleComponent())
-		{
-			Cap->IgnoreActorWhenMoving(Bomb, false);
-		}
-	}
-}
-
-void AD1BomberCharacter::StartInvulnerability(float Duration)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-	bIsInvulnerable = true;
-	GetWorldTimerManager().SetTimer(InvulnTimerHandle, this,
-		&AD1BomberCharacter::EndInvulnerability, Duration, false);
-	OnRep_Invulnerable();
-}
-
-void AD1BomberCharacter::EndInvulnerability()
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-	bIsInvulnerable = false;
-	OnRep_Invulnerable();
-}
-
-void AD1BomberCharacter::OnRep_Invulnerable()
-{
-	if (bIsInvulnerable)
-	{
-		bBlinkVisible = true;
-		GetWorldTimerManager().SetTimer(BlinkTimerHandle, this,
-			&AD1BomberCharacter::TickBlink, 0.1f, true);
-	}
-	else
-	{
-		GetWorldTimerManager().ClearTimer(BlinkTimerHandle);
-		if (USkeletalMeshComponent* SK = GetMesh())
-		{
-			SK->SetVisibility(true);
-		}
-	}
-}
-
-void AD1BomberCharacter::TickBlink()
-{
-	bBlinkVisible = !bBlinkVisible;
-	if (USkeletalMeshComponent* SK = GetMesh())
-	{
-		SK->SetVisibility(bBlinkVisible);
-	}
-}
-
-void AD1BomberCharacter::HandleDeath()
-{
-	// 사망 정리 (메시 숨김, 충돌 끔)
-	if (USkeletalMeshComponent* SK = GetMesh())
-	{
-		SK->SetVisibility(false);
-	}
-	if (UCapsuleComponent* Cap = GetCapsuleComponent())
-	{
-		Cap->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	}
-	if (UCharacterMovementComponent* Move = GetCharacterMovement())
-	{
-		Move->DisableMovement();
-	}
-	GetWorldTimerManager().ClearTimer(InvulnTimerHandle);
-	GetWorldTimerManager().ClearTimer(BlinkTimerHandle);
-}
-
-void AD1BomberCharacter::DoMove(float Right, float Forward)
-{
-	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (PC && PC->PlayerCameraManager)
-	{
-		const FRotator CamRot = PC->PlayerCameraManager->GetCameraRotation();
-		const FRotator YawOnly(0.f, CamRot.Yaw, 0.f);
-		const FVector Fwd = FRotationMatrix(YawOnly).GetUnitAxis(EAxis::X);
-		const FVector Rgt = FRotationMatrix(YawOnly).GetUnitAxis(EAxis::Y);
-		AddMovementInput(Fwd, Forward);
-		AddMovementInput(Rgt, Right);
-		return;
-	}
-	if (GetController() != nullptr)
-	{
-		AddMovementInput(FVector::ForwardVector, Forward);
-		AddMovementInput(FVector::RightVector, Right);
-	}
-}
-

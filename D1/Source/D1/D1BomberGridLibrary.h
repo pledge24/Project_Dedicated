@@ -21,10 +21,6 @@ class UD1BomberGridLibrary : public UBlueprintFunctionLibrary
 	GENERATED_BODY()
 
 public:
-	static constexpr float CellSize = 100.f;	// 1m
-	static constexpr int32 GridWidth = 13;   // 플레이어블 11 + 외벽 2열 (X=0, X=12)
-	static constexpr int32 GridHeight = 15;  // 플레이어블 13 + 외벽 2행 (Y=0, Y=14)
-
 	UFUNCTION(BlueprintPure, Category = "Bomber|Grid")
 	static FIntPoint WorldToCell(const FVector& WorldLocation);
 
@@ -43,4 +39,8 @@ public:
 
 	/** 클래식 봄버맨 레이아웃 벽 셀 (외벽 + 짝수 좌표 내부 기둥). */
 	static void BuildDefaultWallCells(TArray<FIntPoint>& OutWallCells);
+
+	static constexpr float CellSize = 100.f;	// 1m
+	static constexpr int32 GridWidth = 13;   // 플레이어블 11 + 외벽 2열 (X=0, X=12)
+	static constexpr int32 GridHeight = 15;  // 플레이어블 13 + 외벽 2행 (Y=0, Y=14)
 };

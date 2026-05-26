@@ -24,6 +24,13 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	UFUNCTION(BlueprintPure, Category = "Bomber")
+	bool IsWallCell(const FIntPoint& Cell) const;
+
+	/** 남은 매치 시간(초). 클라/서버 공용. UMG가 Tick에서 폴링용. */
+	UFUNCTION(BlueprintPure, Category = "Bomber|Match")
+	float GetRemainingTimeSec() const;
+
 	UPROPERTY(ReplicatedUsing = OnRep_MatchPhase, BlueprintReadOnly, Category = "Bomber")
 	EBomberMatchPhase MatchPhase;
 
@@ -38,13 +45,6 @@ public:
 	/** 매치 제한 시간(초). 기본 5분. */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Match")
 	float MatchDurationSec;
-
-	UFUNCTION(BlueprintPure, Category = "Bomber")
-	bool IsWallCell(const FIntPoint& Cell) const;
-
-	/** 남은 매치 시간(초). 클라/서버 공용. UMG가 Tick에서 폴링용. */
-	UFUNCTION(BlueprintPure, Category = "Bomber|Match")
-	float GetRemainingTimeSec() const;
 
 protected:
 	UFUNCTION()
