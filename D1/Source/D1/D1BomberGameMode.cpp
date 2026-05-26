@@ -84,7 +84,7 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 		{
 			if (AD1BomberPlayerState* BomberPS = Player->GetPlayerState<AD1BomberPlayerState>())
 			{
-				BomberPS->PlayerSlotIndex = SlotIndex;
+				BomberPS->SetPlayerSlotIndex(SlotIndex);
 				UE_LOG(LogD1, Log, TEXT("Assigned PlayerSlotIndex=%d to %s (Start=%s)"),
 					SlotIndex, *BomberPS->GetPlayerName(), *Start->GetName());
 			}

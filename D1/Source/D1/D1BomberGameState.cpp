@@ -1,7 +1,13 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "D1BomberGameState.h"
+#include "D1BomberPlayerState.h"
 #include "Net/UnrealNetwork.h"
+
+namespace
+{
+	constexpr int32 BomberMaxSlots = 4;
+}
 
 AD1BomberGameState::AD1BomberGameState()
 {
@@ -20,9 +26,47 @@ void AD1BomberGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(AD1BomberGameState, MatchDurationSec);
 }
 
+void AD1BomberGameState::AddPlayerState(APlayerState* PlayerState)
+{
+	Super::AddPlayerState(PlayerState);
+	MarkPlayerCardsDirty();
+}
+
+void AD1BomberGameState::RemovePlayerState(APlayerState* PlayerState)
+{
+	Super::RemovePlayerState(PlayerState);
+	MarkPlayerCardsDirty();
+}
+
+void AD1BomberGameState::MarkPlayerCardsDirty()
+{
+	OnPlayerCardsDirty.Broadcast();
+}
+
 bool AD1BomberGameState::IsWallCell(const FIntPoint& Cell) const
 {
 	return WallCells.Contains(Cell);
+}
+
+TArray<AD1BomberPlayerState*> AD1BomberGameState::GetPlayerStatesBySlot() const
+{
+	TArray<AD1BomberPlayerState*> BySlot;
+	BySlot.Init(nullptr, BomberMaxSlots);
+
+	for (APlayerState* PS : PlayerArray)
+	{
+		AD1BomberPlayerState* BomberPS = Cast<AD1BomberPlayerState>(PS);
+		if (!BomberPS)
+		{
+			continue;
+		}
+		const int32 Idx = BomberPS->PlayerSlotIndex;
+		if (BySlot.IsValidIndex(Idx))
+		{
+			BySlot[Idx] = BomberPS;
+		}
+	}
+	return BySlot;
 }
 
 float AD1BomberGameState::GetRemainingTimeSec() const

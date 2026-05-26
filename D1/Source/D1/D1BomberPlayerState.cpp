@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "D1BomberPlayerState.h"
+#include "D1BomberGameState.h"
 #include "Net/UnrealNetwork.h"
 
 AD1BomberPlayerState::AD1BomberPlayerState()
@@ -40,6 +41,16 @@ bool AD1BomberPlayerState::ApplyHit()
 	return false;
 }
 
+void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	PlayerSlotIndex = NewIndex;
+	OnRep_PlayerSlotIndex(); // Listen Server 자기 자신 갱신
+}
+
 void AD1BomberPlayerState::OnRep_PlayerName()
 {
 	Super::OnRep_PlayerName();
@@ -54,4 +65,18 @@ void AD1BomberPlayerState::OnRep_Lives()
 void AD1BomberPlayerState::OnRep_bIsAlive()
 {
 	OnAliveStateChanged.Broadcast();
+}
+
+void AD1BomberPlayerState::OnRep_PlayerSlotIndex()
+{
+	OnSlotIndexChanged.Broadcast();
+
+	// 컨테이너 위젯이 한 곳에서 카드 전체를 다시 그릴 수 있게 GameState 디스패처도 트리거.
+	if (UWorld* World = GetWorld())
+	{
+		if (AD1BomberGameState* GS = World->GetGameState<AD1BomberGameState>())
+		{
+			GS->MarkPlayerCardsDirty();
+		}
+	}
 }
