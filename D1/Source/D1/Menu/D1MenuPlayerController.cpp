@@ -21,6 +21,7 @@ void AD1MenuPlayerController::BeginPlay()
 		return;
 	}
 
+	ShowBackground();
 	ShowInitialWidgetFromGameMode();
 	ApplyUiOnlyInputMode();
 }
@@ -65,6 +66,21 @@ void AD1MenuPlayerController::ShowInitialWidgetFromGameMode()
 	}
 
 	SwitchToWidget(InitialClass);
+}
+
+void AD1MenuPlayerController::ShowBackground()
+{
+	if (!BackgroundWidgetClass || BackgroundWidget)
+	{
+		return;
+	}
+
+	BackgroundWidget = CreateWidget<UUserWidget>(this, BackgroundWidgetClass);
+	if (BackgroundWidget)
+	{
+		// ZOrder = -1: 어떤 콘텐츠 위젯보다도 항상 뒤에 그려짐
+		BackgroundWidget->AddToViewport(-1);
+	}
 }
 
 void AD1MenuPlayerController::ApplyUiOnlyInputMode()

@@ -10,8 +10,9 @@ class UUserWidget;
 
 /**
  *  메뉴/로비용 PlayerController.
- *  BeginPlay에서 GameMode의 InitialWidgetClass로 위젯을 생성하고
- *  마우스 커서 ON + UI 전용 입력 모드로 전환한다.
+ *  BeginPlay에서 BackgroundWidget(고정 배경)을 깐 뒤
+ *  GameMode의 InitialWidgetClass로 콘텐츠 위젯을 그 위에 띄운다.
+ *  콘텐츠는 SwitchToWidget으로 갈아끼우고, 배경은 그대로 유지된다.
  */
 UCLASS(abstract)
 class AD1MenuPlayerController : public APlayerController
@@ -30,8 +31,16 @@ public:
 
 private:
 	void ShowInitialWidgetFromGameMode();
+	void ShowBackground();
 	void ApplyUiOnlyInputMode();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Menu",
+	          meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UUserWidget> BackgroundWidgetClass;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> CurrentWidget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> BackgroundWidget;
 };
