@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "UI/D1LobbyWidget.h"
+#include "UI/D1UWLobby.h"
 
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
@@ -8,7 +8,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Online/D1GameInstance.h"
 
-void UD1LobbyWidget::NativeConstruct()
+void UD1UWLobby::NativeConstruct()
 {
 	Super::NativeConstruct();
 
@@ -27,17 +27,17 @@ void UD1LobbyWidget::NativeConstruct()
 
 	const FAuthUserDTO& User = GI->GetCurrentUser();
 
-	if (TextBlock_Nickname)
+	if (NicknameLabel)
 	{
-		TextBlock_Nickname->SetText(FText::FromString(User.Nickname));
+		NicknameLabel->SetText(FText::FromString(User.Nickname));
 	}
-	if (TextBlock_Score)
+	if (ScoreLabel)
 	{
-		TextBlock_Score->SetText(FText::AsNumber(User.Score));
+		ScoreLabel->SetText(FText::AsNumber(User.Score));
 	}
-	if (Button_StartMatching)
+	if (StartMatchingButton)
 	{
 		// 다음 슬라이스에서 활성화
-		Button_StartMatching->SetIsEnabled(false);
+		StartMatchingButton->SetIsEnabled(false);
 	}
 }

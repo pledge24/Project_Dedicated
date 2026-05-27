@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "UI/D1RegisterWidget.h"
+#include "UI/D1UWRegister.h"
 
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
@@ -9,21 +9,21 @@
 #include "Online/BackendErrorMessages.h"
 #include "Online/BackendSubsystem.h"
 
-void UD1RegisterWidget::NativeConstruct()
+void UD1UWRegister::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (Button_Register)
+	if (RegisterButton)
 	{
-		Button_Register->OnClicked.AddDynamic(this, &UD1RegisterWidget::OnRegisterClicked);
+		RegisterButton->OnClicked.AddDynamic(this, &UD1UWRegister::OnRegisterClicked);
 	}
-	if (Button_BackToLogin)
+	if (BackToLoginButton)
 	{
-		Button_BackToLogin->OnClicked.AddDynamic(this, &UD1RegisterWidget::OnBackToLoginClicked);
+		BackToLoginButton->OnClicked.AddDynamic(this, &UD1UWRegister::OnBackToLoginClicked);
 	}
 }
 
-void UD1RegisterWidget::OnRegisterClicked()
+void UD1UWRegister::OnRegisterClicked()
 {
 	UBackendSubsystem* Backend = GetGameInstance() ? GetGameInstance()->GetSubsystem<UBackendSubsystem>() : nullptr;
 	if (!Backend)
@@ -33,22 +33,22 @@ void UD1RegisterWidget::OnRegisterClicked()
 		return;
 	}
 
-	const FString LoginId = TextBox_LoginId ? TextBox_LoginId->GetText().ToString() : FString();
-	const FString Password = TextBox_Password ? TextBox_Password->GetText().ToString() : FString();
-	const FString Nickname = TextBox_Nickname ? TextBox_Nickname->GetText().ToString() : FString();
+	const FString LoginId = LoginIdTextBox ? LoginIdTextBox->GetText().ToString() : FString();
+	const FString Password = PasswordTextBox ? PasswordTextBox->GetText().ToString() : FString();
+	const FString Nickname = NicknameTextBox ? NicknameTextBox->GetText().ToString() : FString();
 
 	BeginRequest();
-	if (Button_Register)
+	if (RegisterButton)
 	{
-		Button_Register->SetIsEnabled(false);
+		RegisterButton->SetIsEnabled(false);
 	}
 
 	FOnAuthCompleted Cb;
-	Cb.BindDynamic(this, &UD1RegisterWidget::OnRegisterCompletedInternal);
+	Cb.BindDynamic(this, &UD1UWRegister::OnRegisterCompletedInternal);
 	Backend->Register(LoginId, Password, Nickname, Cb);
 }
 
-void UD1RegisterWidget::OnBackToLoginClicked()
+void UD1UWRegister::OnBackToLoginClicked()
 {
 	if (!LoginWidgetClass)
 	{
@@ -63,11 +63,11 @@ void UD1RegisterWidget::OnBackToLoginClicked()
 	}
 }
 
-void UD1RegisterWidget::OnRegisterCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User)
+void UD1UWRegister::OnRegisterCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User)
 {
-	if (Button_Register)
+	if (RegisterButton)
 	{
-		Button_Register->SetIsEnabled(true);
+		RegisterButton->SetIsEnabled(true);
 	}
 
 	if (!Response.bOk)

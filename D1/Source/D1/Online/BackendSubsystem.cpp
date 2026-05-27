@@ -80,7 +80,7 @@ TSharedRef<IHttpRequest> UBackendSubsystem::BuildPostJson(const FString& Path, c
 
 	if (bAttachAuth)
 	{
-		if (const UD1GameInstance* GI = GetGameInstance<UD1GameInstance>())
+		if (const UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance()))
 		{
 			const FString& Jwt = GI->GetCurrentJwt();
 			if (!Jwt.IsEmpty())
@@ -133,7 +133,7 @@ void UBackendSubsystem::HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr
 			User.Score    = static_cast<int32>((*DataObj)->GetNumberField(TEXT("score")));
 			const FString Token = (*DataObj)->GetStringField(TEXT("token"));
 
-			if (UD1GameInstance* GI = GetGameInstance<UD1GameInstance>())
+			if (UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance()))
 			{
 				GI->SetSession(Token, User);
 			}

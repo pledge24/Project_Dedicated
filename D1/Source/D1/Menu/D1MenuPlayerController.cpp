@@ -15,6 +15,12 @@ void AD1MenuPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// 위젯은 로컬 PC에만 생성. Listen Server의 서버 PC는 LocalPlayer가 없어 AddToViewport 실패.
+	if (!IsLocalController())
+	{
+		return;
+	}
+
 	ShowInitialWidgetFromGameMode();
 	ApplyUiOnlyInputMode();
 }

@@ -3,8 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
-#include "D1AuthWidgetBase.generated.h"
+#include "UI/D1UserWidget.h"
+#include "D1UWAuthBase.generated.h"
 
 class UTextBlock;
 
@@ -14,7 +14,7 @@ class UTextBlock;
  *  자식 위젯은 NativeConstruct에서 버튼 OnClicked 바인딩만 하면 된다.
  */
 UCLASS(abstract)
-class UD1AuthWidgetBase : public UUserWidget
+class UD1UWAuthBase : public UD1UserWidget
 {
 	GENERATED_BODY()
 
@@ -36,6 +36,6 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Auth|Events")
 	void OnRequestFinished(bool bSuccess, const FString& ErrorMessage);
 
-	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UTextBlock> TextBlock_Error;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> ErrorLabel;
 };

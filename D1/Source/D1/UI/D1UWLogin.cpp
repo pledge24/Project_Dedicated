@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "UI/D1LoginWidget.h"
+#include "UI/D1UWLogin.h"
 
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
@@ -10,21 +10,21 @@
 #include "Online/BackendErrorMessages.h"
 #include "Online/BackendSubsystem.h"
 
-void UD1LoginWidget::NativeConstruct()
+void UD1UWLogin::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (Button_Login)
+	if (LoginButton)
 	{
-		Button_Login->OnClicked.AddDynamic(this, &UD1LoginWidget::OnLoginClicked);
+		LoginButton->OnClicked.AddDynamic(this, &UD1UWLogin::OnLoginClicked);
 	}
-	if (Button_GotoRegister)
+	if (GotoRegisterButton)
 	{
-		Button_GotoRegister->OnClicked.AddDynamic(this, &UD1LoginWidget::OnGotoRegisterClicked);
+		GotoRegisterButton->OnClicked.AddDynamic(this, &UD1UWLogin::OnGotoRegisterClicked);
 	}
 }
 
-void UD1LoginWidget::OnLoginClicked()
+void UD1UWLogin::OnLoginClicked()
 {
 	UBackendSubsystem* Backend = GetGameInstance() ? GetGameInstance()->GetSubsystem<UBackendSubsystem>() : nullptr;
 	if (!Backend)
@@ -34,21 +34,21 @@ void UD1LoginWidget::OnLoginClicked()
 		return;
 	}
 
-	const FString LoginId = TextBox_LoginId ? TextBox_LoginId->GetText().ToString() : FString();
-	const FString Password = TextBox_Password ? TextBox_Password->GetText().ToString() : FString();
+	const FString LoginId = LoginIdTextBox ? LoginIdTextBox->GetText().ToString() : FString();
+	const FString Password = PasswordTextBox ? PasswordTextBox->GetText().ToString() : FString();
 
 	BeginRequest();
-	if (Button_Login)
+	if (LoginButton)
 	{
-		Button_Login->SetIsEnabled(false);
+		LoginButton->SetIsEnabled(false);
 	}
 
 	FOnAuthCompleted Cb;
-	Cb.BindDynamic(this, &UD1LoginWidget::OnLoginCompletedInternal);
+	Cb.BindDynamic(this, &UD1UWLogin::OnLoginCompletedInternal);
 	Backend->Login(LoginId, Password, Cb);
 }
 
-void UD1LoginWidget::OnGotoRegisterClicked()
+void UD1UWLogin::OnGotoRegisterClicked()
 {
 	if (!RegisterWidgetClass)
 	{
@@ -63,11 +63,11 @@ void UD1LoginWidget::OnGotoRegisterClicked()
 	}
 }
 
-void UD1LoginWidget::OnLoginCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User)
+void UD1UWLogin::OnLoginCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User)
 {
-	if (Button_Login)
+	if (LoginButton)
 	{
-		Button_Login->SetIsEnabled(true);
+		LoginButton->SetIsEnabled(true);
 	}
 
 	if (!Response.bOk)
