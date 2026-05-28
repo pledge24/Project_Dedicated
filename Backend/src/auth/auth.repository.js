@@ -1,13 +1,13 @@
 // 인증 도메인의 DB 쿼리만 담당 (repository 레이어)
-const { getPool } = require('../common/db');
+import { getPool } from '../common/db.js';
 
-/** @typedef {import('../common/types').UserRow} UserRow */
+/** @typedef {import('../common/types.js').UserRow} UserRow */
 
 /**
  * @param {string} loginId
  * @returns {Promise<UserRow|null>}
  */
-async function findByLoginId(loginId)
+export async function findByLoginId(loginId)
 {
     const [rows] = await getPool().execute(
         'SELECT id, login_id, password_hash, nickname, score FROM users WHERE login_id = ? LIMIT 1',
@@ -20,7 +20,7 @@ async function findByLoginId(loginId)
  * @param {string} nickname
  * @returns {Promise<UserRow|null>}
  */
-async function findByNickname(nickname)
+export async function findByNickname(nickname)
 {
     const [rows] = await getPool().execute(
         'SELECT id, login_id, password_hash, nickname, score FROM users WHERE nickname = ? LIMIT 1',
@@ -33,7 +33,7 @@ async function findByNickname(nickname)
  * @param {{loginId:string, passwordHash:string, nickname:string}} u
  * @returns {Promise<number>} insertId
  */
-async function insertUser({ loginId, passwordHash, nickname })
+export async function insertUser({ loginId, passwordHash, nickname })
 {
     const [result] = await getPool().execute(
         'INSERT INTO users (login_id, password_hash, nickname) VALUES (?, ?, ?)',
@@ -41,5 +41,3 @@ async function insertUser({ loginId, passwordHash, nickname })
     );
     return result.insertId;
 }
-
-module.exports = { findByLoginId, findByNickname, insertUser };

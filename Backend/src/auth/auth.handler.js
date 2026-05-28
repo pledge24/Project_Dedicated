@@ -1,13 +1,13 @@
 // 인증 요청/응답 어댑터 (handler 레이어)
-const service = require('./auth.service');
-const { ok } = require('../common/envelope');
-const { validateLoginId, validatePassword, validateNickname } = require('../common/validate');
+import * as service from './auth.service.js';
+import { ok } from '../common/envelope.js';
+import { validateLoginId, validatePassword, validateNickname } from '../common/validate.js';
 
 /**
  * POST /api/auth/register
  * body: { loginId, password, nickname }
  */
-async function register(req, res, next)
+export async function register(req, res, next)
 {
     try
     {
@@ -29,7 +29,7 @@ async function register(req, res, next)
  * POST /api/auth/login
  * body: { loginId, password }
  */
-async function login(req, res, next)
+export async function login(req, res, next)
 {
     try
     {
@@ -45,5 +45,3 @@ async function login(req, res, next)
         next(err);
     }
 }
-
-module.exports = { register, login };

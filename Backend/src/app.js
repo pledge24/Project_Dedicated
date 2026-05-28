@@ -1,14 +1,14 @@
 // Express 앱 조립: 미들웨어 → 라우터 → 에러 핸들러
-const express = require('express');
+import express from 'express';
 
-const { ok, fail } = require('./common/envelope');
-const { AppError } = require('./common/errors');
-const authRouter = require('./auth/auth.router');
+import { ok, fail } from './common/envelope.js';
+import { AppError, Codes } from './common/errors.js';
+import authRouter from './auth/auth.router.js';
 
 /**
  * @returns {import('express').Express}
  */
-function buildApp()
+export default function buildApp()
 {
     const app = express();
 
@@ -22,7 +22,7 @@ function buildApp()
 
     // 404
     app.use((req, res) => {
-        res.status(404).json(fail('NOT_FOUND', '요청한 경로를 찾을 수 없습니다.'));
+        res.status(Codes.NOT_FOUND.http).json(fail(Codes.NOT_FOUND.code, '요청한 경로를 찾을 수 없습니다.'));
     });
 
     // 에러 미들웨어
@@ -33,10 +33,8 @@ function buildApp()
             return res.status(err.kind.http).json(fail(err.kind.code, err.message));
         }
         console.error('[Unhandled]', err);
-        return res.status(500).json(fail('INTERNAL_ERROR', '서버 오류가 발생했습니다.'));
+        return res.status(Codes.INTERNAL_ERROR.http).json(fail(Codes.INTERNAL_ERROR.code, '서버 오류가 발생했습니다.'));
     });
 
     return app;
 }
-
-module.exports = buildApp;

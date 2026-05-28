@@ -1,12 +1,12 @@
 // 응답 봉투 헬퍼
-/** @typedef {import('./types').BackendResponse} BackendResponse */
+/** @typedef {import('./types.js').BackendResponse} BackendResponse */
 
 /**
  * 성공 응답 만들기.
  * @param {*} data
  * @returns {BackendResponse}
  */
-function ok(data)
+export function ok(data)
 {
     return { ok: true, data };
 }
@@ -17,9 +17,7 @@ function ok(data)
  * @param {string} message
  * @returns {BackendResponse}
  */
-function fail(code, message)
+export function fail(code, message)
 {
     return { ok: false, error: { code, message } };
 }
-
-module.exports = { ok, fail };

@@ -2,6 +2,7 @@
   "name": "d1-backend",
   "version": "0.1.0",
   "description": "D1 봄버맨 백엔드 (인증/매칭/랭킹)",
+  "type": "module",
   "main": "src/index.js",
   "directories": {
     "test": "tests"

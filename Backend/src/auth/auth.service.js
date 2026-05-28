@@ -1,8 +1,8 @@
 // 인증 비즈니스 로직 (service 레이어)
-const repo = require('./auth.repository');
-const passwordUtil = require('../common/password');
-const jwtUtil = require('../common/jwt');
-const { AppError, Codes } = require('../common/errors');
+import * as repo from './auth.repository.js';
+import * as passwordUtil from '../common/password.js';
+import * as jwtUtil from '../common/jwt.js';
+import { AppError, Codes } from '../common/errors.js';
 
 const DEFAULT_SCORE = 1000;
 
@@ -13,7 +13,7 @@ const DEFAULT_SCORE = 1000;
  * @param {string} nickname
  * @returns {Promise<{userId:number, nickname:string, score:number, token:string}>}
  */
-async function register(loginId, password, nickname)
+export async function register(loginId, password, nickname)
 {
     if (await repo.findByLoginId(loginId))
     {
@@ -37,7 +37,7 @@ async function register(loginId, password, nickname)
  * @param {string} password
  * @returns {Promise<{userId:number, nickname:string, score:number, token:string}>}
  */
-async function login(loginId, password)
+export async function login(loginId, password)
 {
     const row = await repo.findByLoginId(loginId);
     // ID/PW 어느 쪽이 틀린지 노출하지 않음 (enumeration 방지)
@@ -49,5 +49,3 @@ async function login(loginId, password)
     const token = jwtUtil.sign({ userId: row.id, nickname: row.nickname });
     return { userId: row.id, nickname: row.nickname, score: row.score, token };
 }
-
-module.exports = { register, login };

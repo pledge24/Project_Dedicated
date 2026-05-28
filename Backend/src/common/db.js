@@ -1,19 +1,21 @@
 // MySQL2 풀 싱글톤
-const mysql = require('mysql2/promise');
+import mysql from 'mysql2/promise';
+
+import { config } from './config.js';
 
 /** @type {import('mysql2/promise').Pool|null} */
 let pool = null;
 
-function getPool()
+export function getPool()
 {
     if (pool) return pool;
 
     pool = mysql.createPool({
-        host: process.env.DB_HOST || '127.0.0.1',
-        port: Number(process.env.DB_PORT) || 3306,
-        user: process.env.DB_USER || 'root',
-        password: process.env.DB_PASS || '',
-        database: process.env.DB_NAME || 'd1',
+        host: config.db.host,
+        port: config.db.port,
+        user: config.db.user,
+        password: config.db.password,
+        database: config.db.name,
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0,
@@ -22,4 +24,11 @@ function getPool()
     return pool;
 }
 
-module.exports = { getPool };
+/** graceful shutdown용 — pool이 있으면 닫고 null로 리셋. */
+export async function closePool()
+{
+    if (!pool) return;
+    const p = pool;
+    pool = null;
+    await p.end();
+}

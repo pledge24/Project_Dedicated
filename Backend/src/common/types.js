@@ -30,4 +30,4 @@
  * @property {number} score
  */
 
-module.exports = {};
+export {};

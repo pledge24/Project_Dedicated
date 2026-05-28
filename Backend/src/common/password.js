@@ -1,5 +1,5 @@
 // bcryptjs 래퍼 (Windows node-gyp 회피)
-const bcrypt = require('bcryptjs');
+import bcrypt from 'bcryptjs';
 
 const ROUNDS = 10;
 
@@ -7,7 +7,7 @@ const ROUNDS = 10;
  * @param {string} plain
  * @returns {Promise<string>} bcrypt 해시
  */
-async function hash(plain)
+export async function hash(plain)
 {
     return bcrypt.hash(plain, ROUNDS);
 }
@@ -17,9 +17,7 @@ async function hash(plain)
  * @param {string} hashed
  * @returns {Promise<boolean>}
  */
-async function verify(plain, hashed)
+export async function verify(plain, hashed)
 {
     return bcrypt.compare(plain, hashed);
 }
-
-module.exports = { hash, verify };

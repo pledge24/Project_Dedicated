@@ -1,5 +1,5 @@
 // 입력 형식 검증. 위반 시 AppError(VALIDATION_FAILED) throw.
-const { AppError, Codes } = require('./errors');
+import { AppError, Codes } from './errors.js';
 
 const RX_LOGIN_ID = /^[A-Za-z0-9_]{4,20}$/;
 const RX_PASSWORD_LEN = /^.{8,64}$/;
@@ -17,7 +17,7 @@ function asString(v)
     return typeof v === 'string' ? v : '';
 }
 
-function validateLoginId(loginId)
+export function validateLoginId(loginId)
 {
     if (!RX_LOGIN_ID.test(asString(loginId)))
     {
@@ -25,7 +25,7 @@ function validateLoginId(loginId)
     }
 }
 
-function validatePassword(password)
+export function validatePassword(password)
 {
     const s = asString(password);
     if (!RX_PASSWORD_LEN.test(s))
@@ -38,7 +38,7 @@ function validatePassword(password)
     }
 }
 
-function validateNickname(nickname)
+export function validateNickname(nickname)
 {
     const s = asString(nickname);
     if (s !== s.trim())
@@ -50,5 +50,3 @@ function validateNickname(nickname)
         throw new AppError(Codes.VALIDATION_FAILED, '닉네임은 한글/영문/숫자 2~12자여야 합니다.');
     }
 }
-
-module.exports = { validateLoginId, validatePassword, validateNickname };
