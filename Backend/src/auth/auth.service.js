@@ -4,8 +4,6 @@ import * as passwordUtil from '../common/password.js';
 import * as jwtUtil from '../common/jwt.js';
 import { AppError, Codes } from '../common/errors.js';
 
-const DEFAULT_SCORE = 1000;
-
 // 가입 직후 자동 로그인을 막기 위해 register는 토큰을 발급하지 않는다.
 // 클라는 별도로 /api/auth/login을 호출해 세션을 시작한다.
 /**
@@ -13,7 +11,7 @@ const DEFAULT_SCORE = 1000;
  * @param {string} loginId
  * @param {string} password
  * @param {string} nickname
- * @returns {Promise<{userId:number, nickname:string, score:number}>}
+ * @returns {Promise<{userId:number, nickname:string, score:number, level:number, exp:number}>}
  */
 export async function register(loginId, password, nickname)
 {
@@ -29,14 +27,22 @@ export async function register(loginId, password, nickname)
     const passwordHash = await passwordUtil.hash(password);
     const userId = await repo.insertUser({ loginId, passwordHash, nickname });
 
-    return { userId, nickname, score: DEFAULT_SCORE };
+    // 단일 진실: DB의 DEFAULT가 변하면 응답도 자동 반영되도록 SELECT.
+    const profile = await repo.findProfileByUserId(userId);
+    return {
+        userId,
+        nickname,
+        score: profile.score,
+        level: profile.level,
+        exp:   profile.exp,
+    };
 }
 
 /**
  * 로그인.
  * @param {string} loginId
  * @param {string} password
- * @returns {Promise<{userId:number, nickname:string, score:number, token:string}>}
+ * @returns {Promise<{userId:number, nickname:string, score:number, level:number, exp:number, token:string}>}
  */
 export async function login(loginId, password)
 {
@@ -47,6 +53,14 @@ export async function login(loginId, password)
         throw new AppError(Codes.INVALID_CREDENTIALS, 'ID 또는 비밀번호가 일치하지 않습니다.');
     }
 
+    const profile = await repo.findProfileByUserId(row.id);
     const token = jwtUtil.sign({ userId: row.id, nickname: row.nickname });
-    return { userId: row.id, nickname: row.nickname, score: row.score, token };
+    return {
+        userId:   row.id,
+        nickname: row.nickname,
+        score:    profile.score,
+        level:    profile.level,
+        exp:      profile.exp,
+        token,
+    };
 }

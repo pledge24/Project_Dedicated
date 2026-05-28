@@ -138,6 +138,10 @@ void UBackendSubsystem::HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr
 			User.Nickname = (*DataObj)->GetStringField(TEXT("nickname"));
 			User.Score    = static_cast<int32>((*DataObj)->GetNumberField(TEXT("score")));
 
+			// level/exp는 register/login 둘 다 응답에 포함. 미존재 시 기본값 유지.
+			(*DataObj)->TryGetNumberField(TEXT("level"), User.Level);
+			(*DataObj)->TryGetNumberField(TEXT("exp"),   User.Exp);
+
 			// register 응답은 token이 없다 (서버가 가입 직후 자동 로그인을 막음).
 			// token이 비어있으면 세션을 만들지 않고, 클라는 별도로 Login을 호출해야 한다.
 			FString Token;

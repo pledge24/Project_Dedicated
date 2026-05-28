@@ -34,6 +34,12 @@ struct FAuthUserDTO
 
 	UPROPERTY(BlueprintReadOnly, Category = "Backend")
 	int32 Score = 1000;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Level = 1;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Exp = 0;
 };
 
 /** 백엔드 응답 결과. 성공 여부 + 실패 시 코드/메시지. */
