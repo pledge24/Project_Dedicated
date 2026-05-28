@@ -22,6 +22,13 @@
  */
 
 /**
+ * @typedef {Object} RegisterResultDTO
+ * @property {number} userId
+ * @property {string} nickname
+ * @property {number} score
+ */
+
+/**
  * @typedef {Object} UserRow
  * @property {number} id
  * @property {string} login_id

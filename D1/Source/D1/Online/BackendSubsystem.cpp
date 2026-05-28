@@ -137,11 +137,18 @@ void UBackendSubsystem::HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr
 			User.UserId   = static_cast<int32>((*DataObj)->GetNumberField(TEXT("userId")));
 			User.Nickname = (*DataObj)->GetStringField(TEXT("nickname"));
 			User.Score    = static_cast<int32>((*DataObj)->GetNumberField(TEXT("score")));
-			const FString Token = (*DataObj)->GetStringField(TEXT("token"));
 
-			if (UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance()))
+			// register 응답은 token이 없다 (서버가 가입 직후 자동 로그인을 막음).
+			// token이 비어있으면 세션을 만들지 않고, 클라는 별도로 Login을 호출해야 한다.
+			FString Token;
+			(*DataObj)->TryGetStringField(TEXT("token"), Token);
+
+			if (!Token.IsEmpty())
 			{
-				GI->SetSession(Token, User);
+				if (UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance()))
+				{
+					GI->SetSession(Token, User);
+				}
 			}
 
 			Out.bOk = true;

@@ -6,12 +6,14 @@ import { AppError, Codes } from '../common/errors.js';
 
 const DEFAULT_SCORE = 1000;
 
+// 가입 직후 자동 로그인을 막기 위해 register는 토큰을 발급하지 않는다.
+// 클라는 별도로 /api/auth/login을 호출해 세션을 시작한다.
 /**
  * 회원가입.
  * @param {string} loginId
  * @param {string} password
  * @param {string} nickname
- * @returns {Promise<{userId:number, nickname:string, score:number, token:string}>}
+ * @returns {Promise<{userId:number, nickname:string, score:number}>}
  */
 export async function register(loginId, password, nickname)
 {
@@ -26,9 +28,8 @@ export async function register(loginId, password, nickname)
 
     const passwordHash = await passwordUtil.hash(password);
     const userId = await repo.insertUser({ loginId, passwordHash, nickname });
-    const token = jwtUtil.sign({ userId, nickname });
 
-    return { userId, nickname, score: DEFAULT_SCORE, token };
+    return { userId, nickname, score: DEFAULT_SCORE };
 }
 
 /**
