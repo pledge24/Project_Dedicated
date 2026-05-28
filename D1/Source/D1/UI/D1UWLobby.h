@@ -8,6 +8,7 @@
 
 class UButton;
 class UTextBlock;
+class UVerticalBox;
 
 /**
  *  로비 위젯.
@@ -24,14 +25,30 @@ protected:
 	//~ UUserWidget
 	virtual void NativeConstruct() override;
 
+	//~ 버튼 핸들러
+	UFUNCTION()
+	void OnStartMatchingClicked();
+
+	UFUNCTION()
+	void OnCancelMatchingClicked();
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> NicknameLabel;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> LevelLabel;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> ScoreLabel;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UButton> StartMatchingButton;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UVerticalBox> MatchStatusPanel;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UButton> CancelMatchingButton;
 
 private:
 	/** 비로그인 시 복귀할 맵 — 디테일 패널에서 MP_Frontend 지정. */
