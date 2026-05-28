@@ -6,6 +6,7 @@
 #include "HttpModule.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Online/D1GameInstance.h"
+#include "Online/D1OnlineSettings.h"
 #include "Policies/CondensedJsonPrintPolicy.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
@@ -14,12 +15,17 @@
 void UBackendSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
-	UE_LOG(LogD1, Log, TEXT("[Backend] Subsystem 초기화 (BaseUrl=%s)"), *BaseUrl);
+	UE_LOG(LogD1, Log, TEXT("[Backend] Subsystem 초기화 (BaseUrl=%s)"), *GetBaseUrl());
 }
 
 void UBackendSubsystem::Deinitialize()
 {
 	Super::Deinitialize();
+}
+
+const FString& UBackendSubsystem::GetBaseUrl() const
+{
+	return GetDefault<UD1OnlineSettings>()->BaseUrl;
 }
 
 void UBackendSubsystem::Register(const FString& LoginId, const FString& Password, const FString& Nickname, const FOnAuthCompleted& OnCompleted)
@@ -73,7 +79,7 @@ TSharedRef<IHttpRequest> UBackendSubsystem::BuildPostJson(const FString& Path, c
 	FJsonSerializer::Serialize(Body, Writer);
 
 	const TSharedRef<IHttpRequest> Request = FHttpModule::Get().CreateRequest();
-	Request->SetURL(BaseUrl + Path);
+	Request->SetURL(GetBaseUrl() + Path);
 	Request->SetVerb(TEXT("POST"));
 	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json; charset=utf-8"));
 	Request->SetContentAsString(Serialized);

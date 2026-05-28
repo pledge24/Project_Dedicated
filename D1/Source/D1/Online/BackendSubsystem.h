@@ -33,15 +33,11 @@ public:
 	void Login(const FString& LoginId, const FString& Password, const FOnAuthCompleted& OnCompleted);
 
 	UFUNCTION(BlueprintCallable, Category = "Backend")
-	const FString& GetBaseUrl() const { return BaseUrl; }
+	const FString& GetBaseUrl() const;
 
 private:
 	//~ 내부 헬퍼
 	TSharedRef<IHttpRequest> BuildPostJson(const FString& Path, const TSharedRef<FJsonObject>& Body, bool bAttachAuth) const;
 	void HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded, FOnAuthCompleted Forward);
 	static EBackendErrorCode ParseErrorCode(const FString& CodeStr);
-
-	//~ 설정 데이터 (디테일 패널에서 dev/prod 전환)
-	UPROPERTY(EditDefaultsOnly, Category = "Backend", meta = (AllowPrivateAccess = "true"))
-	FString BaseUrl = TEXT("http://127.0.0.1:3000");
 };

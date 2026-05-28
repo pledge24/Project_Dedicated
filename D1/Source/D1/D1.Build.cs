@@ -22,7 +22,8 @@ public class D1 : ModuleRules
 			"HTTP",
 			"WebSockets",
 			"Json",
-			"JsonUtilities"
+			"JsonUtilities",
+			"DeveloperSettings"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
