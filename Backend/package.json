@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "db:init": "\"C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe\" -u root -p < src/common/db.sql"
+    "db:init": "node scripts/db-init.js"
   },
   "keywords": [],
   "author": "",

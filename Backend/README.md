@@ -7,10 +7,11 @@
 1. **MySQL 비밀번호 설정** — `Backend/.env` 의 `DB_PASS=` 에 로컬 MySQL `root` 비밀번호를 적는다.
 2. **JWT 시크릿 교체** — `JWT_SECRET=` 을 32바이트 이상의 임의 문자열로 바꾼다.
 3. **DB 스키마 적용** (한 번만):
-   ```
-   npm run db:init
-   ```
-   MySQL `root` 비밀번호 입력 프롬프트가 뜬다. `d1` 데이터베이스 + `users` 테이블 생성.
+   - 사전: `d1` 데이터베이스를 미리 만들어 둔다.
+     ```sql
+     CREATE DATABASE d1 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+     ```
+   - `npm run db:init` — `users` 테이블 생성. `.env`의 `DB_PASS`를 자동으로 사용한다.
 4. **서버 실행**:
    ```
    npm run dev   # nodemon (변경 자동 재시작)

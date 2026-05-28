@@ -4,3 +4,6 @@
 # Node (루트 .gitignore에도 있지만 명시적으로 둠)
 node_modules/
 *.log
+
+# 로컬 검증/디버그 산출물 (PID 파일, probe 스크립트 등)
+.dev-logs/

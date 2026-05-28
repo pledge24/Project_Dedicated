@@ -1,11 +1,6 @@
--- D1 백엔드 v1 스키마
--- 적용: npm run db:init  (root 비밀번호 입력)
-
-CREATE DATABASE IF NOT EXISTS d1
-  DEFAULT CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
-USE d1;
+-- D1 백엔드 v1 스키마 — users 테이블만.
+-- d1 데이터베이스는 사전에 존재한다고 가정. db:init 스크립트가 .env의 DB_NAME으로 접속한다.
+-- 적용: npm run db:init
 
 -- 유저 테이블
 CREATE TABLE IF NOT EXISTS users (
