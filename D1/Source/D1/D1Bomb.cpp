@@ -210,6 +210,7 @@ void AD1Bomb::DoExplode()
 			else
 			{
 				BC->StartInvulnerability(2.0f);
+				BC->ApplyHitStun();
 			}
 		}
 	}

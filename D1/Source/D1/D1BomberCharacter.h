@@ -8,6 +8,8 @@
 
 class AD1Bomb;
 class AD1BomberPlayerState;
+class UAnimMontage;
+class UAnimSequenceBase;
 class UInputAction;
 class UInputComponent;
 struct FInputActionValue;
@@ -40,6 +42,10 @@ public:
 	 *		Server Only
 	 * ---------------------*/
 	void StartInvulnerability(float Duration);
+
+	/** 서버 전용: 피격 경직(조작 불가) 시작. StunDuration 동안 입력 차단. */
+	void ApplyHitStun();
+
 	void NotifyBombDestroyed(AD1Bomb* Bomb);
 	void AddIgnoredBomb(AD1Bomb* Bomb);
 
@@ -81,6 +87,12 @@ private:
 	/** PossessedBy / OnRep_PlayerState 양쪽에서 호출. PS 확보되면 OnAliveStateChanged 바인딩. */
 	void RefreshPlayerStateBinding();
 
+	/** 사망 연출(깜빡임+몽타주) 종료 후 메시를 숨긴다. 타이머 콜백. */
+	void FinishDeath();
+
+	/** 경직 해제. 타이머 콜백(서버). */
+	void EndStun();
+
 	UPROPERTY(EditAnywhere, Category = "Input")
 	TObjectPtr<UInputAction> MoveAction;
 
@@ -90,15 +102,37 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	TSubclassOf<AD1Bomb> BombClass;
 
+	/** 사망 시 재생할 몽타주(Mixamo 리타게팅 결과). Auto Blend Out=off 권장. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
+	TObjectPtr<UAnimMontage> DeathMontage;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber", meta = (ClampMin = "1"))
 	int32 MaxBombCount = 1;
+
+	/** 사망 애니 종료 후 메시를 숨기기까지의 추가 대기(초). */
+	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
+	float DeathHideDelay = 1.0f;
+
+	/** 피격 시 재생할 애니메이션. DefaultSlot에 동적 몽타주로 재생. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
+	TObjectPtr<UAnimSequenceBase> HitAnim;
+
+	/** 피격 경직(조작 불가) 지속 시간(초). */
+	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
+	float StunDuration = 1.0f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_Invulnerable, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	bool bIsInvulnerable;
 
+	UPROPERTY(Replicated)
+	bool bStunned = false;
+
 	FTimerHandle InvulnTimerHandle;
 	FTimerHandle BlinkTimerHandle;
+	FTimerHandle DeathHideTimerHandle;
+	FTimerHandle StunTimerHandle;
 	bool bBlinkVisible;
+	bool bDeathHandled = false;
 
 	/** 현재 바인딩된 PlayerState. 재바인딩 시 중복 방지/이전 핸들러 제거용. */
 	TWeakObjectPtr<AD1BomberPlayerState> BoundPlayerState;

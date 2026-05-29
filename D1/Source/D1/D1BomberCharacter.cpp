@@ -1,8 +1,12 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "D1BomberCharacter.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Animation/AnimSequenceBase.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/WidgetComponent.h"
 #include "EngineUtils.h"
 #include "EnhancedInputComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -91,6 +95,7 @@ void AD1BomberCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AD1BomberCharacter, bIsInvulnerable);
+	DOREPLIFETIME(AD1BomberCharacter, bStunned);
 }
 
 void AD1BomberCharacter::PossessedBy(AController* NewController)
@@ -107,6 +112,11 @@ void AD1BomberCharacter::OnRep_PlayerState()
 
 void AD1BomberCharacter::DoMove(float Right, float Forward)
 {
+	if (bStunned)
+	{
+		return;
+	}
+
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (PC && PC->PlayerCameraManager)
 	{
@@ -127,11 +137,13 @@ void AD1BomberCharacter::DoMove(float Right, float Forward)
 
 void AD1BomberCharacter::HandleDeath()
 {
-	// 사망 정리 (메시 숨김, 충돌 끔)
-	if (USkeletalMeshComponent* SK = GetMesh())
+	if (bDeathHandled)
 	{
-		SK->SetVisibility(false);
+		return;
 	}
+	bDeathHandled = true;
+
+	// 충돌·이동 즉시 정지.
 	if (UCapsuleComponent* Cap = GetCapsuleComponent())
 	{
 		Cap->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -140,8 +152,44 @@ void AD1BomberCharacter::HandleDeath()
 	{
 		Move->DisableMovement();
 	}
+
+	// 머리 위 이름표(Screen Space 위젯)는 SetVisibility로 꺼야 한다.
+	TArray<UWidgetComponent*> WidgetComps;
+	GetComponents<UWidgetComponent>(WidgetComps);
+	for (UWidgetComponent* WC : WidgetComps)
+	{
+		WC->SetVisibility(false);
+	}
+
+	// 무적 타이머 중단 — 죽은 뒤 EndInvulnerability가 메시를 다시 켜는 사고 방지.
 	GetWorldTimerManager().ClearTimer(InvulnTimerHandle);
-	GetWorldTimerManager().ClearTimer(BlinkTimerHandle);
+
+	// 사망 연출: 피격처럼 깜빡이게 하고 사망 몽타주 재생.
+	bBlinkVisible = true;
+	if (USkeletalMeshComponent* SK = GetMesh())
+	{
+		SK->SetVisibility(true);
+	}
+	GetWorldTimerManager().SetTimer(BlinkTimerHandle, this,
+		&AD1BomberCharacter::TickBlink, 0.1f, true);
+
+	// 몽타주는 각 인스턴스에서 로컬 재생(HandleDeath가 서버·클라 양쪽에서 불림 → RPC 불필요).
+	float HideAfter = DeathHideDelay;
+	if (DeathMontage)
+	{
+		if (UAnimInstance* AnimInst = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+		{
+			const float MontageLen = AnimInst->Montage_Play(DeathMontage);
+			if (MontageLen > 0.f)
+			{
+				HideAfter = MontageLen + DeathHideDelay;
+			}
+		}
+	}
+
+	// 사망 애니 종료 + 딜레이 후 메시 숨김.
+	GetWorldTimerManager().SetTimer(DeathHideTimerHandle, this,
+		&AD1BomberCharacter::FinishDeath, HideAfter, false);
 }
 
 void AD1BomberCharacter::StartInvulnerability(float Duration)
@@ -154,6 +202,17 @@ void AD1BomberCharacter::StartInvulnerability(float Duration)
 	GetWorldTimerManager().SetTimer(InvulnTimerHandle, this,
 		&AD1BomberCharacter::EndInvulnerability, Duration, false);
 	OnRep_Invulnerable();
+}
+
+void AD1BomberCharacter::ApplyHitStun()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	bStunned = true;
+	GetWorldTimerManager().SetTimer(StunTimerHandle, this,
+		&AD1BomberCharacter::EndStun, StunDuration, false);
 }
 
 void AD1BomberCharacter::NotifyBombDestroyed(AD1Bomb* Bomb)
@@ -194,6 +253,10 @@ void AD1BomberCharacter::AddIgnoredBomb(AD1Bomb* Bomb)
 void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 {
 	if (!HasAuthority())
+	{
+		return;
+	}
+	if (bStunned)
 	{
 		return;
 	}
@@ -268,6 +331,16 @@ void AD1BomberCharacter::OnRep_Invulnerable()
 {
 	if (bIsInvulnerable)
 	{
+		// 피격 리액션: AS_HitBomb를 DefaultSlot에 동적 몽타주로 재생.
+		// invuln 복제로 모든 인스턴스에서 OnRep_Invulnerable이 불려 함께 재생됨.
+		if (HitAnim && !bDeathHandled)
+		{
+			if (UAnimInstance* AnimInst = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+			{
+				AnimInst->PlaySlotAnimationAsDynamicMontage(HitAnim, TEXT("DefaultSlot"));
+			}
+		}
+
 		bBlinkVisible = true;
 		GetWorldTimerManager().SetTimer(BlinkTimerHandle, this,
 			&AD1BomberCharacter::TickBlink, 0.1f, true);
@@ -415,4 +488,18 @@ void AD1BomberCharacter::RefreshPlayerStateBinding()
 	{
 		OnPlayerAliveStateChanged();
 	}
+}
+
+void AD1BomberCharacter::FinishDeath()
+{
+	GetWorldTimerManager().ClearTimer(BlinkTimerHandle);
+	if (USkeletalMeshComponent* SK = GetMesh())
+	{
+		SK->SetVisibility(false);
+	}
+}
+
+void AD1BomberCharacter::EndStun()
+{
+	bStunned = false;
 }
