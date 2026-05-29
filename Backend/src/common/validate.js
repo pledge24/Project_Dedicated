@@ -1,11 +1,11 @@
 // 입력 형식 검증. 위반 시 AppError(VALIDATION_FAILED) throw.
 import { AppError, Codes } from './errors.js';
 
-const RX_LOGIN_ID = /^[A-Za-z0-9_]{4,20}$/;
-const RX_PASSWORD_LEN = /^.{8,64}$/;
-const RX_PASSWORD_HAS_LETTER = /[A-Za-z]/;
-const RX_PASSWORD_HAS_DIGIT = /[0-9]/;
-// 한글(가-힣) + 영문 + 숫자 + 단일 공백 없음. 2~12자.
+// 소문자 시작, 영소문자/숫자/_ 4~16자. 입력은 normalizeLoginId로 소문자 정규화 후 검증.
+const RX_LOGIN_ID = /^[a-z][a-z0-9_]{3,15}$/;
+// 출력 가능 ASCII(공백 포함) 8~64자. 복잡도(영문/숫자 혼합) 강제 안 함.
+const RX_PASSWORD = /^[\x20-\x7E]{8,64}$/;
+// 완성형 한글(가-힣) + 영문 + 숫자, 2~12자.
 const RX_NICKNAME = /^[가-힣A-Za-z0-9]{2,12}$/;
 
 /**
@@ -17,24 +17,30 @@ function asString(v)
     return typeof v === 'string' ? v : '';
 }
 
+/**
+ * loginId를 저장/검증 전에 소문자로 정규화. 문자열이 아니면 그대로 반환(검증에서 걸림).
+ * register/login 양쪽 핸들러에서 호출해 대소문자 차이로 같은 계정이 갈리지 않게 한다.
+ * @param {*} v
+ * @returns {*}
+ */
+export function normalizeLoginId(v)
+{
+    return typeof v === 'string' ? v.toLowerCase() : v;
+}
+
 export function validateLoginId(loginId)
 {
     if (!RX_LOGIN_ID.test(asString(loginId)))
     {
-        throw new AppError(Codes.VALIDATION_FAILED, 'ID는 영문/숫자/_ 조합으로 4~20자여야 합니다.');
+        throw new AppError(Codes.VALIDATION_FAILED, 'ID는 소문자로 시작하는 영소문자/숫자/_ 조합 4~16자여야 합니다.');
     }
 }
 
 export function validatePassword(password)
 {
-    const s = asString(password);
-    if (!RX_PASSWORD_LEN.test(s))
+    if (!RX_PASSWORD.test(asString(password)))
     {
-        throw new AppError(Codes.VALIDATION_FAILED, '비밀번호는 8~64자여야 합니다.');
-    }
-    if (!RX_PASSWORD_HAS_LETTER.test(s) || !RX_PASSWORD_HAS_DIGIT.test(s))
-    {
-        throw new AppError(Codes.VALIDATION_FAILED, '비밀번호는 영문자와 숫자를 각각 1자 이상 포함해야 합니다.');
+        throw new AppError(Codes.VALIDATION_FAILED, '비밀번호는 공백 포함 출력 가능한 ASCII 8~64자여야 합니다.');
     }
 }
 

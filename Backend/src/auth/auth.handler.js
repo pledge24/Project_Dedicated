@@ -1,7 +1,7 @@
 // 인증 요청/응답 어댑터 (handler 레이어)
 import * as service from './auth.service.js';
 import { ok } from '../common/envelope.js';
-import { validateLoginId, validatePassword, validateNickname } from '../common/validate.js';
+import { normalizeLoginId, validateLoginId, validatePassword, validateNickname } from '../common/validate.js';
 
 /**
  * POST /api/auth/register
@@ -11,7 +11,9 @@ export async function register(req, res, next)
 {
     try
     {
-        const { loginId, password, nickname } = req.body || {};
+        const body = req.body || {};
+        const loginId = normalizeLoginId(body.loginId);
+        const { password, nickname } = body;
         validateLoginId(loginId);
         validatePassword(password);
         validateNickname(nickname);
@@ -33,7 +35,9 @@ export async function login(req, res, next)
 {
     try
     {
-        const { loginId, password } = req.body || {};
+        const body = req.body || {};
+        const loginId = normalizeLoginId(body.loginId);
+        const { password } = body;
         validateLoginId(loginId);
         validatePassword(password);
 
