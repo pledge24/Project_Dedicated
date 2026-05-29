@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
+#include "D1MatchTypes.h"
 #include "D1BomberGameState.generated.h"
 
 class APlayerState;
@@ -18,6 +19,7 @@ enum class EBomberMatchPhase : uint8
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerCardsDirty);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMatchFinished);
 
 UCLASS()
 class AD1BomberGameState : public AGameStateBase
@@ -51,6 +53,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Bomber|Events")
 	void MarkPlayerCardsDirty();
 
+	/** 서버 전용: 최종 결과 스냅샷을 설정하고 OnMatchFinished를 알린다(리슨 서버 자기 클라 포함). */
+	void SetFinalResults(const TArray<FD1MatchResultEntry>& InResults);
+
 	/**-------------------
 	 *	    API Data
 	 *-------------------*/
@@ -59,6 +64,10 @@ public:
 	 *  PlayerCardContainer 위젯이 Construct에서 한 번만 구독하고, 콜백에서 전체 PlayerArray를 재스캔. */
 	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
 	FOnPlayerCardsDirty OnPlayerCardsDirty;
+
+	/** 매치 종료 + 결과 스냅샷 도착 시 1회 브로드캐스트. PC가 결과 위젯 표시용으로 구독. */
+	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
+	FOnMatchFinished OnMatchFinished;
 
 	UPROPERTY(ReplicatedUsing = OnRep_MatchPhase, BlueprintReadOnly, Category = "Bomber")
 	EBomberMatchPhase MatchPhase;
@@ -75,7 +84,14 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Match")
 	float MatchDurationSec;
 
+	/** 매치 종료 시 서버가 한 번 채우는 최종 결과(등수 포함). 단일 배열로 원자 복제. */
+	UPROPERTY(ReplicatedUsing = OnRep_FinalResults, BlueprintReadOnly, Category = "Bomber|Match")
+	TArray<FD1MatchResultEntry> FinalResults;
+
 protected:
 	UFUNCTION()
 	void OnRep_MatchPhase();
+
+	UFUNCTION()
+	void OnRep_FinalResults();
 };

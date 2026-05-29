@@ -24,6 +24,7 @@ void AD1BomberGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(AD1BomberGameState, WallCells);
 	DOREPLIFETIME(AD1BomberGameState, MatchStartServerTime);
 	DOREPLIFETIME(AD1BomberGameState, MatchDurationSec);
+	DOREPLIFETIME(AD1BomberGameState, FinalResults);
 }
 
 void AD1BomberGameState::AddPlayerState(APlayerState* PlayerState)
@@ -87,7 +88,23 @@ void AD1BomberGameState::MarkPlayerCardsDirty()
 	OnPlayerCardsDirty.Broadcast();
 }
 
+void AD1BomberGameState::SetFinalResults(const TArray<FD1MatchResultEntry>& InResults)
+{
+	FinalResults = InResults;
+
+	// OnRep은 서버 자신에게 안 불리므로(리슨 서버) 수동 브로드캐스트.
+	if (HasAuthority())
+	{
+		OnMatchFinished.Broadcast();
+	}
+}
+
 void AD1BomberGameState::OnRep_MatchPhase()
 {
 	// 클라측 반응 자리 (UI, 입력 차단 등).
+}
+
+void AD1BomberGameState::OnRep_FinalResults()
+{
+	OnMatchFinished.Broadcast();
 }

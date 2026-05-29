@@ -169,6 +169,26 @@ void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS)
 			PC->DisableInput(PC);
 		}
 	}
+
+	// 최종 결과 스냅샷: 흩어진 PlayerState.Placement 대신 한 배열로 묶어 원자 복제(액터 간 순서 미보장 회피).
+	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
+	{
+		TArray<FD1MatchResultEntry> Entries;
+		Entries.Reserve(GS->PlayerArray.Num());
+		for (APlayerState* PS : GS->PlayerArray)
+		{
+			if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
+			{
+				FD1MatchResultEntry Entry;
+				Entry.Placement = B->Placement;
+				Entry.Nickname  = B->GetPlayerName();
+				Entry.SlotIndex = B->PlayerSlotIndex;
+				Entry.LivesLeft = B->Lives;
+				Entries.Add(Entry);
+			}
+		}
+		GS->SetFinalResults(Entries);
+	}
 }
 
 void AD1BomberGameMode::EnsureAliveListInitialized()
