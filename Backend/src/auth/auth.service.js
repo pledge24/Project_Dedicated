@@ -64,3 +64,26 @@ export async function login(loginId, password)
         token,
     };
 }
+
+/**
+ * 현재 사용자 프로필 조회. 토큰 검증(requireAuth) 통과 후 호출된다.
+ * @param {number} userId 토큰 클레임의 user id
+ * @param {string} nickname 토큰 클레임의 닉네임
+ * @returns {Promise<{userId:number, nickname:string, score:number, level:number, exp:number}>}
+ */
+export async function getMe(userId, nickname)
+{
+    const profile = await repo.findProfileByUserId(userId);
+    // 토큰은 유효하지만 계정이 사라진 경우 (삭제 등)
+    if (!profile)
+    {
+        throw new AppError(Codes.NOT_FOUND, '사용자 정보를 찾을 수 없습니다.');
+    }
+    return {
+        userId,
+        nickname,
+        score: profile.score,
+        level: profile.level,
+        exp:   profile.exp,
+    };
+}

@@ -45,3 +45,21 @@ export async function login(req, res, next)
         next(err);
     }
 }
+
+/**
+ * GET /api/auth/me  (requireAuth 보호)
+ * 저장된 토큰의 유효성 확인 + 최신 프로필(score/level/exp) 반환.
+ */
+export async function me(req, res, next)
+{
+    try
+    {
+        const { userId, nickname } = req.user;
+        const data = await service.getMe(userId, nickname);
+        res.json(ok(data));
+    }
+    catch (err)
+    {
+        next(err);
+    }
+}

@@ -14,6 +14,13 @@
  */
 
 /**
+ * 인증 미들웨어가 req.user에 주입하는 토큰 클레임.
+ * @typedef {Object} AuthedUser
+ * @property {number} userId
+ * @property {string} nickname
+ */
+
+/**
  * @typedef {Object} AuthUserDTO
  * @property {number} userId
  * @property {string} nickname

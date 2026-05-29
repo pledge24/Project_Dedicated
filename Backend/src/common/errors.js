@@ -3,6 +3,9 @@
 export const Codes = Object.freeze({
     VALIDATION_FAILED:   { http: 400, code: 'VALIDATION_FAILED' },
     INVALID_CREDENTIALS: { http: 401, code: 'INVALID_CREDENTIALS' },
+    AUTH_REQUIRED:       { http: 401, code: 'AUTH_REQUIRED' },
+    TOKEN_EXPIRED:       { http: 401, code: 'TOKEN_EXPIRED' },
+    INVALID_TOKEN:       { http: 401, code: 'INVALID_TOKEN' },
     NOT_FOUND:           { http: 404, code: 'NOT_FOUND' },
     DUPLICATE_LOGIN_ID:  { http: 409, code: 'DUPLICATE_LOGIN_ID' },
     DUPLICATE_NICKNAME:  { http: 409, code: 'DUPLICATE_NICKNAME' },

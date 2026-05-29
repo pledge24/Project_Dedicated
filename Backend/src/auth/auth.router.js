@@ -3,6 +3,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 
 import * as handler from './auth.handler.js';
+import { requireAuth } from '../common/authMiddleware.js';
 import { fail } from '../common/envelope.js';
 import { Codes } from '../common/errors.js';
 import { config } from '../common/config.js';
@@ -33,5 +34,6 @@ const router = express.Router();
 
 router.post('/register', registerLimiter, handler.register);
 router.post('/login',    loginLimiter,    handler.login);
+router.get('/me',        requireAuth,     handler.me);
 
 export default router;
