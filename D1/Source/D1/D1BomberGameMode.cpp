@@ -203,7 +203,9 @@ void AD1BomberGameMode::EnsureAliveListInitialized()
 		{
 			if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
 			{
-				if (B->bIsAlive)
+				// ApplyHit가 NotifyPlayerDied보다 먼저 bIsAlive를 꺼서, 첫 사망자가
+				// 누락되면 등수가 1 모자람. 미랭크(Placement<=0) 기준으로 전원 포함.
+				if (B->Placement <= 0)
 				{
 					AlivePlayerStates.Add(B);
 				}
