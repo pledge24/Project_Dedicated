@@ -31,6 +31,8 @@ function validateJwtSecret(v: string, name: string): void
 }
 
 export const config = Object.freeze({
+    nodeEnv: process.env.NODE_ENV || 'development',
+    logLevel: process.env.LOG_LEVEL || 'info',
     port: asNumber('PORT', 3000),
     db: Object.freeze({
         host: process.env.DB_HOST || '127.0.0.1',
