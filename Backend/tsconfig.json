@@ -1,0 +1,18 @@
+{
+  // 전면 TS 전환. tsx 로 빌드 없이 실행하고, tsc 는 타입검사(typecheck)·운영 빌드(build)에 쓴다.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+
+    // 엄격 검사 묶음(널 체크·암묵 any·catch unknown 등) 전부 켠다.
+    "strict": true,
+
+    // 라이브러리 내부(.d.ts) 에러는 무시하고 내 코드만 본다.
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*", "scripts/**/*"]
+}

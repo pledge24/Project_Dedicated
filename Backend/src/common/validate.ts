@@ -8,11 +8,7 @@ const RX_PASSWORD = /^[\x20-\x7E]{8,64}$/;
 // 완성형 한글(가-힣) + 영문 + 숫자, 2~12자.
 const RX_NICKNAME = /^[가-힣A-Za-z0-9]{2,12}$/;
 
-/**
- * @param {*} v
- * @returns {string}
- */
-function asString(v)
+function asString(v: unknown): string
 {
     return typeof v === 'string' ? v : '';
 }
@@ -20,15 +16,13 @@ function asString(v)
 /**
  * loginId를 저장/검증 전에 소문자로 정규화. 문자열이 아니면 그대로 반환(검증에서 걸림).
  * register/login 양쪽 핸들러에서 호출해 대소문자 차이로 같은 계정이 갈리지 않게 한다.
- * @param {*} v
- * @returns {*}
  */
-export function normalizeLoginId(v)
+export function normalizeLoginId(v: unknown): unknown
 {
     return typeof v === 'string' ? v.toLowerCase() : v;
 }
 
-export function validateLoginId(loginId)
+export function validateLoginId(loginId: unknown): asserts loginId is string
 {
     if (!RX_LOGIN_ID.test(asString(loginId)))
     {
@@ -36,7 +30,7 @@ export function validateLoginId(loginId)
     }
 }
 
-export function validatePassword(password)
+export function validatePassword(password: unknown): asserts password is string
 {
     if (!RX_PASSWORD.test(asString(password)))
     {
@@ -44,7 +38,7 @@ export function validatePassword(password)
     }
 }
 
-export function validateNickname(nickname)
+export function validateNickname(nickname: unknown): asserts nickname is string
 {
     const s = asString(nickname);
     if (s !== s.trim())

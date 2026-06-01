@@ -3,17 +3,12 @@ import * as repo from './auth.repository.js';
 import * as passwordUtil from '../common/password.js';
 import * as jwtUtil from '../common/jwt.js';
 import { AppError, Codes } from '../common/errors.js';
+import type { RegisterResultDTO, AuthUserDTO } from '../common/types.js';
 
 // 가입 직후 자동 로그인을 막기 위해 register는 토큰을 발급하지 않는다.
 // 클라는 별도로 /api/auth/login을 호출해 세션을 시작한다.
-/**
- * 회원가입.
- * @param {string} loginId
- * @param {string} password
- * @param {string} nickname
- * @returns {Promise<{userId:number, nickname:string, score:number, level:number, exp:number}>}
- */
-export async function register(loginId, password, nickname)
+/** 회원가입. */
+export async function register(loginId: string, password: string, nickname: string): Promise<RegisterResultDTO>
 {
     if (await repo.findByLoginId(loginId))
     {
@@ -29,6 +24,10 @@ export async function register(loginId, password, nickname)
 
     // 단일 진실: DB의 DEFAULT가 변하면 응답도 자동 반영되도록 SELECT.
     const profile = await repo.findProfileByUserId(userId);
+    if (!profile)
+    {
+        throw new AppError(Codes.INTERNAL_ERROR, '가입 직후 프로필 조회에 실패했습니다.');
+    }
     return {
         userId,
         nickname,
@@ -38,13 +37,8 @@ export async function register(loginId, password, nickname)
     };
 }
 
-/**
- * 로그인.
- * @param {string} loginId
- * @param {string} password
- * @returns {Promise<{userId:number, nickname:string, score:number, level:number, exp:number, token:string}>}
- */
-export async function login(loginId, password)
+/** 로그인. */
+export async function login(loginId: string, password: string): Promise<AuthUserDTO>
 {
     const row = await repo.findByLoginId(loginId);
     // ID/PW 어느 쪽이 틀린지 노출하지 않음 (enumeration 방지)
@@ -54,6 +48,10 @@ export async function login(loginId, password)
     }
 
     const profile = await repo.findProfileByUserId(row.id);
+    if (!profile)
+    {
+        throw new AppError(Codes.INTERNAL_ERROR, '프로필 조회에 실패했습니다.');
+    }
     const token = jwtUtil.sign({ userId: row.id, nickname: row.nickname });
     return {
         userId:   row.id,
@@ -65,13 +63,8 @@ export async function login(loginId, password)
     };
 }
 
-/**
- * 현재 사용자 프로필 조회. 토큰 검증(requireAuth) 통과 후 호출된다.
- * @param {number} userId 토큰 클레임의 user id
- * @param {string} nickname 토큰 클레임의 닉네임
- * @returns {Promise<{userId:number, nickname:string, score:number, level:number, exp:number}>}
- */
-export async function getMe(userId, nickname)
+/** 현재 사용자 프로필 조회. 토큰 검증(requireAuth) 통과 후 호출된다. */
+export async function getMe(userId: number, nickname: string): Promise<RegisterResultDTO>
 {
     const profile = await repo.findProfileByUserId(userId);
     // 토큰은 유효하지만 계정이 사라진 경우 (삭제 등)

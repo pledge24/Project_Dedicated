@@ -1,29 +1,21 @@
 // 인증 도메인의 DB 쿼리만 담당 (repository 레이어)
+import type { ResultSetHeader } from 'mysql2';
+
 import { getPool } from '../common/db.js';
+import type { UserRow, PlayerProfileRow } from '../common/types.js';
 
-/** @typedef {import('../common/types.js').UserRow} UserRow */
-/** @typedef {import('../common/types.js').PlayerProfileRow} PlayerProfileRow */
-
-/**
- * @param {string} loginId
- * @returns {Promise<UserRow|null>}
- */
-export async function findByLoginId(loginId)
+export async function findByLoginId(loginId: string): Promise<UserRow | null>
 {
-    const [rows] = await getPool().execute(
+    const [rows] = await getPool().execute<UserRow[]>(
         'SELECT id, login_id, password_hash, nickname FROM users WHERE login_id = ? LIMIT 1',
         [loginId]
     );
     return rows.length ? rows[0] : null;
 }
 
-/**
- * @param {string} nickname
- * @returns {Promise<UserRow|null>}
- */
-export async function findByNickname(nickname)
+export async function findByNickname(nickname: string): Promise<UserRow | null>
 {
-    const [rows] = await getPool().execute(
+    const [rows] = await getPool().execute<UserRow[]>(
         'SELECT id, login_id, password_hash, nickname FROM users WHERE nickname = ? LIMIT 1',
         [nickname]
     );
@@ -33,17 +25,17 @@ export async function findByNickname(nickname)
 /**
  * users INSERT + player_profiles INSERT를 한 트랜잭션으로 묶는다.
  * 둘 중 하나라도 실패하면 둘 다 롤백된다.
- * @param {{loginId:string, passwordHash:string, nickname:string}} u
- * @returns {Promise<number>} 신규 user id
  */
-export async function insertUser({ loginId, passwordHash, nickname })
+export async function insertUser(
+    { loginId, passwordHash, nickname }: { loginId: string; passwordHash: string; nickname: string }
+): Promise<number>
 {
     const conn = await getPool().getConnection();
     try
     {
         await conn.beginTransaction();
 
-        const [userRes] = await conn.execute(
+        const [userRes] = await conn.execute<ResultSetHeader>(
             'INSERT INTO users (login_id, password_hash, nickname) VALUES (?, ?, ?)',
             [loginId, passwordHash, nickname]
         );
@@ -69,13 +61,9 @@ export async function insertUser({ loginId, passwordHash, nickname })
     }
 }
 
-/**
- * @param {number} userId
- * @returns {Promise<PlayerProfileRow|null>}
- */
-export async function findProfileByUserId(userId)
+export async function findProfileByUserId(userId: number): Promise<PlayerProfileRow | null>
 {
-    const [rows] = await getPool().execute(
+    const [rows] = await getPool().execute<PlayerProfileRow[]>(
         'SELECT user_id, score, level, exp, wins, losses, matches_played, last_match_at ' +
         'FROM player_profiles WHERE user_id = ? LIMIT 1',
         [userId]

@@ -1,5 +1,6 @@
 // MySQL2 풀 싱글톤
 import mysql from 'mysql2/promise';
+import type { Pool } from 'mysql2/promise';
 
 import { config } from './config.js';
 
@@ -13,10 +14,9 @@ export const dbConnectionOptions = Object.freeze({
     database: config.db.name,
 });
 
-/** @type {import('mysql2/promise').Pool|null} */
-let pool = null;
+let pool: Pool | null = null;
 
-export function getPool()
+export function getPool(): Pool
 {
     if (pool) return pool;
 
@@ -31,7 +31,7 @@ export function getPool()
 }
 
 /** graceful shutdown용 — pool이 있으면 닫고 null로 리셋. */
-export async function closePool()
+export async function closePool(): Promise<void>
 {
     if (!pool) return;
     const p = pool;

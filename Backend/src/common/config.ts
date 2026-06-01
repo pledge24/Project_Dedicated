@@ -2,12 +2,12 @@
 // 잘못된 .env로 서버가 "떠 있다고 착각하는" 상태를 막기 위해 부팅 시점에 fail-fast.
 import 'dotenv/config';
 
-function fail(reason)
+function fail(reason: string): never
 {
     throw new Error(`[Config] ${reason}`);
 }
 
-function required(name, extraCheck)
+function required(name: string, extraCheck?: (v: string, name: string) => void): string
 {
     const v = process.env[name];
     if (!v) fail(`env ${name}이(가) 비어있음`);
@@ -15,7 +15,7 @@ function required(name, extraCheck)
     return v;
 }
 
-function asNumber(name, def)
+function asNumber(name: string, def: number): number
 {
     const raw = process.env[name];
     if (raw === undefined || raw === '') return def;
@@ -24,7 +24,7 @@ function asNumber(name, def)
     return n;
 }
 
-function validateJwtSecret(v, name)
+function validateJwtSecret(v: string, name: string): void
 {
     if (v.length < 16) fail(`${name}은 16자 이상이어야 함 (현재 ${v.length}자)`);
     if (v.includes('please-change')) fail(`${name}이 .env.example 디폴트 문자열 그대로임 — 임의 값으로 교체 필요`);
