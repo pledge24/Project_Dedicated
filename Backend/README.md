@@ -14,10 +14,11 @@
    - `npm run db:init` — `users` 테이블 생성. `.env`의 `DB_PASS`를 자동으로 사용한다.
 4. **서버 실행**:
    ```
-   npm run dev   # nodemon (변경 자동 재시작)
+   npm run dev   # tsx watch (변경 자동 재시작)
    npm start     # 단발 실행
    ```
-   `http://127.0.0.1:3000/` 가 헬스체크.
+   - `GET /healthz` — 라이브니스(프로세스 생존, DB 미검사).
+   - `GET /readyz` — 레디니스(DB ping 성공 시 200, 실패 시 503).
 
 ## 엔드포인트 (v0.1.0)
 

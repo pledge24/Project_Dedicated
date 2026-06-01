@@ -30,6 +30,14 @@ export function getPool(): Pool
     return pool;
 }
 
+/** 레디니스 프로브용 — 풀에서 커넥션 받아 ping 후 반환. 실패 시 throw. */
+export async function pingDb(): Promise<void>
+{
+    const conn = await getPool().getConnection();
+    try { await conn.ping(); }
+    finally { conn.release(); }
+}
+
 /** graceful shutdown용 — pool이 있으면 닫고 null로 리셋. */
 export async function closePool(): Promise<void>
 {
