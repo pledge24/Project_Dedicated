@@ -6,12 +6,17 @@
 
 1. **MySQL 비밀번호 설정** — `Backend/.env` 의 `DB_PASS=` 에 로컬 MySQL `root` 비밀번호를 적는다.
 2. **JWT 시크릿 교체** — `JWT_SECRET=` 을 32바이트 이상의 임의 문자열로 바꾼다.
-3. **DB 스키마 적용** (한 번만):
+3. **DB 스키마 적용**:
    - 사전: `d1` 데이터베이스를 미리 만들어 둔다.
      ```sql
      CREATE DATABASE d1 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
      ```
-   - `npm run db:init` — `users` 테이블 생성. `.env`의 `DB_PASS`를 자동으로 사용한다.
+   - `npm run migrate` — `migrations/`의 미적용 SQL을 순서대로 적용하고 `schema_migrations`에 기록한다.
+     기존 `db:init` DB 위에 돌려도 안전(CREATE IF NOT EXISTS, 데이터 보존).
+   - `npm run migrate:status` — 적용/대기 현황 확인.
+   - 스키마 변경 시 — `npm run migrate:make <name>` 으로 새 `migrations/00N_*.sql` 생성 후 작성하고 `migrate`.
+     마이그레이션 SQL은 **idempotent**하게 (MySQL DDL은 암묵 커밋이라 파일 단위 원자성이 없음).
+   - `npm run db:init` — **파괴적 리셋**(모든 테이블 드롭). 초기화하려면 `db:init` → `migrate` 순서.
 4. **서버 실행**:
    ```
    npm run dev   # tsx watch (변경 자동 재시작)
