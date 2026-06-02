@@ -1,5 +1,6 @@
 // 매칭 WebSocket 네트워크 레이어.
 // 같은 http.Server를 공유(noServer) → upgrade 헤더에서 JWT 인증 후 handleUpgrade.
+import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, Server as HttpServer } from 'node:http';
 import type { Duplex } from 'node:stream';
 
@@ -12,6 +13,8 @@ import type { ErrorKind } from '../common/errors.js';
 import * as jwtUtil from '../common/jwt.js';
 import { logger } from '../common/logger.js';
 import type { AuthedUser } from '../common/types.js';
+import * as ds from './ds.js';
+import type { MatchGroup } from './queue.js';
 import * as service from './service.js';
 import type { ClientMessage, ServerMessage, ServerMessageType } from './protocol.js';
 
@@ -139,19 +142,40 @@ function onConnection(wss: WebSocketServer, ws: WebSocket, user: AuthedUser): vo
     logger.info({ userId: aws.userId }, 'WS 연결 수립');
 }
 
-/** 1초 사이클: 매칭 시도 → 성사분 4명 소켓에 match:found 푸시. */
+/** 1초 사이클: 매칭 시도 → 성사 그룹마다 DS 할당+푸시(비동기). */
 function runMatchCycle(): void
 {
+    // runMatching이 매칭 즉시 큐에서 제거하므로, 비동기 할당 중 재매칭 위험은 없다.
     const groups = service.runMatching(Date.now());
-    for (const group of groups)
+    for (const group of groups) void handleMatch(group);
+}
+
+/** 한 매치 처리: DS 할당(또는 stub) → match:found 푸시. 할당 실패 시 에러 푸시. */
+async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
+{
+    const matchId = randomUUID();
+
+    let server: { host: string; port: number };
+    try
     {
-        const { data, targets } = service.buildMatchFound(group);
-        for (const ref of targets)
-        {
-            send(ref, { type: 'match:found', ok: true, data });
-        }
-        logger.info({ matchId: data.matchId, players: data.players.map((p) => p.userId) }, '매치 성사');
+        server = config.match.ds.enabled ? await ds.allocate(matchId) : config.match.stubServer;
     }
+    catch (err)
+    {
+        logger.error({ err, matchId }, 'DS 할당 실패 — 매치 취소');
+        for (const e of group.entries)
+        {
+            sendError(e.ref, 'error', Codes.INTERNAL_ERROR, '게임 서버 할당에 실패했습니다.');
+        }
+        return;
+    }
+
+    const { data, targets } = service.buildMatchFound(group, matchId, server);
+    for (const ref of targets)
+    {
+        send(ref, { type: 'match:found', ok: true, data });
+    }
+    logger.info({ matchId, server, players: data.players.map((p) => p.userId) }, '매치 성사');
 }
 
 /** http.Server에 매칭 WS를 붙이고 사이클/heartbeat를 기동. stop()으로 정리. */
@@ -214,6 +238,7 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
         {
             clearInterval(heartbeat);
             clearInterval(cycle);
+            ds.shutdownAll();
             for (const client of wss.clients) client.terminate();
             wss.close();
         },

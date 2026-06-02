@@ -58,10 +58,21 @@ export const config = Object.freeze({
         maxWindow:       asNumber('MATCH_MAX_WINDOW', 2000),   // 윈도우 상한
         cycleMs:         asNumber('MATCH_CYCLE_MS', 1000),     // 매칭 사이클 주기
         heartbeatMs:     asNumber('MATCH_HEARTBEAT_MS', 30_000),
-        // 매칭 성사 시 푸시할 서버 주소. 이번 슬라이스는 stub — 실제 DS 할당은 다음 슬라이스.
+        // ds.enabled=false면 아래 stub 주소 사용(봇/알고리즘 테스트 경로 보존).
         stubServer: Object.freeze({
             host: process.env.MATCH_STUB_HOST || '127.0.0.1',
             port: asNumber('MATCH_STUB_PORT', 7777),
+        }),
+        // 실제 Dedicated Server 할당(매치당 spawn). enabled=true일 때만 D1Server.exe를 띄운다.
+        ds: Object.freeze({
+            enabled:       process.env.MATCH_DS_ENABLED === 'true',
+            exePath:       process.env.MATCH_DS_EXE || 'D:/Unreal/Projects/Project_Dedicated/D1/Package/WindowsServer/D1/D1Server.exe',
+            map:           process.env.MATCH_DS_MAP || '/Game/D1/Maps/MP_Ingame', // 미쿡 시 임시로 /Game/Maps/MP_Test
+            host:          process.env.MATCH_DS_HOST || '127.0.0.1',
+            portMin:       asNumber('MATCH_DS_PORT_MIN', 7777),
+            portMax:       asNumber('MATCH_DS_PORT_MAX', 7787),
+            bootDelayMs:   asNumber('MATCH_DS_BOOT_DELAY_MS', 5000),  // UDP라 TCP 프로브 불가 → 고정 부팅 지연
+            maxLifetimeMs: asNumber('MATCH_DS_MAX_LIFETIME_MS', 900_000), // 15분 후 강제 회수
         }),
     }),
 });

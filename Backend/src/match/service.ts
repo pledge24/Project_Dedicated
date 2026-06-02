@@ -1,7 +1,5 @@
 // 매칭 도메인 로직 (service 레이어). 인메모리 큐 싱글톤을 소유한다.
 // 프로세스 1개·포트 1개 가정(PROJECT_PLAN). 큐는 영속화하지 않는다.
-import { randomUUID } from 'node:crypto';
-
 import type { WebSocket } from 'ws';
 
 import { config } from '../common/config.js';
@@ -54,8 +52,12 @@ export function queueSize(): number
     return queue.size;
 }
 
-/** 매치 그룹 → match:found payload + 푸시 대상 소켓. 서버 주소는 stub. */
-export function buildMatchFound(group: MatchGroup<WebSocket>): { data: MatchFoundData; targets: WebSocket[] }
+/** 매치 그룹 + 할당된 서버 주소 → match:found payload + 푸시 대상 소켓. */
+export function buildMatchFound(
+    group: MatchGroup<WebSocket>,
+    matchId: string,
+    server: { host: string; port: number }
+): { data: MatchFoundData; targets: WebSocket[] }
 {
     const players: MatchPlayer[] = group.entries.map((e, i) => ({
         userId: e.userId,
@@ -65,8 +67,8 @@ export function buildMatchFound(group: MatchGroup<WebSocket>): { data: MatchFoun
     }));
 
     const data: MatchFoundData = {
-        matchId: randomUUID(),
-        server: { host: config.match.stubServer.host, port: config.match.stubServer.port },
+        matchId,
+        server: { host: server.host, port: server.port },
         players,
     };
 
