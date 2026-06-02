@@ -15,6 +15,10 @@ export default function buildApp(): Express
 {
     const app = express();
 
+    /*--------------
+        Middleware
+    --------------*/
+
     // 요청 로깅 + 상관 ID. 가장 앞에 두어 req.log/req.id가 어디서나 존재하게 함.
     app.use(pinoHttp({
         logger,
@@ -32,8 +36,12 @@ export default function buildApp(): Express
             return 'info';
         },
     }));
-
+    
     app.use(express.json({ limit: '32kb' }));
+
+    /*--------------
+          Router
+    --------------*/
 
     // 사람용 루트 (프로브는 /healthz·/readyz)
     app.get('/', (req: Request, res: Response) =>
@@ -64,6 +72,10 @@ export default function buildApp(): Express
             res.status(503).json({ status: 'error' });
         }
     });
+
+    /*---------------
+       Error Handler
+    ----------------*/
 
     // 404
     app.use((req: Request, res: Response) =>
