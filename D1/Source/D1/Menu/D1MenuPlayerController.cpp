@@ -3,8 +3,11 @@
 #include "Menu/D1MenuPlayerController.h"
 
 #include "Blueprint/UserWidget.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/Widget.h"
 #include "D1.h"
 #include "Menu/D1MenuGameMode.h"
+#include "Widgets/SWidget.h"
 
 AD1MenuPlayerController::AD1MenuPlayerController()
 {
@@ -22,8 +25,8 @@ void AD1MenuPlayerController::BeginPlay()
 	}
 
 	ShowBackground();
+	// 입력 모드는 SwitchToWidget 끝에서 적용됨 (여기서 중복 호출 안 함)
 	ShowInitialWidgetFromGameMode();
-	ApplyUiOnlyInputMode();
 }
 
 void AD1MenuPlayerController::SwitchToWidget(TSubclassOf<UUserWidget> NewWidgetClass)
@@ -89,8 +92,38 @@ void AD1MenuPlayerController::ApplyUiOnlyInputMode()
 	Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	if (CurrentWidget)
 	{
-		Mode.SetWidgetToFocus(CurrentWidget->TakeWidget());
+		// 루트 UserWidget은 기본 비-포커스 → 첫 포커스 가능 자식을 대상으로 (UIOnly 포커스 에러 회피)
+		if (UWidget* FocusTarget = FindFirstFocusableWidget(CurrentWidget))
+		{
+			Mode.SetWidgetToFocus(FocusTarget->TakeWidget());
+		}
 	}
 	SetInputMode(Mode);
 	SetShowMouseCursor(true);
+}
+
+UWidget* AD1MenuPlayerController::FindFirstFocusableWidget(UUserWidget* Root)
+{
+	if (!Root || !Root->WidgetTree)
+	{
+		return nullptr;
+	}
+
+	// ForEachWidgetUntil은 UMG_API 미익스포트라 모듈 외부에서 링크 불가 →
+	// 익스포트된 ForEachWidgetAndDescendants + Found 가드로 첫 매치만 취함
+	UWidget* Found = nullptr;
+	Root->WidgetTree->ForEachWidgetAndDescendants([&Found](UWidget* Widget)
+	{
+		if (Found)
+		{
+			return;
+		}
+
+		const TSharedPtr<SWidget> Slate = Widget ? Widget->GetCachedWidget() : nullptr;
+		if (Slate.IsValid() && Slate->SupportsKeyboardFocus())
+		{
+			Found = Widget;
+		}
+	});
+	return Found;
 }

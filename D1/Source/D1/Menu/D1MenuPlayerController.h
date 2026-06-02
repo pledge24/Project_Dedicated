@@ -7,6 +7,7 @@
 #include "D1MenuPlayerController.generated.h"
 
 class UUserWidget;
+class UWidget;
 
 /**
  *  메뉴/로비용 PlayerController.
@@ -33,6 +34,7 @@ private:
 	void ShowInitialWidgetFromGameMode();
 	void ShowBackground();
 	void ApplyUiOnlyInputMode();
+	static UWidget* FindFirstFocusableWidget(UUserWidget* Root);
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Menu",
 	          meta = (AllowPrivateAccess = "true"))
