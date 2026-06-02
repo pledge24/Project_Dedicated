@@ -50,4 +50,18 @@ export const config = Object.freeze({
         loginMax: asNumber('RATE_LIMIT_LOGIN_MAX', 5),
         registerMax: asNumber('RATE_LIMIT_REGISTER_MAX', 10),
     }),
+    // 매칭 큐 파라미터. score 디폴트 1000 기준 합리값. 전부 MATCH_* env로 override 가능.
+    match: Object.freeze({
+        playersPerMatch: asNumber('MATCH_PLAYERS_PER_MATCH', 4),
+        baseWindow:      asNumber('MATCH_BASE_WINDOW', 200),   // 시작 점수 윈도우(±)
+        expandRate:      asNumber('MATCH_EXPAND_RATE', 50),    // 대기 1초당 윈도우 확장폭
+        maxWindow:       asNumber('MATCH_MAX_WINDOW', 2000),   // 윈도우 상한
+        cycleMs:         asNumber('MATCH_CYCLE_MS', 1000),     // 매칭 사이클 주기
+        heartbeatMs:     asNumber('MATCH_HEARTBEAT_MS', 30_000),
+        // 매칭 성사 시 푸시할 서버 주소. 이번 슬라이스는 stub — 실제 DS 할당은 다음 슬라이스.
+        stubServer: Object.freeze({
+            host: process.env.MATCH_STUB_HOST || '127.0.0.1',
+            port: asNumber('MATCH_STUB_PORT', 7777),
+        }),
+    }),
 });

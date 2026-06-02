@@ -15,7 +15,8 @@
     "migrate": "tsx scripts/migrate.ts up",
     "migrate:status": "tsx scripts/migrate.ts status",
     "migrate:make": "tsx scripts/migrate.ts make",
-    "db:init": "tsx scripts/db-init.ts"
+    "db:init": "tsx scripts/db-init.ts",
+    "match:sim": "tsx scripts/match-sim.ts"
   },
   "keywords": [],
   "author": "",
