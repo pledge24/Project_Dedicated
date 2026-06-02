@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UI/D1UserWidget.h"
+#include "Online/BackendTypes.h"
 #include "D1UWLobby.generated.h"
 
 class UButton;
@@ -24,6 +25,7 @@ class UD1UWLobby : public UD1UserWidget
 protected:
 	//~ UUserWidget
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 
 	//~ 버튼 핸들러
 	UFUNCTION()
@@ -31,6 +33,16 @@ protected:
 
 	UFUNCTION()
 	void OnCancelMatchingClicked();
+
+	//~ 매칭 이벤트 핸들러 (BackendSubsystem 멀티캐스트 구독)
+	UFUNCTION()
+	void HandleQueueJoined();
+
+	UFUNCTION()
+	void HandleMatchFound(const FMatchFoundDTO& Match);
+
+	UFUNCTION()
+	void HandleMatchmakingError(const FBackendResponse& Error);
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> NicknameLabel;
@@ -49,6 +61,9 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UButton> CancelMatchingButton;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> MatchStatusLabel;
 
 private:
 	/** 비로그인 시 복귀할 맵 — 디테일 패널에서 MP_Frontend 지정. */

@@ -5,12 +5,14 @@
 #include "D1.h"
 #include "HttpModule.h"
 #include "Interfaces/IHttpResponse.h"
+#include "IWebSocket.h"
 #include "Online/D1GameInstance.h"
 #include "Online/D1OnlineSettings.h"
 #include "Policies/CondensedJsonPrintPolicy.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
+#include "WebSocketsModule.h"
 
 void UBackendSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -20,6 +22,7 @@ void UBackendSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UBackendSubsystem::Deinitialize()
 {
+	CloseMatchSocket();
 	Super::Deinitialize();
 }
 
@@ -69,6 +72,59 @@ void UBackendSubsystem::Login(const FString& LoginId, const FString& Password, c
 			}
 		});
 	Request->ProcessRequest();
+}
+
+void UBackendSubsystem::StartMatchmaking()
+{
+	if (MatchmakingState != EMatchmakingState::Idle)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Match] 이미 매칭 중 (state=%d) — Start 무시"), static_cast<int32>(MatchmakingState));
+		return;
+	}
+
+	const UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance());
+	const FString Jwt = GI ? GI->GetCurrentJwt() : FString();
+	if (Jwt.IsEmpty())
+	{
+		FBackendResponse Err;
+		Err.bOk = false;
+		Err.ErrorCode = EBackendErrorCode::Unknown;
+		Err.ErrorMessage = TEXT("로그인이 필요합니다.");
+		OnMatchmakingError.Broadcast(Err);
+		return;
+	}
+
+	TMap<FString, FString> UpgradeHeaders;
+	UpgradeHeaders.Add(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *Jwt));
+
+	const FString Url = BuildMatchWsUrl();
+	MatchSocket = FWebSocketsModule::Get().CreateWebSocket(Url, TArray<FString>(), UpgradeHeaders);
+
+	// Connect() 전에 바인딩 (엔진 StompClient 관용구). UObject라 AddUObject 사용.
+	MatchSocket->OnConnected().AddUObject(this, &UBackendSubsystem::HandleSocketConnected);
+	MatchSocket->OnConnectionError().AddUObject(this, &UBackendSubsystem::HandleSocketConnectionError);
+	MatchSocket->OnClosed().AddUObject(this, &UBackendSubsystem::HandleSocketClosed);
+	MatchSocket->OnMessage().AddUObject(this, &UBackendSubsystem::HandleSocketMessage);
+
+	MatchmakingState = EMatchmakingState::Connecting;
+	UE_LOG(LogD1, Log, TEXT("[Match] WS 연결 시도: %s"), *Url);
+	MatchSocket->Connect();
+}
+
+void UBackendSubsystem::CancelMatchmaking()
+{
+	if (MatchmakingState == EMatchmakingState::Idle)
+	{
+		return;
+	}
+
+	if (MatchSocket.IsValid() && MatchSocket->IsConnected())
+	{
+		SendType(TEXT("queue:cancel"));
+	}
+	CloseMatchSocket();
+	MatchmakingState = EMatchmakingState::Idle;
+	UE_LOG(LogD1, Log, TEXT("[Match] 매칭 취소"));
 }
 
 TSharedRef<IHttpRequest> UBackendSubsystem::BuildPostJson(const FString& Path, const TSharedRef<FJsonObject>& Body, bool bAttachAuth) const
@@ -193,4 +249,186 @@ EBackendErrorCode UBackendSubsystem::ParseErrorCode(const FString& CodeStr)
 	if (CodeStr == TEXT("RATE_LIMITED"))         return EBackendErrorCode::RateLimited;
 	if (CodeStr == TEXT("INTERNAL_ERROR"))       return EBackendErrorCode::InternalError;
 	return EBackendErrorCode::Unknown;
+}
+
+FString UBackendSubsystem::BuildMatchWsUrl() const
+{
+	FString Url = GetBaseUrl();
+	if (Url.StartsWith(TEXT("https://")))
+	{
+		Url = TEXT("wss://") + Url.RightChop(8);
+	}
+	else if (Url.StartsWith(TEXT("http://")))
+	{
+		Url = TEXT("ws://") + Url.RightChop(7);
+	}
+	return Url + TEXT("/ws/match");
+}
+
+void UBackendSubsystem::SendType(const FString& Type)
+{
+	if (!MatchSocket.IsValid() || !MatchSocket->IsConnected())
+	{
+		return;
+	}
+
+	const TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
+	Body->SetStringField(TEXT("type"), Type);
+
+	FString Serialized;
+	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer
+		= TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Serialized);
+	FJsonSerializer::Serialize(Body, Writer);
+
+	MatchSocket->Send(Serialized);
+}
+
+void UBackendSubsystem::CloseMatchSocket()
+{
+	if (!MatchSocket.IsValid())
+	{
+		return;
+	}
+
+	MatchSocket->OnConnected().RemoveAll(this);
+	MatchSocket->OnConnectionError().RemoveAll(this);
+	MatchSocket->OnClosed().RemoveAll(this);
+	MatchSocket->OnMessage().RemoveAll(this);
+	if (MatchSocket->IsConnected())
+	{
+		MatchSocket->Close();
+	}
+	MatchSocket.Reset();
+}
+
+void UBackendSubsystem::HandleSocketConnected()
+{
+	UE_LOG(LogD1, Log, TEXT("[Match] WS 연결됨 — queue:join 전송"));
+	SendType(TEXT("queue:join"));
+}
+
+void UBackendSubsystem::HandleSocketMessage(const FString& Message)
+{
+	const TSharedRef<TJsonReader<TCHAR>> Reader = TJsonReaderFactory<TCHAR>::Create(Message);
+	TSharedPtr<FJsonObject> Root;
+	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Match] WS 메시지 파싱 실패: %s"), *Message);
+		return;
+	}
+
+	const FString Type = Root->GetStringField(TEXT("type"));
+
+	if (Type == TEXT("queue:joined"))
+	{
+		MatchmakingState = EMatchmakingState::Queued;
+		OnQueueJoined.Broadcast();
+		return;
+	}
+
+	if (Type == TEXT("queue:left"))
+	{
+		MatchmakingState = EMatchmakingState::Idle;
+		return;
+	}
+
+	if (Type == TEXT("match:found"))
+	{
+		FMatchFoundDTO Match;
+		const TSharedPtr<FJsonObject>* DataObj = nullptr;
+		if (Root->TryGetObjectField(TEXT("data"), DataObj) && DataObj && DataObj->IsValid())
+		{
+			(*DataObj)->TryGetStringField(TEXT("matchId"), Match.MatchId);
+
+			const TSharedPtr<FJsonObject>* ServerObj = nullptr;
+			if ((*DataObj)->TryGetObjectField(TEXT("server"), ServerObj) && ServerObj && ServerObj->IsValid())
+			{
+				(*ServerObj)->TryGetStringField(TEXT("host"), Match.ServerHost);
+				(*ServerObj)->TryGetNumberField(TEXT("port"), Match.ServerPort);
+			}
+
+			const TArray<TSharedPtr<FJsonValue>>* PlayersArr = nullptr;
+			if ((*DataObj)->TryGetArrayField(TEXT("players"), PlayersArr))
+			{
+				for (const TSharedPtr<FJsonValue>& Val : *PlayersArr)
+				{
+					const TSharedPtr<FJsonObject>* PObj = nullptr;
+					if (Val.IsValid() && Val->TryGetObject(PObj) && PObj && PObj->IsValid())
+					{
+						FMatchPlayerDTO P;
+						(*PObj)->TryGetNumberField(TEXT("userId"),    P.UserId);
+						(*PObj)->TryGetStringField(TEXT("nickname"),  P.Nickname);
+						(*PObj)->TryGetNumberField(TEXT("score"),     P.Score);
+						(*PObj)->TryGetNumberField(TEXT("slotIndex"), P.SlotIndex);
+						Match.Players.Add(P);
+					}
+				}
+			}
+		}
+
+		MatchmakingState = EMatchmakingState::Matched;
+		UE_LOG(LogD1, Log, TEXT("[Match] 매칭 성사 matchId=%s server=%s:%d players=%d"),
+			*Match.MatchId, *Match.ServerHost, Match.ServerPort, Match.Players.Num());
+		OnMatchFound.Broadcast(Match);
+
+		// 이번 슬라이스는 표시까지 — WS 닫음. (F1c에서 close 대신 DS travel로 교체)
+		CloseMatchSocket();
+		return;
+	}
+
+	if (Type == TEXT("error"))
+	{
+		FBackendResponse Err;
+		Err.bOk = false;
+		const TSharedPtr<FJsonObject>* ErrorObj = nullptr;
+		if (Root->TryGetObjectField(TEXT("error"), ErrorObj) && ErrorObj && ErrorObj->IsValid())
+		{
+			Err.ErrorCode = ParseErrorCode((*ErrorObj)->GetStringField(TEXT("code")));
+			(*ErrorObj)->TryGetStringField(TEXT("message"), Err.ErrorMessage);
+		}
+		else
+		{
+			Err.ErrorCode = EBackendErrorCode::Unknown;
+		}
+		UE_LOG(LogD1, Warning, TEXT("[Match] 서버 에러: %s"), *Err.ErrorMessage);
+		OnMatchmakingError.Broadcast(Err);
+		return;
+	}
+
+	UE_LOG(LogD1, Warning, TEXT("[Match] 알 수 없는 WS 메시지 type=%s"), *Type);
+}
+
+void UBackendSubsystem::HandleSocketConnectionError(const FString& Error)
+{
+	UE_LOG(LogD1, Warning, TEXT("[Match] WS 연결 에러: %s"), *Error);
+
+	CloseMatchSocket();
+	MatchmakingState = EMatchmakingState::Idle;
+
+	FBackendResponse Err;
+	Err.bOk = false;
+	Err.ErrorCode = EBackendErrorCode::NetworkError;
+	Err.ErrorMessage = TEXT("");
+	OnMatchmakingError.Broadcast(Err);
+}
+
+void UBackendSubsystem::HandleSocketClosed(int32 StatusCode, const FString& Reason, bool bWasClean)
+{
+	UE_LOG(LogD1, Log, TEXT("[Match] WS 종료 code=%d clean=%d reason=%s"), StatusCode, bWasClean ? 1 : 0, *Reason);
+
+	// 매칭 성사 후 우리가 닫았거나(Matched), 취소(Idle)면 정상 — 에러 아님.
+	if (MatchmakingState == EMatchmakingState::Matched || MatchmakingState == EMatchmakingState::Idle)
+	{
+		return;
+	}
+
+	// 큐 대기/연결 중 예기치 않게 끊김 → 에러 표면화. 재연결은 이번 슬라이스 제외.
+	CloseMatchSocket();
+	MatchmakingState = EMatchmakingState::Idle;
+
+	FBackendResponse Err;
+	Err.bOk = false;
+	Err.ErrorCode = EBackendErrorCode::NetworkError;
+	Err.ErrorMessage = TEXT("매칭 서버 연결이 끊겼습니다.");
+	OnMatchmakingError.Broadcast(Err);
 }

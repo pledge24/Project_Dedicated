@@ -20,6 +20,16 @@ enum class EBackendErrorCode : uint8
 	Unknown
 };
 
+/** 매칭 진행 상태. 위젯이 버튼/문구를 결정할 때 참조. */
+UENUM(BlueprintType)
+enum class EMatchmakingState : uint8
+{
+	Idle,        // 큐 밖
+	Connecting,  // WS 연결 시도 중
+	Queued,      // 큐 입장 완료, 상대 대기
+	Matched      // 매칭 성사
+};
+
 /** 인증된 유저 정보 (토큰 제외 — 토큰은 GameInstance가 별도 보관). */
 USTRUCT(BlueprintType)
 struct FAuthUserDTO
@@ -59,5 +69,52 @@ struct FBackendResponse
 	FString ErrorMessage;
 };
 
-/** 회원가입/로그인 완료 콜백. */
+/** match:found 한 명분. 서버가 슬롯 0~3을 배정. */
+USTRUCT(BlueprintType)
+struct FMatchPlayerDTO
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 UserId = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	FString Nickname;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Score = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 SlotIndex = 0;
+};
+
+/** 매칭 성사 정보. ServerHost/Port는 현재 stub (실제 DS 할당은 다음 슬라이스). */
+USTRUCT(BlueprintType)
+struct FMatchFoundDTO
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	FString MatchId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	FString ServerHost;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 ServerPort = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	TArray<FMatchPlayerDTO> Players;
+};
+
+/** 회원가입/로그인 완료 콜백 (1회성 pass-in). */
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnAuthCompleted, const FBackendResponse&, Response, const FAuthUserDTO&, User);
+
+/** 매칭 성사 푸시 (서버 발신 — 멀티캐스트). */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMatchFound, const FMatchFoundDTO&, Match);
+
+/** 큐 입장 확정 푸시. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnQueueJoined);
+
+/** 매칭 에러(연결 실패/거부/끊김). */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMatchmakingError, const FBackendResponse&, Error);
