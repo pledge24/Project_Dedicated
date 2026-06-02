@@ -3,6 +3,7 @@
 #include "Online/BackendSubsystem.h"
 
 #include "D1.h"
+#include "GameFramework/PlayerController.h"
 #include "HttpModule.h"
 #include "Interfaces/IHttpResponse.h"
 #include "IWebSocket.h"
@@ -371,8 +372,23 @@ void UBackendSubsystem::HandleSocketMessage(const FString& Message)
 			*Match.MatchId, *Match.ServerHost, Match.ServerPort, Match.Players.Num());
 		OnMatchFound.Broadcast(Match);
 
-		// 이번 슬라이스는 표시까지 — WS 닫음. (F1c에서 close 대신 DS travel로 교체)
+		// travel이 월드를 내리므로 WS 먼저 정리.
 		CloseMatchSocket();
+
+		// 할당받은 DS 주소로 입장. 로컬 PC에서 raw "host:port"로 ClientTravel.
+		if (!Match.ServerHost.IsEmpty() && Match.ServerPort > 0)
+		{
+			if (APlayerController* PC = GetGameInstance()->GetFirstLocalPlayerController())
+			{
+				const FString Url = FString::Printf(TEXT("%s:%d?matchId=%s"), *Match.ServerHost, Match.ServerPort, *Match.MatchId);
+				UE_LOG(LogD1, Log, TEXT("[Match] DS 입장: %s"), *Url);
+				PC->ClientTravel(Url, TRAVEL_Absolute);
+			}
+			else
+			{
+				UE_LOG(LogD1, Warning, TEXT("[Match] 로컬 PlayerController 없음 — travel 불가"));
+			}
+		}
 		return;
 	}
 

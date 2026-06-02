@@ -141,11 +141,11 @@ void UD1UWLobby::HandleMatchFound(const FMatchFoundDTO& Match)
 	if (MatchStatusLabel)
 	{
 		MatchStatusLabel->SetText(FText::Format(
-			NSLOCTEXT("Lobby", "MatchFoundFmt", "매칭 완료! ({0}명)"),
+			NSLOCTEXT("Lobby", "MatchFoundFmt", "매칭 완료! ({0}명) — 입장 중..."),
 			FText::AsNumber(Match.Players.Num())
 		));
 	}
-	// 실제 DS 입장(travel)은 F1c. 지금은 표시까지.
+	// 실제 DS 입장(ClientTravel)은 BackendSubsystem가 처리. 위젯은 곧 travel로 소멸.
 }
 
 void UD1UWLobby::HandleMatchmakingError(const FBackendResponse& Error)
