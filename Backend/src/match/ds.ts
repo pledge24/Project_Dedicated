@@ -79,7 +79,7 @@ export function shutdownAll(): void
     {
         killProcess(port);
     }
-    
+
     if (ports.length)
     {
         logger.info({ count: ports.length }, 'DS 전부 종료');

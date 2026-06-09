@@ -21,6 +21,7 @@ export const config = Object.freeze({
         windowMs: asNumber('RATE_LIMIT_WINDOW_MS', 60_000),
         loginMax: asNumber('RATE_LIMIT_LOGIN_MAX', 5),
         registerMax: asNumber('RATE_LIMIT_REGISTER_MAX', 10),
+        resultMax: asNumber('RATE_LIMIT_RESULT_MAX', 30),    // DS 결과 보고(/api/match/result)
     }),
     // 매칭 큐 파라미터. score 디폴트 1000 기준 합리값. 전부 MATCH_* env로 override 가능.
     match: Object.freeze({
@@ -30,6 +31,8 @@ export const config = Object.freeze({
         maxWindow:       asNumber('MATCH_MAX_WINDOW', 2000),   // 윈도우 상한
         cycleMs:         asNumber('MATCH_CYCLE_MS', 1000),     // 매칭 사이클 주기
         heartbeatMs:     asNumber('MATCH_HEARTBEAT_MS', 30_000),
+        eloK:            asNumber('MATCH_ELO_K', 32),          // ELO K-factor
+        scoreFloor:      asNumber('MATCH_SCORE_FLOOR', 0),     // 점수 하한(음수 방지)
         // ds.enabled=false면 아래 stub 주소 사용(봇/알고리즘 테스트 경로 보존).
         stubServer: Object.freeze({
             host: process.env.MATCH_STUB_HOST || '127.0.0.1',

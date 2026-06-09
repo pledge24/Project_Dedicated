@@ -1,6 +1,6 @@
 // 매칭 WebSocket 네트워크 레이어.
 // 같은 http.Server를 공유(noServer) → upgrade 헤더에서 JWT 인증 후 handleUpgrade.
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { Server as HttpServer, IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocket, WebSocketServer } from 'ws';
@@ -15,6 +15,7 @@ import type { AuthedUser } from '../common/types.js';
 import * as ds from './ds.js';
 import type { ClientMessage, ServerMessage, ServerMessageType } from './protocol.js';
 import type { MatchGroup } from './queue.js';
+import * as roster from './roster.js';
 import * as service from './service.js';
 
 const WS_PATH = '/ws/match';
@@ -248,6 +249,8 @@ function runMatchCycle(): void
 async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
 {
     const matchId = randomUUID();
+    // DS 결과 보고 인증용 매치별 서버 토큰. F5b에서 DS spawn에 주입되며, 클라엔 보내지 않는다.
+    const serverToken = randomBytes(24).toString('base64url');
 
     let server: { host: string; port: number };
     try
@@ -266,6 +269,16 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     }
 
     const { data, targets } = service.buildMatchFound(group, matchId, server);
+
+    // 결과 POST 검증용 roster 등록(matchId → 4명 신원 + 서버 토큰).
+    roster.register({
+        matchId,
+        serverToken,
+        mapName: config.match.ds.map,
+        startedAt: Date.now(),
+        players: data.players.map((p) => ({ userId: p.userId, slotIndex: p.slotIndex, nickname: p.nickname })),
+    });
+
     for (const ref of targets)
     {
         send(ref, { type: 'match:found', ok: true, data });

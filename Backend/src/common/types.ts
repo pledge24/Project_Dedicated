@@ -62,6 +62,8 @@ export interface PlayerProfileRow extends RowDataPacket
     last_match_at: Date | null;
 }
 
+export type MatchEndReason = 'winner' | 'draw' | 'time_expired' | 'abort';
+
 export interface MatchRowDTO
 {
     id: number;
@@ -70,7 +72,7 @@ export interface MatchRowDTO
     startedAt: string;
     endedAt: string;
     durationSec: number;
-    endReason: 'winner' | 'draw' | 'time_expired' | 'abort';
+    endReason: MatchEndReason;
     winnerUserId: number | null;
 }
 
@@ -84,4 +86,38 @@ export interface MatchParticipantRowDTO
     livesLeft: number;
     expGained: number;
     scoreDelta: number;
+}
+
+/* DS → POST /api/match/result 계약 */
+
+/** 결과 보고의 플레이어 1명. slotIndex·nickname은 백엔드가 roster에서 채운다. */
+export interface MatchResultEntryInput
+{
+    userId: number;
+    placement: number;   // 1=1등, 동점 허용
+    livesLeft: number;
+}
+
+export interface MatchResultRequest
+{
+    matchId: string;     // 백엔드가 발급한 client_match_id(UUID)
+    mapName: string;
+    durationSec: number;
+    endReason: MatchEndReason;
+    results: MatchResultEntryInput[];
+}
+
+/** 응답: 확정된 각 플레이어의 점수 변화. */
+export interface MatchResultParticipantDTO
+{
+    userId: number;
+    placement: number;
+    scoreDelta: number;
+    scoreAfter: number;
+}
+
+export interface MatchResultResponse
+{
+    matchId: string;
+    participants: MatchResultParticipantDTO[];
 }
