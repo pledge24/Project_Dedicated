@@ -26,7 +26,10 @@ let shuttingDown = false;
 
 async function shutdown(signal: string): Promise<void>
 {
-    if (shuttingDown) return;
+    if (shuttingDown)
+    {
+        return;
+    }
     shuttingDown = true;
     logger.info({ signal }, 'graceful shutdown 시작');
 
@@ -47,6 +50,7 @@ async function shutdown(signal: string): Promise<void>
         {
             logger.error({ err }, 'HTTP 서버 close 실패');
             process.exit(1);
+
             return;
         }
         try
@@ -63,5 +67,12 @@ async function shutdown(signal: string): Promise<void>
     });
 }
 
-process.on('SIGTERM', () => { void shutdown('SIGTERM'); });
-process.on('SIGINT',  () => { void shutdown('SIGINT'); });
+process.on('SIGTERM', () =>
+{
+    void shutdown('SIGTERM');
+});
+
+process.on('SIGINT',  () =>
+{
+    void shutdown('SIGINT');
+});

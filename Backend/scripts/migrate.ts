@@ -29,7 +29,11 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 function parse(file: string): { version: string; name: string }
 {
     const m = /^(\d+)_(.+)\.sql$/.exec(file);
-    if (!m) throw new Error(`마이그레이션 파일명 규칙 위반: ${file} (예: 002_add_foo.sql)`);
+    if (!m)
+    {
+        throw new Error(`마이그레이션 파일명 규칙 위반: ${file} (예: 002_add_foo.sql)`);
+    }
+
     return { version: m[1], name: m[2] };
 }
 
@@ -37,6 +41,7 @@ function parse(file: string): { version: string; name: string }
 async function listFiles(): Promise<string[]>
 {
     const all = await readdir(migrationsDir);
+
     return all.filter((f) => f.endsWith('.sql')).sort();
 }
 
@@ -45,6 +50,7 @@ async function appliedVersions(conn: mysql.Connection): Promise<Set<string>>
 {
     await conn.query(TRACKING_DDL);
     const [rows] = await conn.query<MigrationRow[]>('SELECT version FROM schema_migrations');
+
     return new Set(rows.map((r) => r.version));
 }
 
@@ -59,6 +65,7 @@ async function up(): Promise<void>
         if (pending.length === 0)
         {
             logger.info('적용할 마이그레이션 없음');
+
             return;
         }
         for (const file of pending)
@@ -103,7 +110,10 @@ async function status(): Promise<void>
             logger.info(`${done.has(version) ? '[적용됨]' : '[대기  ]'} ${file}`);
         }
         const orphan = [...done].filter((v) => !files.some((f) => parse(f).version === v));
-        if (orphan.length > 0) logger.warn({ orphan }, '파일 없는 기록된 버전 존재');
+        if (orphan.length > 0)
+        {
+            logger.warn({ orphan }, '파일 없는 기록된 버전 존재');
+        }
     }
     finally
     {
@@ -114,7 +124,10 @@ async function status(): Promise<void>
 /** 다음 번호로 빈 마이그레이션 파일 생성. */
 async function make(name: string): Promise<void>
 {
-    if (!/^[a-z0-9_]+$/.test(name)) throw new Error(`name은 [a-z0-9_]만 허용: ${name}`);
+    if (!/^[a-z0-9_]+$/.test(name))
+    {
+        throw new Error(`name은 [a-z0-9_]만 허용: ${name}`);
+    }
     const files = await listFiles();
     const maxVer = files.reduce((mx, f) => Math.max(mx, Number(parse(f).version)), 0);
     const version = String(maxVer + 1).padStart(3, '0');
@@ -126,12 +139,21 @@ async function make(name: string): Promise<void>
 const cmd = process.argv[2] ?? 'up';
 try
 {
-    if (cmd === 'up') await up();
-    else if (cmd === 'status') await status();
+    if (cmd === 'up')
+    {
+        await up();
+    }
+    else if (cmd === 'status')
+    {
+        await status();
+    }
     else if (cmd === 'make')
     {
         const name = process.argv[3];
-        if (!name) throw new Error('사용법: npm run migrate:make <name>');
+        if (!name)
+        {
+            throw new Error('사용법: npm run migrate:make <name>');
+        }
         await make(name);
     }
     else

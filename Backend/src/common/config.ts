@@ -57,22 +57,42 @@ function fail(reason: string): never
 function required(name: string, extraCheck?: (v: string, name: string) => void): string
 {
     const v = process.env[name];
-    if (!v) fail(`env ${name}이(가) 비어있음`);
-    if (extraCheck) extraCheck(v, name);
+    if (!v)
+    {
+        fail(`env ${name}이(가) 비어있음`);
+    }
+    if (extraCheck)
+    {
+        extraCheck(v, name);
+    }
+
     return v;
 }
 
 function asNumber(name: string, def: number): number
 {
     const raw = process.env[name];
-    if (raw === undefined || raw === '') return def;
+    if (raw === undefined || raw === '')
+    {
+        return def;
+    }
     const n = Number(raw);
-    if (!Number.isFinite(n)) fail(`env ${name}은 숫자여야 함 (값='${raw}')`);
+    if (!Number.isFinite(n))
+    {
+        fail(`env ${name}은 숫자여야 함 (값='${raw}')`);
+    }
+
     return n;
 }
 
 function validateJwtSecret(v: string, name: string): void
 {
-    if (v.length < 16) fail(`${name}은 16자 이상이어야 함 (현재 ${v.length}자)`);
-    if (v.includes('please-change')) fail(`${name}이 .env.example 디폴트 문자열 그대로임 — 임의 값으로 교체 필요`);
+    if (v.length < 16)
+    {
+        fail(`${name}은 16자 이상이어야 함 (현재 ${v.length}자)`);
+    }
+    if (v.includes('please-change'))
+    {
+        fail(`${name}이 .env.example 디폴트 문자열 그대로임 — 임의 값으로 교체 필요`);
+    }
 }

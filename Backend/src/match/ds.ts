@@ -35,7 +35,10 @@ export async function allocate(matchId: string): Promise<{ host: string; port: n
         logger.warn({ port, matchId }, 'DS 최대 수명 초과 — 회수');
         killProcess(port);
     }, ds.maxLifetimeMs);
-    if (typeof killTimer.unref === 'function') killTimer.unref();
+    if (typeof killTimer.unref === 'function')
+    {
+        killTimer.unref();
+    }
 
     running.set(port, { child, matchId, port, killTimer });
 
@@ -49,6 +52,7 @@ export async function allocate(matchId: string): Promise<{ host: string; port: n
         }
         logger.info({ port, matchId, code }, 'DS 프로세스 종료');
     });
+
     child.on('error', (err) =>
     {
         logger.error({ err, port, matchId, exePath: ds.exePath }, 'DS spawn 실패');
@@ -71,8 +75,15 @@ export async function allocate(matchId: string): Promise<{ host: string; port: n
 export function shutdownAll(): void
 {
     const ports = [...running.keys()];
-    for (const port of ports) killProcess(port);
-    if (ports.length) logger.info({ count: ports.length }, 'DS 전부 종료');
+    for (const port of ports)
+    {
+        killProcess(port);
+    }
+    
+    if (ports.length)
+    {
+        logger.info({ count: ports.length }, 'DS 전부 종료');
+    }
 }
 
 export function runningCount(): number
@@ -82,15 +93,22 @@ export function runningCount(): number
 
 function delay(ms: number): Promise<void>
 {
-    return new Promise((resolve) => { setTimeout(resolve, ms); });
+    return new Promise((resolve) =>
+    {
+        setTimeout(resolve, ms);
+    });
 }
 
 function pickFreePort(): number | null
 {
     for (let p = ds.portMin; p <= ds.portMax; p++)
     {
-        if (!running.has(p)) return p;
+        if (!running.has(p))
+        {
+            return p;
+        }
     }
+
     return null;
 }
 
@@ -98,7 +116,10 @@ function pickFreePort(): number | null
 function killProcess(port: number): void
 {
     const proc = running.get(port);
-    if (!proc) return;
+    if (!proc)
+    {
+        return;
+    }
 
     clearTimeout(proc.killTimer);
     running.delete(port);

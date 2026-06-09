@@ -23,6 +23,7 @@ async function post(path: string, body: unknown): Promise<Envelope>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
     });
+
     return res.json() as Promise<Envelope>;
 }
 
@@ -41,6 +42,7 @@ async function ensureToken(loginId: string, nickname: string): Promise<string>
     {
         throw new Error(`[${loginId}] login 실패: ${login.error?.code ?? 'no token'} ${login.error?.message ?? ''}`);
     }
+
     return token;
 }
 
@@ -57,8 +59,14 @@ function connectBot(loginId: string, token: string): void
     ws.on('message', (raw: Buffer) =>
     {
         let msg: { type?: string; data?: { players?: unknown[] } };
-        try { msg = JSON.parse(raw.toString()); }
-        catch { return; }
+        try
+        {
+            msg = JSON.parse(raw.toString());
+        }
+        catch
+        {
+            return;
+        }
 
         if (msg.type === 'match:found')
         {

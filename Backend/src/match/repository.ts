@@ -18,5 +18,6 @@ export async function findScoreAndNickname(userId: number): Promise<{ nickname: 
         'WHERE u.id = ? LIMIT 1',
         [userId]
     );
+
     return rows.length ? { nickname: rows[0].nickname, score: rows[0].score } : null;
 }

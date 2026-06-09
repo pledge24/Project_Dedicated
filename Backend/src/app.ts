@@ -26,16 +26,24 @@ export default function buildApp(): Express
             const incoming = req.headers['x-request-id'];
             const id = (typeof incoming === 'string' && incoming) ? incoming : randomUUID();
             res.setHeader('X-Request-Id', id);
+
             return id;
         },
         customLogLevel(_req, res, err)
         {
-            if (res.statusCode >= 500 || err) return 'error';
-            if (res.statusCode >= 400) return 'warn';
+            if (res.statusCode >= 500 || err)
+            {
+                return 'error';
+            }
+            if (res.statusCode >= 400)
+            {
+                return 'warn';
+            }
+
             return 'info';
         },
     }));
-    
+
     app.use(express.json({ limit: '32kb' }));
 
     /*--------------
@@ -88,6 +96,7 @@ export default function buildApp(): Express
         if (err instanceof AppError)
         {
             res.status(err.kind.http).json(fail(err.kind.code, err.message));
+
             return;
         }
         (req.log ?? logger).error({ err }, '처리되지 않은 예외');

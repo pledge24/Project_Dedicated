@@ -10,6 +10,7 @@ export async function findByLoginId(loginId: string): Promise<UserRow | null>
         'SELECT id, login_id, password_hash, nickname FROM users WHERE login_id = ? LIMIT 1',
         [loginId]
     );
+
     return rows.length ? rows[0] : null;
 }
 
@@ -19,6 +20,7 @@ export async function findByNickname(nickname: string): Promise<UserRow | null>
         'SELECT id, login_id, password_hash, nickname FROM users WHERE nickname = ? LIMIT 1',
         [nickname]
     );
+
     return rows.length ? rows[0] : null;
 }
 
@@ -48,6 +50,7 @@ export async function insertUser(
         );
 
         await conn.commit();
+
         return userId;
     }
     catch (err)
@@ -68,5 +71,6 @@ export async function findProfileByUserId(userId: number): Promise<PlayerProfile
         'FROM player_profiles WHERE user_id = ? LIMIT 1',
         [userId]
     );
+
     return rows.length ? rows[0] : null;
 }

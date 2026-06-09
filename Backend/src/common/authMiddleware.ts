@@ -38,6 +38,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
         {
             return next(new AppError(Codes.TOKEN_EXPIRED, '세션이 만료되었습니다. 다시 로그인해주세요.'));
         }
+
         return next(new AppError(Codes.INVALID_TOKEN, '인증 토큰이 올바르지 않습니다.'));
     }
 }

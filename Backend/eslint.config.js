@@ -67,8 +67,23 @@ export default tseslint.config(
                 ],
             }],
 
-            // C++ 패리티 — Allman 중괄호. 한 줄 블록(() => { x; })은 허용.
-            '@stylistic/brace-style': ['error', 'allman', { allowSingleLine: true }],
+            // C++ 패리티 — Allman 중괄호. 한 줄 블록도 펼침(allowSingleLine off).
+            '@stylistic/brace-style': ['error', 'allman'],
+
+            // 들여쓰기 4칸(switch case 1단). curly가 넣은 중괄호/본문을 정렬한다.
+            '@stylistic/indent': ['error', 4, { SwitchCase: 1 }],
+
+            // 줄 끝 공백 제거(중괄호 줄바꿈 후 남는 trailing space 정리).
+            '@stylistic/no-trailing-spaces': 'error',
+
+            // 제어문 본문 중괄호 항상(한 줄이어도 생략 금지). 위치는 brace-style이 담당.
+            'curly': ['error', 'all'],
+
+            // 빈 줄: return 위 1줄, 여러 줄 표현식문끼리 사이 1줄.
+            '@stylistic/padding-line-between-statements': ['error',
+                { blankLine: 'always', prev: '*', next: 'return' },
+                { blankLine: 'always', prev: 'multiline-expression', next: 'multiline-expression' },
+            ],
         },
     },
 );

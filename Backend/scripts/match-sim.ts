@@ -96,7 +96,10 @@ const scenarios: Array<[string, () => void]> = [
     ['8명 동일 score → 한 tick에 2매치', () =>
     {
         const q = makeQueue();
-        for (let i = 1; i <= 8; i++) add(q, i, 1000, i);
+        for (let i = 1; i <= 8; i++)
+        {
+            add(q, i, 1000, i);
+        }
         const m = q.runCycle(1000);
         assert.equal(m.length, 2);
         assert.equal(q.size, 0);
@@ -120,4 +123,7 @@ for (const [name, fn] of scenarios)
 }
 
 console.log(`\n${scenarios.length - failed}/${scenarios.length} passed`);
-if (failed > 0) process.exit(1);
+if (failed > 0)
+{
+    process.exit(1);
+}

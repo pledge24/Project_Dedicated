@@ -47,8 +47,12 @@ export class MatchQueue<Ref = unknown>
     dequeue(userId: number): boolean
     {
         const idx = this.entries.findIndex((e) => e.userId === userId);
-        if (idx < 0) return false;
+        if (idx < 0)
+        {
+            return false;
+        }
         this.entries.splice(idx, 1);
+
         return true;
     }
 
@@ -63,6 +67,7 @@ export class MatchQueue<Ref = unknown>
         const entry: QueueEntry<Ref> = { ...input, seq: this.seqCounter++ };
         const idx = this.lowerBound(entry.score);
         this.entries.splice(idx, 0, entry);
+
         return entry;
     }
 
@@ -87,7 +92,10 @@ export class MatchQueue<Ref = unknown>
             const seed = this.pickSeed();
             const window = this.windowFor(seed, now);
             const candidates = this.entries.filter((e) => Math.abs(e.score - seed.score) <= window);
-            if (candidates.length < playersPerMatch) break;
+            if (candidates.length < playersPerMatch)
+            {
+                break;
+            }
 
             candidates.sort(byWait);
             const chosen = candidates.slice(0, playersPerMatch);
@@ -113,9 +121,16 @@ export class MatchQueue<Ref = unknown>
         while (lo < hi)
         {
             const mid = (lo + hi) >> 1;
-            if (this.entries[mid].score < score) lo = mid + 1;
-            else hi = mid;
+            if (this.entries[mid].score < score)
+            {
+                lo = mid + 1;
+            }
+            else
+            {
+                hi = mid;
+            }
         }
+
         return lo;
     }
 
@@ -125,14 +140,19 @@ export class MatchQueue<Ref = unknown>
         let seed = this.entries[0];
         for (const e of this.entries)
         {
-            if (byWait(e, seed) < 0) seed = e;
+            if (byWait(e, seed) < 0)
+            {
+                seed = e;
+            }
         }
+
         return seed;
     }
 
     private windowFor(seed: QueueEntry<Ref>, now: number): number
     {
         const waitSec = Math.max(0, (now - seed.joinedAt) / 1000);
+
         return Math.min(this.params.baseWindow + waitSec * this.params.expandRate, this.params.maxWindow);
     }
 }
@@ -140,6 +160,10 @@ export class MatchQueue<Ref = unknown>
 /** 대기시간 비교: joinedAt 오름차순, 동률이면 seq 오름차순(먼저 들어온 쪽이 앞). */
 function byWait<Ref>(a: QueueEntry<Ref>, b: QueueEntry<Ref>): number
 {
-    if (a.joinedAt !== b.joinedAt) return a.joinedAt - b.joinedAt;
+    if (a.joinedAt !== b.joinedAt)
+    {
+        return a.joinedAt - b.joinedAt;
+    }
+
     return a.seq - b.seq;
 }

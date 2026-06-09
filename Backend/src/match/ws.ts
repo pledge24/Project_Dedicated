@@ -39,6 +39,7 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
         if (pathname !== WS_PATH)
         {
             socket.destroy();
+
             return;
         }
 
@@ -49,6 +50,7 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
         {
             socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
             socket.destroy();
+
             return;
         }
 
@@ -89,7 +91,10 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
             clearInterval(heartbeat);
             clearInterval(cycle);
             ds.shutdownAll();
-            for (const client of wss.clients) client.terminate();
+            for (const client of wss.clients)
+            {
+                client.terminate();
+            }
             wss.close();
         },
     };
@@ -99,14 +104,21 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
 function authenticate(req: IncomingMessage): AuthedUser | null
 {
     const header = req.headers.authorization;
-    if (!header || !header.startsWith(BEARER_PREFIX)) return null;
+    if (!header || !header.startsWith(BEARER_PREFIX))
+    {
+        return null;
+    }
 
     const token = header.slice(BEARER_PREFIX.length).trim();
-    if (!token) return null;
+    if (!token)
+    {
+        return null;
+    }
 
     try
     {
         const claims = jwtUtil.verify(token);
+
         return { userId: claims.userId, nickname: claims.nickname };
     }
     catch
@@ -122,7 +134,10 @@ function onSocketError(err: Error): void
 
 function send(ws: WebSocket, msg: ServerMessage): void
 {
-    if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+    if (ws.readyState === WebSocket.OPEN)
+    {
+        ws.send(JSON.stringify(msg));
+    }
 }
 
 function sendError(ws: WebSocket, type: ServerMessageType, kind: ErrorKind, message: string): void
@@ -141,6 +156,7 @@ async function onMessage(ws: AuthedWs, raw: RawData): Promise<void>
     catch
     {
         sendError(ws, 'error', Codes.BAD_MESSAGE, '메시지 JSON 파싱 실패');
+
         return;
     }
 
@@ -171,6 +187,7 @@ async function onMessage(ws: AuthedWs, raw: RawData): Promise<void>
         if (err instanceof AppError)
         {
             sendError(ws, 'error', err.kind, err.message);
+
             return;
         }
         logger.error({ err, userId: ws.userId }, '매칭 메시지 처리 실패');
@@ -196,8 +213,16 @@ function onConnection(wss: WebSocketServer, ws: WebSocket, user: AuthedUser): vo
         }
     }
 
-    aws.on('pong', () => { aws.isAlive = true; });
-    aws.on('message', (raw) => { void onMessage(aws, raw); });
+    aws.on('pong', () =>
+    {
+        aws.isAlive = true;
+    });
+
+    aws.on('message', (raw) =>
+    {
+        void onMessage(aws, raw);
+    });
+
     aws.on('close', () =>
     {
         const removed = service.leave(aws.userId);
@@ -213,7 +238,10 @@ function runMatchCycle(): void
 {
     // runMatching이 매칭 즉시 큐에서 제거하므로, 비동기 할당 중 재매칭 위험은 없다.
     const groups = service.runMatching(Date.now());
-    for (const group of groups) void handleMatch(group);
+    for (const group of groups)
+    {
+        void handleMatch(group);
+    }
 }
 
 /** 한 매치 처리: DS 할당(또는 stub) → match:found 푸시. 할당 실패 시 에러 푸시. */
@@ -233,6 +261,7 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
         {
             sendError(e.ref, 'error', Codes.INTERNAL_ERROR, '게임 서버 할당에 실패했습니다.');
         }
+
         return;
     }
 

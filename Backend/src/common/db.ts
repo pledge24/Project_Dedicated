@@ -18,7 +18,10 @@ let pool: Pool | null = null;
 
 export function getPool(): Pool
 {
-    if (pool) return pool;
+    if (pool)
+    {
+        return pool;
+    }
 
     pool = mysql.createPool({
         ...dbConnectionOptions,
@@ -27,6 +30,7 @@ export function getPool(): Pool
         queueLimit: 0,
         charset: 'utf8mb4_unicode_ci',
     });
+
     return pool;
 }
 
@@ -34,14 +38,23 @@ export function getPool(): Pool
 export async function pingDb(): Promise<void>
 {
     const conn = await getPool().getConnection();
-    try { await conn.ping(); }
-    finally { conn.release(); }
+    try
+    {
+        await conn.ping();
+    }
+    finally
+    {
+        conn.release();
+    }
 }
 
 /** graceful shutdown용 — pool이 있으면 닫고 null로 리셋. */
 export async function closePool(): Promise<void>
 {
-    if (!pool) return;
+    if (!pool)
+    {
+        return;
+    }
     const p = pool;
     pool = null;
     await p.end();

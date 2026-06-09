@@ -28,6 +28,7 @@ export async function register(loginId: string, password: string, nickname: stri
     {
         throw new AppError(Codes.INTERNAL_ERROR, '가입 직후 프로필 조회에 실패했습니다.');
     }
+
     return {
         userId,
         nickname,
@@ -53,6 +54,7 @@ export async function login(loginId: string, password: string): Promise<AuthUser
         throw new AppError(Codes.INTERNAL_ERROR, '프로필 조회에 실패했습니다.');
     }
     const token = jwtUtil.sign({ userId: row.id, nickname: row.nickname });
+
     return {
         userId:   row.id,
         nickname: row.nickname,
@@ -72,6 +74,7 @@ export async function getMe(userId: number, nickname: string): Promise<RegisterR
     {
         throw new AppError(Codes.NOT_FOUND, '사용자 정보를 찾을 수 없습니다.');
     }
+
     return {
         userId,
         nickname,
