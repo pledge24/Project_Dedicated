@@ -1,5 +1,6 @@
 // D1 백엔드 엔트리: env 로드 → 검증 → app 구성 → WS 부착 → listen → graceful shutdown
 import 'dotenv/config';
+
 import http from 'node:http';
 
 import buildApp from './app.js';

@@ -27,18 +27,11 @@ export interface MatchQueueParams
     maxWindow: number;
 }
 
-/** 대기시간 비교: joinedAt 오름차순, 동률이면 seq 오름차순(먼저 들어온 쪽이 앞). */
-function byWait<Ref>(a: QueueEntry<Ref>, b: QueueEntry<Ref>): number
-{
-    if (a.joinedAt !== b.joinedAt) return a.joinedAt - b.joinedAt;
-    return a.seq - b.seq;
-}
-
 export class MatchQueue<Ref = unknown>
 {
     private entries: QueueEntry<Ref>[] = []; // score 오름차순 유지
-    private seqCounter = 0;
     private readonly params: MatchQueueParams;
+    private seqCounter = 0;
 
     constructor(params: MatchQueueParams)
     {
@@ -50,9 +43,13 @@ export class MatchQueue<Ref = unknown>
         return this.entries.length;
     }
 
-    has(userId: number): boolean
+    /** 큐에서 제거(취소/연결 끊김). 제거됐으면 true. */
+    dequeue(userId: number): boolean
     {
-        return this.entries.some((e) => e.userId === userId);
+        const idx = this.entries.findIndex((e) => e.userId === userId);
+        if (idx < 0) return false;
+        this.entries.splice(idx, 1);
+        return true;
     }
 
     /** userId당 1자리. 중복이면 AppError(ALREADY_IN_QUEUE). score 정렬 위치에 삽입. */
@@ -69,13 +66,9 @@ export class MatchQueue<Ref = unknown>
         return entry;
     }
 
-    /** 큐에서 제거(취소/연결 끊김). 제거됐으면 true. */
-    dequeue(userId: number): boolean
+    has(userId: number): boolean
     {
-        const idx = this.entries.findIndex((e) => e.userId === userId);
-        if (idx < 0) return false;
-        this.entries.splice(idx, 1);
-        return true;
+        return this.entries.some((e) => e.userId === userId);
     }
 
     /**
@@ -112,6 +105,20 @@ export class MatchQueue<Ref = unknown>
         return this.entries;
     }
 
+    /** score 이상이 처음 나오는 위치(이진 탐색) — 정렬 삽입용. */
+    private lowerBound(score: number): number
+    {
+        let lo = 0;
+        let hi = this.entries.length;
+        while (lo < hi)
+        {
+            const mid = (lo + hi) >> 1;
+            if (this.entries[mid].score < score) lo = mid + 1;
+            else hi = mid;
+        }
+        return lo;
+    }
+
     /** 최장대기 자리 = byWait 최소. */
     private pickSeed(): QueueEntry<Ref>
     {
@@ -128,18 +135,11 @@ export class MatchQueue<Ref = unknown>
         const waitSec = Math.max(0, (now - seed.joinedAt) / 1000);
         return Math.min(this.params.baseWindow + waitSec * this.params.expandRate, this.params.maxWindow);
     }
+}
 
-    /** score 이상이 처음 나오는 위치(이진 탐색) — 정렬 삽입용. */
-    private lowerBound(score: number): number
-    {
-        let lo = 0;
-        let hi = this.entries.length;
-        while (lo < hi)
-        {
-            const mid = (lo + hi) >> 1;
-            if (this.entries[mid].score < score) lo = mid + 1;
-            else hi = mid;
-        }
-        return lo;
-    }
+/** 대기시간 비교: joinedAt 오름차순, 동률이면 seq 오름차순(먼저 들어온 쪽이 앞). */
+function byWait<Ref>(a: QueueEntry<Ref>, b: QueueEntry<Ref>): number
+{
+    if (a.joinedAt !== b.joinedAt) return a.joinedAt - b.joinedAt;
+    return a.seq - b.seq;
 }

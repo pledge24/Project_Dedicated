@@ -3,11 +3,11 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 
-import * as handler from './auth.handler.js';
 import { requireAuth } from '../common/authMiddleware.js';
+import { config } from '../common/config.js';
 import { fail } from '../common/envelope.js';
 import { Codes } from '../common/errors.js';
-import { config } from '../common/config.js';
+import * as handler from './auth.handler.js';
 
 /** 공통 limit 핸들러 — envelope 포맷 응답 */
 function rateLimitHandler(req: Request, res: Response): void

@@ -1,15 +1,14 @@
+import express from 'express';
+import type { Express, NextFunction, Request, Response } from 'express';
 // Express 앱 조립: 미들웨어 → 라우터 → 에러 핸들러
 import { randomUUID } from 'node:crypto';
-
-import express from 'express';
-import type { Request, Response, NextFunction, Express } from 'express';
 import { pinoHttp } from 'pino-http';
 
-import { ok, fail } from './common/envelope.js';
+import authRouter from './auth/auth.router.js';
+import { pingDb } from './common/db.js';
+import { fail, ok } from './common/envelope.js';
 import { AppError, Codes } from './common/errors.js';
 import { logger } from './common/logger.js';
-import { pingDb } from './common/db.js';
-import authRouter from './auth/auth.router.js';
 
 export default function buildApp(): Express
 {

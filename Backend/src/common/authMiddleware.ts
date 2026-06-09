@@ -1,8 +1,8 @@
 // Bearer 토큰 검증 미들웨어 (network 레이어). Authorization 헤더 → req.user.
-import type { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 
-import * as jwtUtil from './jwt.js';
 import { AppError, Codes } from './errors.js';
+import * as jwtUtil from './jwt.js';
 
 const BEARER_PREFIX = 'Bearer ';
 

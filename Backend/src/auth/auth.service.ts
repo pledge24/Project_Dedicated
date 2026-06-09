@@ -1,9 +1,9 @@
+import { AppError, Codes } from '../common/errors.js';
+import * as jwtUtil from '../common/jwt.js';
+import * as passwordUtil from '../common/password.js';
+import type { AuthUserDTO, RegisterResultDTO } from '../common/types.js';
 // 인증 비즈니스 로직 (service 레이어)
 import * as repo from './auth.repository.js';
-import * as passwordUtil from '../common/password.js';
-import * as jwtUtil from '../common/jwt.js';
-import { AppError, Codes } from '../common/errors.js';
-import type { RegisterResultDTO, AuthUserDTO } from '../common/types.js';
 
 // 가입 직후 자동 로그인을 막기 위해 register는 토큰을 발급하지 않는다.
 // 클라는 별도로 /api/auth/login을 호출해 세션을 시작한다.

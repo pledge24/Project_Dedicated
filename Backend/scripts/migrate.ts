@@ -1,11 +1,10 @@
+import type { RowDataPacket } from 'mysql2';
+import mysql from 'mysql2/promise';
 // 경량 마이그레이션 러너. schema_migrations로 적용 버전 추적, up-only.
 // 명령: up(기본) | status | make <name>. db-init과 동일하게 dbConnectionOptions 공유.
 import { readdir, readFile, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-
-import mysql from 'mysql2/promise';
-import type { RowDataPacket } from 'mysql2';
+import { fileURLToPath } from 'node:url';
 
 import { dbConnectionOptions } from '../src/common/db.js';
 import { logger } from '../src/common/logger.js';

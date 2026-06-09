@@ -1,9 +1,9 @@
 // 인증 요청/응답 어댑터 (handler 레이어)
-import type { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 
-import * as service from './auth.service.js';
 import { ok } from '../common/envelope.js';
-import { normalizeLoginId, validateLoginId, validatePassword, validateNickname } from '../common/validate.js';
+import { normalizeLoginId, validateLoginId, validateNickname, validatePassword } from '../common/validate.js';
+import * as service from './auth.service.js';
 
 /**
  * POST /api/auth/register

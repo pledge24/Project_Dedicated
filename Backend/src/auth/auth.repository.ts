@@ -2,7 +2,7 @@
 import type { ResultSetHeader } from 'mysql2';
 
 import { getPool } from '../common/db.js';
-import type { UserRow, PlayerProfileRow } from '../common/types.js';
+import type { PlayerProfileRow, UserRow } from '../common/types.js';
 
 export async function findByLoginId(loginId: string): Promise<UserRow | null>
 {

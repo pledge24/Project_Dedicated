@@ -7,8 +7,6 @@ import type { ChildProcess } from 'node:child_process';
 import { config } from '../common/config.js';
 import { logger } from '../common/logger.js';
 
-const ds = config.match.ds;
-
 interface DsProcess
 {
     child: ChildProcess;
@@ -17,38 +15,8 @@ interface DsProcess
     killTimer: NodeJS.Timeout;
 }
 
+const ds = config.match.ds;
 const running = new Map<number, DsProcess>(); // port → 프로세스
-
-function delay(ms: number): Promise<void>
-{
-    return new Promise((resolve) => { setTimeout(resolve, ms); });
-}
-
-function pickFreePort(): number | null
-{
-    for (let p = ds.portMin; p <= ds.portMax; p++)
-    {
-        if (!running.has(p)) return p;
-    }
-    return null;
-}
-
-/** 포트의 DS를 트리째 종료하고 풀에서 해제. */
-function killProcess(port: number): void
-{
-    const proc = running.get(port);
-    if (!proc) return;
-
-    clearTimeout(proc.killTimer);
-    running.delete(port);
-
-    const pid = proc.child.pid;
-    if (pid !== undefined)
-    {
-        // 런처가 실제 서버를 자식으로 띄우므로 /T로 트리 전체 종료.
-        spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
-    }
-}
 
 /** 빈 포트에 DS spawn → bootDelay 후 {host, port}. 포트 고갈/부팅 실패 시 throw. */
 export async function allocate(matchId: string): Promise<{ host: string; port: number }>
@@ -110,4 +78,35 @@ export function shutdownAll(): void
 export function runningCount(): number
 {
     return running.size;
+}
+
+function delay(ms: number): Promise<void>
+{
+    return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
+function pickFreePort(): number | null
+{
+    for (let p = ds.portMin; p <= ds.portMax; p++)
+    {
+        if (!running.has(p)) return p;
+    }
+    return null;
+}
+
+/** 포트의 DS를 트리째 종료하고 풀에서 해제. */
+function killProcess(port: number): void
+{
+    const proc = running.get(port);
+    if (!proc) return;
+
+    clearTimeout(proc.killTimer);
+    running.delete(port);
+
+    const pid = proc.child.pid;
+    if (pid !== undefined)
+    {
+        // 런처가 실제 서버를 자식으로 띄우므로 /T로 트리 전체 종료.
+        spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
+    }
 }

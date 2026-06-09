@@ -1,10 +1,9 @@
 // 매칭 WebSocket 네트워크 레이어.
 // 같은 http.Server를 공유(noServer) → upgrade 헤더에서 JWT 인증 후 handleUpgrade.
 import { randomUUID } from 'node:crypto';
-import type { IncomingMessage, Server as HttpServer } from 'node:http';
+import type { Server as HttpServer, IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
-
-import { WebSocketServer, WebSocket } from 'ws';
+import { WebSocket, WebSocketServer } from 'ws';
 import type { RawData } from 'ws';
 
 import { config } from '../common/config.js';
@@ -14,9 +13,9 @@ import * as jwtUtil from '../common/jwt.js';
 import { logger } from '../common/logger.js';
 import type { AuthedUser } from '../common/types.js';
 import * as ds from './ds.js';
+import type { ClientMessage, ServerMessage, ServerMessageType } from './protocol.js';
 import type { MatchGroup } from './queue.js';
 import * as service from './service.js';
-import type { ClientMessage, ServerMessage, ServerMessageType } from './protocol.js';
 
 const WS_PATH = '/ws/match';
 const BEARER_PREFIX = 'Bearer ';
@@ -27,6 +26,73 @@ interface AuthedWs extends WebSocket
     userId: number;
     nickname: string;
     isAlive: boolean;
+}
+
+/** http.Server에 매칭 WS를 붙이고 사이클/heartbeat를 기동. stop()으로 정리. */
+export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
+{
+    const wss = new WebSocketServer({ noServer: true });
+
+    server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) =>
+    {
+        const { pathname } = new URL(req.url ?? '', 'http://localhost');
+        if (pathname !== WS_PATH)
+        {
+            socket.destroy();
+            return;
+        }
+
+        socket.on('error', onSocketError);
+
+        const user = authenticate(req);
+        if (!user)
+        {
+            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+        }
+
+        socket.removeListener('error', onSocketError);
+        wss.handleUpgrade(req, socket, head, (ws) =>
+        {
+            wss.emit('connection', ws, req, user);
+        });
+    });
+
+    wss.on('connection', (ws: WebSocket, _req: IncomingMessage, user: AuthedUser) => onConnection(wss, ws, user));
+
+    // 죽은 연결 감지 — heartbeat 주기마다 pong 못 받은 소켓은 terminate.
+    const heartbeat = setInterval(() =>
+    {
+        for (const client of wss.clients)
+        {
+            const aws = client as AuthedWs;
+            if (!aws.isAlive)
+            {
+                aws.terminate();
+                continue;
+            }
+            aws.isAlive = false;
+            aws.ping();
+        }
+    }, config.match.heartbeatMs);
+    heartbeat.unref();
+
+    const cycle = setInterval(runMatchCycle, config.match.cycleMs);
+    cycle.unref();
+
+    logger.info({ path: WS_PATH, cycleMs: config.match.cycleMs }, '매칭 WebSocket 시작');
+
+    return {
+        stop()
+        {
+            clearInterval(heartbeat);
+            clearInterval(cycle);
+            ds.shutdownAll();
+            for (const client of wss.clients) client.terminate();
+            wss.close();
+        },
+    };
 }
 
 /** 업그레이드 핸드셰이크의 Authorization 헤더에서 토큰 검증. 실패 시 null. */
@@ -176,71 +242,4 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
         send(ref, { type: 'match:found', ok: true, data });
     }
     logger.info({ matchId, server, players: data.players.map((p) => p.userId) }, '매치 성사');
-}
-
-/** http.Server에 매칭 WS를 붙이고 사이클/heartbeat를 기동. stop()으로 정리. */
-export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
-{
-    const wss = new WebSocketServer({ noServer: true });
-
-    server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) =>
-    {
-        const { pathname } = new URL(req.url ?? '', 'http://localhost');
-        if (pathname !== WS_PATH)
-        {
-            socket.destroy();
-            return;
-        }
-
-        socket.on('error', onSocketError);
-
-        const user = authenticate(req);
-        if (!user)
-        {
-            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-            socket.destroy();
-            return;
-        }
-
-        socket.removeListener('error', onSocketError);
-        wss.handleUpgrade(req, socket, head, (ws) =>
-        {
-            wss.emit('connection', ws, req, user);
-        });
-    });
-
-    wss.on('connection', (ws: WebSocket, _req: IncomingMessage, user: AuthedUser) => onConnection(wss, ws, user));
-
-    // 죽은 연결 감지 — heartbeat 주기마다 pong 못 받은 소켓은 terminate.
-    const heartbeat = setInterval(() =>
-    {
-        for (const client of wss.clients)
-        {
-            const aws = client as AuthedWs;
-            if (!aws.isAlive)
-            {
-                aws.terminate();
-                continue;
-            }
-            aws.isAlive = false;
-            aws.ping();
-        }
-    }, config.match.heartbeatMs);
-    heartbeat.unref();
-
-    const cycle = setInterval(runMatchCycle, config.match.cycleMs);
-    cycle.unref();
-
-    logger.info({ path: WS_PATH, cycleMs: config.match.cycleMs }, '매칭 WebSocket 시작');
-
-    return {
-        stop()
-        {
-            clearInterval(heartbeat);
-            clearInterval(cycle);
-            ds.shutdownAll();
-            for (const client of wss.clients) client.terminate();
-            wss.close();
-        },
-    };
 }
