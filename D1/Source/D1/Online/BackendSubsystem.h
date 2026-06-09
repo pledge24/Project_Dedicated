@@ -46,6 +46,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Backend")
 	const FString& GetBaseUrl() const;
 
+	//~ 외부 API — 매치 결과 보고 (DS 전용, C++ 호출). 매치별 서버 토큰을 Bearer로 첨부.
+	void ReportMatchResult(const FString& MatchId, const FString& MatchToken, const FString& MapName,
+		int32 DurationSec, const FString& EndReason, const TArray<FMatchResultPlayer>& Players);
+
 	//~ 매칭 이벤트 (서버 푸시 구독용)
 	UPROPERTY(BlueprintAssignable, Category = "Backend|Match")
 	FOnMatchFound OnMatchFound;

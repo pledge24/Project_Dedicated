@@ -107,6 +107,14 @@ struct FMatchFoundDTO
 	TArray<FMatchPlayerDTO> Players;
 };
 
+/** DS가 백엔드에 보고할 매치 결과 한 명분 (서버 내부용 — BP 비노출, USTRUCT 아님). */
+struct FMatchResultPlayer
+{
+	int64 UserId = 0;
+	int32 Placement = 0;
+	int32 LivesLeft = 0;
+};
+
 /** 회원가입/로그인 완료 콜백 (1회성 pass-in). */
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnAuthCompleted, const FBackendResponse&, Response, const FAuthUserDTO&, User);
 

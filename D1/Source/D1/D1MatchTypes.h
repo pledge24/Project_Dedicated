@@ -5,6 +5,15 @@
 #include "CoreMinimal.h"
 #include "D1MatchTypes.generated.h"
 
+/** 매치 종료 사유. DS가 백엔드 결과 POST의 endReason으로 변환해 보낸다. */
+UENUM()
+enum class EBomberEndReason : uint8
+{
+	Winner,       // 단독 생존자
+	Draw,         // 전원 동시 사망
+	TimeExpired   // 제한시간 만료
+};
+
 /** 매치 종료 시 한 플레이어의 최종 결과. GameState가 배열로 원자 복제 → UI 표시 + (추후) 백엔드 전송 공용. */
 USTRUCT(BlueprintType)
 struct FD1MatchResultEntry

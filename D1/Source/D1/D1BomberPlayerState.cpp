@@ -10,6 +10,7 @@ AD1BomberPlayerState::AD1BomberPlayerState()
 	bIsAlive = true;
 	Placement = 0;
 	PlayerSlotIndex = -1;
+	BackendUserId = 0;
 }
 
 void AD1BomberPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

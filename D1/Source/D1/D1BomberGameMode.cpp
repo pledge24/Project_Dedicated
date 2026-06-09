@@ -4,10 +4,28 @@
 #include "D1BomberGameState.h"
 #include "D1BomberPlayerState.h"
 #include "D1BomberGridLibrary.h"
+#include "D1MatchTypes.h"
 #include "D1WallBlock.h"
 #include "D1.h"
+#include "Engine/GameInstance.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
+#include "Online/BackendSubsystem.h"
+
+namespace
+{
+	const TCHAR* EndReasonToString(EBomberEndReason Reason)
+	{
+		switch (Reason)
+		{
+		case EBomberEndReason::Winner:      return TEXT("winner");
+		case EBomberEndReason::Draw:        return TEXT("draw");
+		case EBomberEndReason::TimeExpired: return TEXT("time_expired");
+		default:                            return TEXT("abort");
+		}
+	}
+}
 
 AD1BomberGameMode::AD1BomberGameMode()
 {
@@ -18,6 +36,15 @@ AD1BomberGameMode::AD1BomberGameMode()
 void AD1BomberGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// 백엔드가 spawn 시 주입한 매치 식별자/토큰. 둘 다 없으면 PIE/standalone(결과 POST 스킵).
+	FParse::Value(FCommandLine::Get(), TEXT("MatchId="), CurrentMatchId);
+	FParse::Value(FCommandLine::Get(), TEXT("MatchToken="), CurrentMatchToken);
+	if (!CurrentMatchId.IsEmpty())
+	{
+		UE_LOG(LogD1, Log, TEXT("[Match] DS matchId=%s token=%s"),
+			*CurrentMatchId, CurrentMatchToken.IsEmpty() ? TEXT("(none)") : TEXT("(set)"));
+	}
 
 	PopulateWallData();
 
@@ -97,6 +124,24 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 	return Super::ChoosePlayerStart_Implementation(Player);
 }
 
+FString AD1BomberGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)
+{
+	const FString Result = Super::InitNewPlayer(NewPlayerController, UniqueId, Options, Portal);
+
+	// travel URL의 ?userId= 를 PlayerState에 보관 → 매치 종료 시 결과 POST에 사용.
+	const FString UserIdStr = UGameplayStatics::ParseOption(Options, TEXT("userId"));
+	if (!UserIdStr.IsEmpty() && NewPlayerController)
+	{
+		if (AD1BomberPlayerState* PS = NewPlayerController->GetPlayerState<AD1BomberPlayerState>())
+		{
+			PS->BackendUserId = FCString::Atoi64(*UserIdStr);
+			UE_LOG(LogD1, Log, TEXT("[Match] InitNewPlayer %s userId=%lld"), *PS->GetPlayerName(), PS->BackendUserId);
+		}
+	}
+
+	return Result;
+}
+
 void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 {
 	if (bMatchEnded || !DeadPS)
@@ -117,10 +162,9 @@ void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 
 	if (AlivePlayerStates.Num() <= 1)
 	{
-		AD1BomberPlayerState* Winner = (AlivePlayerStates.Num() == 1)
-			? AlivePlayerStates[0].Get()
-			: DeadPS;
-		EndMatchWithWinner(Winner);
+		const bool bHasSurvivor = AlivePlayerStates.Num() == 1;
+		AD1BomberPlayerState* Winner = bHasSurvivor ? AlivePlayerStates[0].Get() : DeadPS;
+		EndMatchWithWinner(Winner, bHasSurvivor ? EBomberEndReason::Winner : EBomberEndReason::Draw);
 	}
 }
 
@@ -140,7 +184,7 @@ void AD1BomberGameMode::PopulateWallData()
 	UE_LOG(LogD1, Log, TEXT("BomberGameMode: populated %d wall cells"), Cells.Num());
 }
 
-void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS)
+void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason)
 {
 	if (bMatchEnded)
 	{
@@ -153,12 +197,14 @@ void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS)
 		WinnerPS->Placement = 1;
 	}
 
-	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
+	AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
+	if (GS)
 	{
 		GS->MatchPhase = EBomberMatchPhase::Finished;
 	}
 
-	UE_LOG(LogD1, Log, TEXT("Match ended. Winner=%s (Placement=%d)"),
+	UE_LOG(LogD1, Log, TEXT("Match ended (%s). Winner=%s (Placement=%d)"),
+		EndReasonToString(Reason),
 		WinnerPS ? *WinnerPS->GetPlayerName() : TEXT("(none)"),
 		WinnerPS ? WinnerPS->Placement : 0);
 
@@ -170,24 +216,55 @@ void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS)
 		}
 	}
 
-	// 최종 결과 스냅샷: 흩어진 PlayerState.Placement 대신 한 배열로 묶어 원자 복제(액터 간 순서 미보장 회피).
-	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
+	if (!GS)
 	{
-		TArray<FD1MatchResultEntry> Entries;
-		Entries.Reserve(GS->PlayerArray.Num());
-		for (APlayerState* PS : GS->PlayerArray)
+		return;
+	}
+
+	// 최종 결과 스냅샷(UI 원자 복제) + 백엔드 보고용 수집을 한 번에.
+	TArray<FD1MatchResultEntry> Entries;
+	TArray<FMatchResultPlayer> ResultPlayers;
+	Entries.Reserve(GS->PlayerArray.Num());
+	ResultPlayers.Reserve(GS->PlayerArray.Num());
+	for (APlayerState* PS : GS->PlayerArray)
+	{
+		if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
 		{
-			if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
+			// 미배정 생존자(시간 만료/무승부)는 공동 1위로 보정 — 백엔드는 placement 1~N만 허용.
+			if (B->Placement <= 0)
 			{
-				FD1MatchResultEntry Entry;
-				Entry.Placement = B->Placement;
-				Entry.Nickname  = B->GetPlayerName();
-				Entry.SlotIndex = B->PlayerSlotIndex;
-				Entry.LivesLeft = B->Lives;
-				Entries.Add(Entry);
+				B->Placement = 1;
+			}
+
+			FD1MatchResultEntry Entry;
+			Entry.Placement = B->Placement;
+			Entry.Nickname  = B->GetPlayerName();
+			Entry.SlotIndex = B->PlayerSlotIndex;
+			Entry.LivesLeft = B->Lives;
+			Entries.Add(Entry);
+
+			FMatchResultPlayer RP;
+			RP.UserId    = B->BackendUserId;
+			RP.Placement = B->Placement;
+			RP.LivesLeft = B->Lives;
+			ResultPlayers.Add(RP);
+		}
+	}
+	GS->SetFinalResults(Entries);
+
+	// 백엔드가 띄운 DS일 때만 결과 보고(토큰 없으면 PIE/standalone → 스킵).
+	if (!CurrentMatchToken.IsEmpty())
+	{
+		if (UGameInstance* GI = GetGameInstance())
+		{
+			if (UBackendSubsystem* Backend = GI->GetSubsystem<UBackendSubsystem>())
+			{
+				const int32 DurationSec = FMath::Max(0,
+					FMath::RoundToInt(GS->GetServerWorldTimeSeconds() - GS->MatchStartServerTime));
+				Backend->ReportMatchResult(CurrentMatchId, CurrentMatchToken, GetWorld()->GetMapName(),
+					DurationSec, EndReasonToString(Reason), ResultPlayers);
 			}
 		}
-		GS->SetFinalResults(Entries);
 	}
 }
 
@@ -221,6 +298,6 @@ void AD1BomberGameMode::OnMatchTimeExpired()
 		return;
 	}
 	UE_LOG(LogD1, Log, TEXT("Match time expired -> ending match"));
-	// placement 룰은 추후 정의. 일단 종료만.
-	EndMatchWithWinner(nullptr);
+	// 생존자는 EndMatchWithWinner에서 공동 1위로 보정된다.
+	EndMatchWithWinner(nullptr, EBomberEndReason::TimeExpired);
 }

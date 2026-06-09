@@ -57,6 +57,10 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_PlayerSlotIndex, BlueprintReadOnly, Category = "Bomber")
 	int32 PlayerSlotIndex;
 
+	// 백엔드 userId — 클라가 travel URL ?userId= 로 전달, 서버가 결과 POST에 사용. 복제 안 함(서버 전용).
+	UPROPERTY(BlueprintReadOnly, Category = "Bomber")
+	int64 BackendUserId;
+
 protected:
 	virtual void OnRep_PlayerName() override;
 
