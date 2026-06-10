@@ -28,23 +28,9 @@ void UD1UWLobby::NativeConstruct()
 		return;
 	}
 
-	const FAuthUserDTO& User = GI->GetCurrentUser();
+	// 우선 캐시값으로 라벨 표시 → 아래 RefreshMyProfile 완료 시 최신값으로 교체.
+	ApplyProfileToLabels();
 
-	if (NicknameLabel)
-	{
-		NicknameLabel->SetText(FText::FromString(User.Nickname));
-	}
-	if (LevelLabel)
-	{
-		LevelLabel->SetText(FText::Format(
-			NSLOCTEXT("Lobby", "LvFmt", "Lv. {0}"),
-			FText::AsNumber(User.Level)
-		));
-	}
-	if (ScoreLabel)
-	{
-		ScoreLabel->SetText(FText::AsNumber(User.Score));
-	}
 	if (StartMatchingButton)
 	{
 		StartMatchingButton->OnClicked.AddDynamic(this, &UD1UWLobby::OnStartMatchingClicked);
@@ -65,6 +51,10 @@ void UD1UWLobby::NativeConstruct()
 		Backend->OnQueueJoined.AddDynamic(this, &UD1UWLobby::HandleQueueJoined);
 		Backend->OnMatchFound.AddDynamic(this, &UD1UWLobby::HandleMatchFound);
 		Backend->OnMatchmakingError.AddDynamic(this, &UD1UWLobby::HandleMatchmakingError);
+		Backend->OnProfileUpdated.AddDynamic(this, &UD1UWLobby::HandleProfileUpdated);
+
+		// 매치 후 ELO가 바뀌었을 수 있음 — 최신 프로필 재조회(완료 시 HandleProfileUpdated).
+		Backend->RefreshMyProfile();
 	}
 }
 
@@ -78,6 +68,7 @@ void UD1UWLobby::NativeDestruct()
 			Backend->OnQueueJoined.RemoveDynamic(this, &UD1UWLobby::HandleQueueJoined);
 			Backend->OnMatchFound.RemoveDynamic(this, &UD1UWLobby::HandleMatchFound);
 			Backend->OnMatchmakingError.RemoveDynamic(this, &UD1UWLobby::HandleMatchmakingError);
+			Backend->OnProfileUpdated.RemoveDynamic(this, &UD1UWLobby::HandleProfileUpdated);
 		}
 	}
 
@@ -164,5 +155,37 @@ void UD1UWLobby::HandleMatchmakingError(const FBackendResponse& Error)
 	{
 		// 에러 문구는 패널에 남겨두고 다시 시도 가능하게 Start 재활성
 		StartMatchingButton->SetIsEnabled(true);
+	}
+}
+
+void UD1UWLobby::HandleProfileUpdated()
+{
+	// /api/auth/me 갱신 완료 — 최신 score/level로 라벨 새로고침.
+	ApplyProfileToLabels();
+}
+
+void UD1UWLobby::ApplyProfileToLabels()
+{
+	const UD1GameInstance* GI = GetGameInstance<UD1GameInstance>();
+	if (!GI)
+	{
+		return;
+	}
+	const FAuthUserDTO& User = GI->GetCurrentUser();
+
+	if (NicknameLabel)
+	{
+		NicknameLabel->SetText(FText::FromString(User.Nickname));
+	}
+	if (LevelLabel)
+	{
+		LevelLabel->SetText(FText::Format(
+			NSLOCTEXT("Lobby", "LvFmt", "Lv. {0}"),
+			FText::AsNumber(User.Level)
+		));
+	}
+	if (ScoreLabel)
+	{
+		ScoreLabel->SetText(FText::AsNumber(User.Score));
 	}
 }

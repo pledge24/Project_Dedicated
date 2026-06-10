@@ -44,6 +44,10 @@ protected:
 	UFUNCTION()
 	void HandleMatchmakingError(const FBackendResponse& Error);
 
+	//~ 프로필 갱신(/api/auth/me 완료) 구독 핸들러
+	UFUNCTION()
+	void HandleProfileUpdated();
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> NicknameLabel;
 
@@ -66,6 +70,9 @@ protected:
 	TObjectPtr<UTextBlock> MatchStatusLabel;
 
 private:
+	/** GameInstance 캐시(GetCurrentUser)의 닉네임/레벨/점수를 라벨에 반영. 캐시·갱신 양쪽에서 호출. */
+	void ApplyProfileToLabels();
+
 	/** 비로그인 시 복귀할 맵 — 디테일 패널에서 MP_Frontend 지정. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))
 	TSoftObjectPtr<UWorld> FrontendMap;

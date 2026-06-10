@@ -30,6 +30,9 @@ public:
 	/** Subsystem이 인증 응답 받자마자 호출. */
 	void SetSession(const FString& InJwt, const FAuthUserDTO& InUser);
 
+	/** 세션 유지한 채 유저 정보만 최신화(/api/auth/me 갱신용). JWT·로그인 상태 보존. */
+	void UpdateUserProfile(const FAuthUserDTO& InUser);
+
 	UFUNCTION(BlueprintCallable, Category = "D1|Session")
 	void ClearSession();
 

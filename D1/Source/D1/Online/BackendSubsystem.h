@@ -43,6 +43,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Backend|Match")
 	EMatchmakingState GetMatchmakingState() const { return MatchmakingState; }
 
+	//~ 외부 API — 프로필
+	/** GET /api/auth/me로 최신 프로필을 받아 GameInstance 캐시 갱신 후 OnProfileUpdated 방송. */
+	UFUNCTION(BlueprintCallable, Category = "Backend|Profile")
+	void RefreshMyProfile();
+
 	UFUNCTION(BlueprintCallable, Category = "Backend")
 	const FString& GetBaseUrl() const;
 
@@ -60,10 +65,15 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Backend|Match")
 	FOnMatchmakingError OnMatchmakingError;
 
+	//~ 프로필 이벤트 (갱신 완료 구독용)
+	UPROPERTY(BlueprintAssignable, Category = "Backend|Profile")
+	FOnProfileUpdated OnProfileUpdated;
+
 private:
 	//~ 내부 헬퍼 — HTTP 인증
 	TSharedRef<IHttpRequest> BuildPostJson(const FString& Path, const TSharedRef<FJsonObject>& Body, bool bAttachAuth) const;
 	void HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded, FOnAuthCompleted Forward);
+	void HandleProfileResponse(FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded);
 	static EBackendErrorCode ParseErrorCode(const FString& CodeStr);
 
 	//~ 내부 헬퍼 — 매칭 WebSocket

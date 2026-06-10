@@ -121,6 +121,14 @@ void UBackendSubsystem::Login(const FString& LoginId, const FString& Password, c
 
 void UBackendSubsystem::StartMatchmaking()
 {
+	// 직전 매치에서 Matched로 남은 잔류 상태 — Subsystem이 travel을 가로질러 살아남아
+	// 로비 복귀 후에도 유지됨. 다시 매칭 = 새 매칭이므로 Idle로 리셋(소켓은 입장 직전 이미 닫힘).
+	if (MatchmakingState == EMatchmakingState::Matched)
+	{
+		CloseMatchSocket();
+		MatchmakingState = EMatchmakingState::Idle;
+	}
+
 	if (MatchmakingState != EMatchmakingState::Idle)
 	{
 		UE_LOG(LogD1, Warning, TEXT("[Match] 이미 매칭 중 (state=%d) — Start 무시"), static_cast<int32>(MatchmakingState));
@@ -170,6 +178,33 @@ void UBackendSubsystem::CancelMatchmaking()
 	CloseMatchSocket();
 	MatchmakingState = EMatchmakingState::Idle;
 	UE_LOG(LogD1, Log, TEXT("[Match] 매칭 취소"));
+}
+
+void UBackendSubsystem::RefreshMyProfile()
+{
+	const UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance());
+	const FString Jwt = GI ? GI->GetCurrentJwt() : FString();
+	if (Jwt.IsEmpty())
+	{
+		// 비로그인 — 갱신할 세션 없음.
+		return;
+	}
+
+	const TSharedRef<IHttpRequest> Request = FHttpModule::Get().CreateRequest();
+	Request->SetURL(GetBaseUrl() + TEXT("/api/auth/me"));
+	Request->SetVerb(TEXT("GET"));
+	Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *Jwt));
+
+	TWeakObjectPtr<UBackendSubsystem> WeakThis(this);
+	Request->OnProcessRequestComplete().BindLambda(
+		[WeakThis](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded)
+		{
+			if (UBackendSubsystem* Self = WeakThis.Get())
+			{
+				Self->HandleProfileResponse(Req, Resp, bSucceeded);
+			}
+		});
+	Request->ProcessRequest();
 }
 
 TSharedRef<IHttpRequest> UBackendSubsystem::BuildPostJson(const FString& Path, const TSharedRef<FJsonObject>& Body, bool bAttachAuth) const
@@ -283,6 +318,47 @@ void UBackendSubsystem::HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr
 	}
 	Out.bOk = false;
 	Forward.ExecuteIfBound(Out, User);
+}
+
+void UBackendSubsystem::HandleProfileResponse(FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded)
+{
+	if (!bSucceeded || !Resp.IsValid())
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Profile] /me 갱신 실패 (네트워크)"));
+		return;
+	}
+
+	const FString Content = Resp->GetContentAsString();
+	const TSharedRef<TJsonReader<TCHAR>> Reader = TJsonReaderFactory<TCHAR>::Create(Content);
+	TSharedPtr<FJsonObject> Root;
+	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid()
+		|| !(Root->HasField(TEXT("ok")) && Root->GetBoolField(TEXT("ok"))))
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Profile] /me 응답 파싱 실패: %s"), *Content);
+		return;
+	}
+
+	const TSharedPtr<FJsonObject>* DataObj = nullptr;
+	if (!Root->TryGetObjectField(TEXT("data"), DataObj) || !DataObj || !DataObj->IsValid())
+	{
+		return;
+	}
+
+	// login 응답과 동일 모양 — score/level/exp 최신값. token은 없음(세션은 그대로 유지).
+	FAuthUserDTO User;
+	User.UserId   = static_cast<int32>((*DataObj)->GetNumberField(TEXT("userId")));
+	User.Nickname = (*DataObj)->GetStringField(TEXT("nickname"));
+	User.Score    = static_cast<int32>((*DataObj)->GetNumberField(TEXT("score")));
+	(*DataObj)->TryGetNumberField(TEXT("level"), User.Level);
+	(*DataObj)->TryGetNumberField(TEXT("exp"),   User.Exp);
+
+	if (UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance()))
+	{
+		GI->UpdateUserProfile(User);
+	}
+
+	OnProfileUpdated.Broadcast();
+	UE_LOG(LogD1, Log, TEXT("[Profile] 갱신 완료 score=%d level=%d"), User.Score, User.Level);
 }
 
 EBackendErrorCode UBackendSubsystem::ParseErrorCode(const FString& CodeStr)

@@ -126,3 +126,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnQueueJoined);
 
 /** 매칭 에러(연결 실패/거부/끊김). */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMatchmakingError, const FBackendResponse&, Error);
+
+/** 프로필 갱신 완료(/api/auth/me 응답으로 캐시 갱신됨). UI가 라벨 새로고침용으로 구독. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnProfileUpdated);

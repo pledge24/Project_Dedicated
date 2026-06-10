@@ -9,6 +9,11 @@ void UD1GameInstance::SetSession(const FString& InJwt, const FAuthUserDTO& InUse
 	bLoggedIn = true;
 }
 
+void UD1GameInstance::UpdateUserProfile(const FAuthUserDTO& InUser)
+{
+	CurrentUser = InUser;
+}
+
 void UD1GameInstance::ClearSession()
 {
 	CurrentJwt.Empty();
