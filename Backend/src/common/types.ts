@@ -121,3 +121,43 @@ export interface MatchResultResponse
     matchId: string;
     participants: MatchResultParticipantDTO[];
 }
+
+/* GET /api/ranking 계약 */
+
+/** 랭킹 한 줄 (응답 DTO). rank는 offset+index+1 위치 순위(동점은 user_id로 결정). */
+export interface RankingEntry
+{
+    rank: number;
+    userId: number;
+    nickname: string;
+    score: number;
+    level: number;
+    wins: number;
+    losses: number;
+    matchesPlayed: number;
+}
+
+/** 응답: 페이지 + meta(클라 페이지네이션 렌더용). */
+export interface RankingResponse
+{
+    entries: RankingEntry[];
+    meta: { total: number; limit: number; offset: number };
+}
+
+/** DB player_profiles JOIN users 행 (랭킹 페이지 쿼리). */
+export interface RankingRow extends RowDataPacket
+{
+    user_id: number;
+    nickname: string;
+    score: number;
+    level: number;
+    wins: number;
+    losses: number;
+    matches_played: number;
+}
+
+/** COUNT(*) 행. */
+export interface CountRow extends RowDataPacket
+{
+    total: number;
+}

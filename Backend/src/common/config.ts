@@ -22,6 +22,7 @@ export const config = Object.freeze({
         loginMax: asNumber('RATE_LIMIT_LOGIN_MAX', 5),
         registerMax: asNumber('RATE_LIMIT_REGISTER_MAX', 10),
         resultMax: asNumber('RATE_LIMIT_RESULT_MAX', 30),    // DS 결과 보고(/api/match/result)
+        rankingMax: asNumber('RATE_LIMIT_RANKING_MAX', 60),  // 랭킹 조회(/api/ranking)
     }),
     // 매칭 큐 파라미터. score 디폴트 1000 기준 합리값. 전부 MATCH_* env로 override 가능.
     match: Object.freeze({
@@ -49,6 +50,11 @@ export const config = Object.freeze({
             bootDelayMs:   asNumber('MATCH_DS_BOOT_DELAY_MS', 5000),  // UDP라 TCP 프로브 불가 → 고정 부팅 지연
             maxLifetimeMs: asNumber('MATCH_DS_MAX_LIFETIME_MS', 900_000), // 15분 후 강제 회수
         }),
+    }),
+    // 랭킹 조회 페이지네이션 한도. limit 미지정 시 defaultLimit, 상한은 maxLimit로 클램프.
+    ranking: Object.freeze({
+        defaultLimit: asNumber('RANKING_DEFAULT_LIMIT', 50),
+        maxLimit:     asNumber('RANKING_MAX_LIMIT', 100),
     }),
 });
 
