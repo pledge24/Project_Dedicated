@@ -25,6 +25,36 @@ namespace
 		default:                            return TEXT("abort");
 		}
 	}
+
+	// 슬롯 번호 → PlayerStart. PlayerStartTag=="N" 우선, 없으면 이름순 정렬의 N번째.
+	AActor* FindStartForSlot(const UObject* WorldContext, int32 Slot)
+	{
+		if (Slot < 0)
+		{
+			return nullptr;
+		}
+
+		TArray<AActor*> AllStarts;
+		UGameplayStatics::GetAllActorsOfClass(WorldContext, APlayerStart::StaticClass(), AllStarts);
+		AllStarts.Sort([](const AActor& A, const AActor& B)
+		{
+			return A.GetName() < B.GetName();
+		});
+
+		const FString SlotTag = FString::FromInt(Slot);
+		for (AActor* Start : AllStarts)
+		{
+			if (const APlayerStart* PS = Cast<APlayerStart>(Start))
+			{
+				if (PS->PlayerStartTag.ToString() == SlotTag)
+				{
+					return Start;
+				}
+			}
+		}
+
+		return AllStarts.IsValidIndex(Slot) ? AllStarts[Slot] : nullptr;
+	}
 }
 
 AD1BomberGameMode::AD1BomberGameMode()
@@ -37,26 +67,30 @@ void AD1BomberGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 백엔드가 spawn 시 주입한 매치 식별자/토큰. 둘 다 없으면 PIE/standalone(결과 POST 스킵).
+	// 백엔드가 spawn 시 주입한 매치 식별자/토큰/예상 인원. 둘 다 없으면 PIE/standalone(결과 POST 스킵).
 	FParse::Value(FCommandLine::Get(), TEXT("MatchId="), CurrentMatchId);
 	FParse::Value(FCommandLine::Get(), TEXT("MatchToken="), CurrentMatchToken);
+	FParse::Value(FCommandLine::Get(), TEXT("ExpectedPlayers="), ExpectedPlayerCount);
 	if (!CurrentMatchId.IsEmpty())
 	{
-		UE_LOG(LogD1, Log, TEXT("[Match] DS matchId=%s token=%s"),
-			*CurrentMatchId, CurrentMatchToken.IsEmpty() ? TEXT("(none)") : TEXT("(set)"));
+		UE_LOG(LogD1, Log, TEXT("[Match] DS matchId=%s token=%s expected=%d"),
+			*CurrentMatchId, CurrentMatchToken.IsEmpty() ? TEXT("(none)") : TEXT("(set)"), ExpectedPlayerCount);
 	}
 
 	PopulateWallData();
 
-	if (AD1BomberGameState* BomberGS = GetGameState<AD1BomberGameState>())
+	// 시작 게이트: 예상 인원 0/1(PIE·솔로)이면 즉시 시작, 아니면 전원 입장(PostLogin) 또는 타임아웃까지 Waiting.
+	if (ExpectedPlayerCount <= 1)
 	{
-		BomberGS->MatchStartServerTime = BomberGS->GetServerWorldTimeSeconds();
-		BomberGS->MatchPhase = EBomberMatchPhase::Playing;
-
-		// 매치 제한시간 만료 콜백.
+		StartMatch();
+	}
+	else
+	{
 		GetWorldTimerManager().SetTimer(
-			MatchTimerHandle, this, &AD1BomberGameMode::OnMatchTimeExpired,
-			BomberGS->MatchDurationSec, /*bLoop=*/false);
+			WaitForPlayersTimerHandle, this, &AD1BomberGameMode::OnWaitForPlayersTimeout,
+			WaitForPlayersTimeoutSec, /*bLoop=*/false);
+		UE_LOG(LogD1, Log, TEXT("[Match] 시작 게이트 대기 — 예상 %d명 (타임아웃 %.0fs)"),
+			ExpectedPlayerCount, WaitForPlayersTimeoutSec);
 	}
 }
 
@@ -73,6 +107,26 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 		return A.GetName() < B.GetName();
 	});
 
+	AD1BomberPlayerState* BomberPS = Player ? Player->GetPlayerState<AD1BomberPlayerState>() : nullptr;
+
+	// 백엔드 권위 슬롯(InitNewPlayer가 ?slot= 로 세팅)이 있으면 그 슬롯 자리로 고정 배치.
+	// userId별 슬롯이 고정되므로 이중접속/유령 연결이 있어도 색·위치가 안 꼬인다.
+	if (BomberPS && BomberPS->PlayerSlotIndex >= 0)
+	{
+		// 슬롯→Start는 공용 헬퍼로. (단 DS에선 이 함수가 InitNewPlayer보다 먼저 돌아
+		//  보통 PlayerSlotIndex<0 → 아래 fallback로 빠지고, 위치는 PostLogin에서 보정한다.)
+		if (AActor* Chosen = FindStartForSlot(this, BomberPS->PlayerSlotIndex))
+		{
+			UsedStarts.Add(Chosen);
+			UE_LOG(LogD1, Log, TEXT("Slot %d -> Start %s (authoritative) for %s"),
+				BomberPS->PlayerSlotIndex, *Chosen->GetName(), *BomberPS->GetPlayerName());
+			return Chosen;
+		}
+
+		UE_LOG(LogD1, Warning, TEXT("Slot %d has no matching PlayerStart; falling back"), BomberPS->PlayerSlotIndex);
+	}
+
+	// fallback: 슬롯 미지정(PIE/standalone, 백엔드 없음) — 안 쓴 Start를 순번대로 배정.
 	for (int32 i = 0; i < AllStarts.Num(); ++i)
 	{
 		AActor* Start = AllStarts[i];
@@ -107,14 +161,11 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 		}
 
 		// PlayerState에 슬롯 부여.
-		if (Player)
+		if (BomberPS)
 		{
-			if (AD1BomberPlayerState* BomberPS = Player->GetPlayerState<AD1BomberPlayerState>())
-			{
-				BomberPS->SetPlayerSlotIndex(SlotIndex);
-				UE_LOG(LogD1, Log, TEXT("Assigned PlayerSlotIndex=%d to %s (Start=%s)"),
-					SlotIndex, *BomberPS->GetPlayerName(), *Start->GetName());
-			}
+			BomberPS->SetPlayerSlotIndex(SlotIndex);
+			UE_LOG(LogD1, Log, TEXT("Assigned PlayerSlotIndex=%d to %s (Start=%s)"),
+				SlotIndex, *BomberPS->GetPlayerName(), *Start->GetName());
 		}
 
 		UsedStarts.Add(Start);
@@ -128,18 +179,90 @@ FString AD1BomberGameMode::InitNewPlayer(APlayerController* NewPlayerController,
 {
 	const FString Result = Super::InitNewPlayer(NewPlayerController, UniqueId, Options, Portal);
 
-	// travel URL의 ?userId= 를 PlayerState에 보관 → 매치 종료 시 결과 POST에 사용.
-	const FString UserIdStr = UGameplayStatics::ParseOption(Options, TEXT("userId"));
-	if (!UserIdStr.IsEmpty() && NewPlayerController)
+	AD1BomberPlayerState* PS = NewPlayerController ? NewPlayerController->GetPlayerState<AD1BomberPlayerState>() : nullptr;
+	if (PS)
 	{
-		if (AD1BomberPlayerState* PS = NewPlayerController->GetPlayerState<AD1BomberPlayerState>())
+		// travel URL의 ?userId= 를 PlayerState에 보관 → 매치 종료 시 결과 POST에 사용.
+		const FString UserIdStr = UGameplayStatics::ParseOption(Options, TEXT("userId"));
+		if (!UserIdStr.IsEmpty())
 		{
 			PS->BackendUserId = FCString::Atoi64(*UserIdStr);
 			UE_LOG(LogD1, Log, TEXT("[Match] InitNewPlayer %s userId=%lld"), *PS->GetPlayerName(), PS->BackendUserId);
 		}
+
+		// travel URL의 ?slot= 을 백엔드 권위 슬롯으로 채택 → ChoosePlayerStart가 이 자리로 배치.
+		const FString SlotStr = UGameplayStatics::ParseOption(Options, TEXT("slot"));
+		if (SlotStr.IsNumeric())
+		{
+			const int32 Slot = FCString::Atoi(*SlotStr);
+			if (Slot >= 0 && Slot <= 3)
+			{
+				PS->SetPlayerSlotIndex(Slot);
+				UE_LOG(LogD1, Log, TEXT("[Match] InitNewPlayer %s slot=%d"), *PS->GetPlayerName(), Slot);
+			}
+		}
 	}
 
 	return Result;
+}
+
+void AD1BomberGameMode::Logout(AController* Exiting)
+{
+	// 떠난 플레이어가 점유했던 PlayerStart를 해제 → fallback(순번) 경로 슬롯 누수 방지.
+	// 권위 슬롯 경로에선 슬롯이 고정이라 no-op이어도 무방.
+	if (Exiting && Exiting->StartSpot.IsValid())
+	{
+		UsedStarts.Remove(Exiting->StartSpot);
+	}
+	UsedStarts.RemoveAll([](const TWeakObjectPtr<AActor>& Ptr) { return !Ptr.IsValid(); });
+
+	Super::Logout(Exiting);
+}
+
+void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
+{
+	Super::PostLogin(NewPlayer);
+
+	// 슬롯 기반 스폰 위치 보정. DS에선 ChoosePlayerStart가 InitNewPlayer보다 먼저 돌아
+	// 권위 슬롯을 모른 채 fallback 위치로 스폰된다. 슬롯이 확정된 지금(InitNewPlayer 이후) 슬롯 자리로 옮긴다.
+	if (NewPlayer)
+	{
+		if (const AD1BomberPlayerState* PS = NewPlayer->GetPlayerState<AD1BomberPlayerState>())
+		{
+			if (APawn* Pawn = NewPlayer->GetPawn())
+			{
+				if (const AActor* Start = FindStartForSlot(this, PS->PlayerSlotIndex))
+				{
+					Pawn->SetActorLocationAndRotation(Start->GetActorLocation(), Start->GetActorRotation());
+				}
+			}
+		}
+	}
+
+	// 이미 시작했거나 게이트 비활성(PIE·솔로)이면 시작 게이트 카운트 생략.
+	if (bMatchStarted || ExpectedPlayerCount <= 1)
+	{
+		return;
+	}
+
+	int32 Connected = 0;
+	if (const AGameStateBase* GS = GameState)
+	{
+		for (const APlayerState* PS : GS->PlayerArray)
+		{
+			if (Cast<AD1BomberPlayerState>(PS))
+			{
+				++Connected;
+			}
+		}
+	}
+
+	UE_LOG(LogD1, Log, TEXT("[Match] 입장 %d/%d"), Connected, ExpectedPlayerCount);
+
+	if (Connected >= ExpectedPlayerCount)
+	{
+		StartMatch();
+	}
 }
 
 void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
@@ -289,6 +412,39 @@ void AD1BomberGameMode::EnsureAliveListInitialized()
 			}
 		}
 	}
+}
+
+void AD1BomberGameMode::StartMatch()
+{
+	if (bMatchStarted)
+	{
+		return;
+	}
+	bMatchStarted = true;
+	GetWorldTimerManager().ClearTimer(WaitForPlayersTimerHandle);
+
+	if (AD1BomberGameState* BomberGS = GetGameState<AD1BomberGameState>())
+	{
+		BomberGS->MatchStartServerTime = BomberGS->GetServerWorldTimeSeconds();
+		BomberGS->MatchPhase = EBomberMatchPhase::Playing;
+
+		// 매치 제한시간 만료 콜백.
+		GetWorldTimerManager().SetTimer(
+			MatchTimerHandle, this, &AD1BomberGameMode::OnMatchTimeExpired,
+			BomberGS->MatchDurationSec, /*bLoop=*/false);
+	}
+
+	UE_LOG(LogD1, Log, TEXT("[Match] 매치 시작 (Playing)"));
+}
+
+void AD1BomberGameMode::OnWaitForPlayersTimeout()
+{
+	if (bMatchStarted)
+	{
+		return;
+	}
+	UE_LOG(LogD1, Warning, TEXT("[Match] 시작 게이트 타임아웃 — 현재 인원으로 시작"));
+	StartMatch();
 }
 
 void AD1BomberGameMode::OnMatchTimeExpired()

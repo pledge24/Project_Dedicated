@@ -22,8 +22,14 @@ public:
 	virtual void BeginPlay() override;
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
-	/** 접속 시 travel URL의 ?userId= 를 PlayerState에 저장(서버 결과 POST용). */
+	/** 접속 시 travel URL의 ?userId=/?slot= 를 PlayerState에 저장(서버 결과 POST·권위 슬롯용). */
 	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
+
+	/** 퇴장 시 점유 PlayerStart 해제 — fallback(순번) 경로 슬롯 누수 방지. */
+	virtual void Logout(AController* Exiting) override;
+
+	/** 입장 완료 시점: 예상 인원 다 모이면 매치 시작(시작 게이트). */
+	virtual void PostLogin(APlayerController* NewPlayer) override;
 
 	/** 서버 전용: 플레이어 사망 등록, 등수 부여, 1명 남으면 매치 종료. */
 	void NotifyPlayerDied(AD1BomberPlayerState* DeadPS);
@@ -33,8 +39,18 @@ private:
 	void EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason);
 	void EnsureAliveListInitialized();
 
+	/** Waiting → Playing 전환 + 매치 타이머 시작. 한 번만 실행(가드). */
+	void StartMatch();
+
+	/** 예상 인원 미달 상태로 대기 타임아웃 → 현재 인원으로 매치 시작. */
+	void OnWaitForPlayersTimeout();
+
 	/** 매치 시간 만료 → 매치 종료. placement 룰은 v2에서 정의. */
 	void OnMatchTimeExpired();
+
+	/** 시작 게이트 대기 상한(초). 예상 인원이 안 차도 이 시간 뒤엔 시작. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
+	float WaitForPlayersTimeoutSec = 20.f;
 
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> UsedStarts;
@@ -44,8 +60,16 @@ private:
 
 	bool bMatchEnded = false;
 
+	bool bMatchStarted = false;
+
 	/** 매치 제한시간 만료 콜백용 타이머. */
 	FTimerHandle MatchTimerHandle;
+
+	/** 시작 게이트 대기 타임아웃용 타이머. */
+	FTimerHandle WaitForPlayersTimerHandle;
+
+	/** 백엔드가 spawn 시 -ExpectedPlayers= 로 주입. 이 수만큼 접속하면 매치 시작(0/1=즉시). */
+	int32 ExpectedPlayerCount = 0;
 
 	/** 백엔드가 spawn 시 -MatchId/-MatchToken 으로 주입. 결과 POST 인증에 사용(비면 스킵). */
 	FString CurrentMatchId;

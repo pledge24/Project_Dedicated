@@ -48,6 +48,11 @@ void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)
 	{
 		return;
 	}
+	// -1(미배정 리셋) 또는 0~3만 허용. 범위 밖은 거부 — clamp하면 두 명이 같은 슬롯으로 몰림.
+	if (NewIndex < -1 || NewIndex > 3)
+	{
+		return;
+	}
 	PlayerSlotIndex = NewIndex;
 	OnRep_PlayerSlotIndex(); // Listen Server 대응
 }

@@ -30,6 +30,11 @@ void AD1PlayerController::BeginPlay()
 		return;
 	}
 
+	// 메뉴(D1MenuPlayerController)가 둔 UIOnly 입력 모드는 travel로 새 PC가 생겨도 안 풀린다.
+	// 인게임에선 게임 입력으로 명시 복귀 — 안 하면 WASD/폭탄이 UI로 먹혀 조작 불가.
+	SetInputMode(FInputModeGameOnly());
+	bShowMouseCursor = false;
+
 	if (HUDClass && !HUDWidget)
 	{
 		HUDWidget = CreateWidget<UUserWidget>(this, HUDClass);

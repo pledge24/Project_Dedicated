@@ -430,8 +430,29 @@ void UBackendSubsystem::HandleSocketMessage(const FString& Message)
 				{
 					MyUserId = GI->GetCurrentUser().UserId;
 				}
-				const FString Url = FString::Printf(TEXT("%s:%d?matchId=%s?userId=%d"),
-					*Match.ServerHost, Match.ServerPort, *Match.MatchId, MyUserId);
+
+				// 백엔드 권위 슬롯을 ?slot= 으로 동봉 → DS가 이 자리로 고정 배치(색·위치 일관). 못 찾으면 생략.
+				int32 MySlot = -1;
+				for (const FMatchPlayerDTO& P : Match.Players)
+				{
+					if (P.UserId == MyUserId)
+					{
+						MySlot = P.SlotIndex;
+						break;
+					}
+				}
+				FString SlotSuffix;
+				if (MySlot >= 0)
+				{
+					SlotSuffix = FString::Printf(TEXT("?slot=%d"), MySlot);
+				}
+				else
+				{
+					UE_LOG(LogD1, Warning, TEXT("[Match] match:found에서 내 슬롯(userId=%d) 못 찾음 — slot 생략"), MyUserId);
+				}
+
+				const FString Url = FString::Printf(TEXT("%s:%d?matchId=%s?userId=%d%s"),
+					*Match.ServerHost, Match.ServerPort, *Match.MatchId, MyUserId, *SlotSuffix);
 				UE_LOG(LogD1, Log, TEXT("[Match] DS 입장: %s"), *Url);
 				PC->ClientTravel(Url, TRAVEL_Absolute);
 			}
