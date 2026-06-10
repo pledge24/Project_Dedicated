@@ -48,9 +48,22 @@ private:
 	/** 매치 시간 만료 → 매치 종료. placement 룰은 v2에서 정의. */
 	void OnMatchTimeExpired();
 
+	/** 매치 종료 후 DS 자가 종료 감시 시작(DS 전용). 전원 퇴장 또는 하드캡 시 종료. */
+	void StartShutdownWatchdog();
+
+	/** 1초마다 인원 확인 — 0명이거나 하드캡 도달 시 DS 종료 요청. */
+	void TickShutdownWatchdog();
+
+	/** DS 프로세스 종료 요청(RequestExit). 백엔드가 포트/슬롯 자동 회수. */
+	void RequestServerShutdown();
+
 	/** 시작 게이트 대기 상한(초). 예상 인원이 안 차도 이 시간 뒤엔 시작. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
 	float WaitForPlayersTimeoutSec = 20.f;
+
+	/** 매치 종료 후 전원 퇴장이 없어도 이 시간 뒤엔 DS 강제 종료(하드캡). 클라 복귀 카운트다운보다 길게. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
+	float ShutdownGraceSec = 30.f;
 
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> UsedStarts;
@@ -67,6 +80,12 @@ private:
 
 	/** 시작 게이트 대기 타임아웃용 타이머. */
 	FTimerHandle WaitForPlayersTimerHandle;
+
+	/** 매치 종료 후 종료 감시용 타이머. */
+	FTimerHandle ShutdownWatchdogHandle;
+
+	/** 종료 감시 누적 경과(초). ShutdownGraceSec 도달 시 하드캡 종료. */
+	float ShutdownElapsed = 0.f;
 
 	/** 백엔드가 spawn 시 -ExpectedPlayers= 로 주입. 이 수만큼 접속하면 매치 시작(0/1=즉시). */
 	int32 ExpectedPlayerCount = 0;

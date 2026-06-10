@@ -10,6 +10,7 @@
 #include "Engine/GameInstance.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
+#include "HAL/PlatformMisc.h"
 #include "Kismet/GameplayStatics.h"
 #include "Online/BackendSubsystem.h"
 
@@ -389,6 +390,9 @@ void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomb
 			}
 		}
 	}
+
+	// 클라들이 결과 화면 카운트다운 후 ClientTravel로 빠지면 DS가 스스로 종료.
+	StartShutdownWatchdog();
 }
 
 void AD1BomberGameMode::EnsureAliveListInitialized()
@@ -456,4 +460,43 @@ void AD1BomberGameMode::OnMatchTimeExpired()
 	UE_LOG(LogD1, Log, TEXT("Match time expired -> ending match"));
 	// 생존자는 EndMatchWithWinner에서 공동 1위로 보정된다.
 	EndMatchWithWinner(nullptr, EBomberEndReason::TimeExpired);
+}
+
+void AD1BomberGameMode::StartShutdownWatchdog()
+{
+	// PIE/Listen 서버는 에디터를 죽이면 안 됨 — 실 DS에서만 자가 종료.
+	if (!IsRunningDedicatedServer())
+	{
+		return;
+	}
+
+	ShutdownElapsed = 0.f;
+	GetWorldTimerManager().SetTimer(
+		ShutdownWatchdogHandle, this, &AD1BomberGameMode::TickShutdownWatchdog, 1.f, /*bLoop=*/true);
+	UE_LOG(LogD1, Log, TEXT("[Match] 종료 감시 시작 — 전원 퇴장 또는 %.0fs 후 DS 종료"), ShutdownGraceSec);
+}
+
+void AD1BomberGameMode::TickShutdownWatchdog()
+{
+	// 클라들이 ClientTravel로 빠지면 Logout → NumPlayers 감소. 0 도달 시 정상 종료.
+	if (GetNumPlayers() <= 0)
+	{
+		UE_LOG(LogD1, Log, TEXT("[Match] 전원 퇴장 — DS 종료"));
+		RequestServerShutdown();
+		return;
+	}
+
+	ShutdownElapsed += 1.f;
+	if (ShutdownElapsed >= ShutdownGraceSec)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Match] 종료 하드캡(%.0fs) 도달 — 잔류 클라 무시하고 DS 종료"), ShutdownGraceSec);
+		RequestServerShutdown();
+	}
+}
+
+void AD1BomberGameMode::RequestServerShutdown()
+{
+	GetWorldTimerManager().ClearTimer(ShutdownWatchdogHandle);
+	UE_LOG(LogD1, Log, TEXT("[Match] DS 프로세스 종료 요청(RequestExit)"));
+	FPlatformMisc::RequestExit(false);
 }
