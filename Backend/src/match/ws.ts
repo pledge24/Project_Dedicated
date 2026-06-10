@@ -255,7 +255,7 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     let server: { host: string; port: number };
     try
     {
-        server = config.match.ds.enabled ? await ds.allocate(matchId, serverToken) : config.match.stubServer;
+        server = config.match.ds.enabled ? await ds.allocate(matchId, serverToken, group.entries.length) : config.match.stubServer;
     }
     catch (err)
     {

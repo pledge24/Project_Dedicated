@@ -19,7 +19,7 @@ const ds = config.match.ds;
 const running = new Map<number, DsProcess>(); // port → 프로세스
 
 /** 빈 포트에 DS spawn → bootDelay 후 {host, port}. 포트 고갈/부팅 실패 시 throw. */
-export async function allocate(matchId: string, serverToken: string): Promise<{ host: string; port: number }>
+export async function allocate(matchId: string, serverToken: string, expectedPlayers: number): Promise<{ host: string; port: number }>
 {
     const port = pickFreePort();
     if (port === null)
@@ -28,8 +28,9 @@ export async function allocate(matchId: string, serverToken: string): Promise<{ 
     }
 
     // matchId·serverToken은 cmdline 스위치로 주입(클라를 거치지 않는 안전 채널). DS가 FParse로 읽어 결과 POST 인증에 쓴다.
+    // expectedPlayers: DS가 전원 입장까지 매치 시작을 미루는 게이트용(미충족 시 DS 측 타임아웃으로 시작).
     // stdio 'ignore' — DS는 -log로 자체 콘솔/로그파일에 기록. 파이프 미소비로 막히는 것 방지.
-    const args = [ds.map, `-port=${port}`, `-MatchId=${matchId}`, `-MatchToken=${serverToken}`, '-log'];
+    const args = [ds.map, `-port=${port}`, `-MatchId=${matchId}`, `-MatchToken=${serverToken}`, `-ExpectedPlayers=${expectedPlayers}`, '-log'];
     const child = spawn(ds.exePath, args, { stdio: 'ignore', windowsHide: false });
 
     const killTimer = setTimeout(() =>
