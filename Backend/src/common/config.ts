@@ -42,7 +42,7 @@ export const config = Object.freeze({
         // 실제 Dedicated Server 할당(매치당 spawn). enabled=true일 때만 D1Server.exe를 띄운다.
         ds: Object.freeze({
             enabled:       process.env.MATCH_DS_ENABLED === 'true',
-            exePath:       process.env.MATCH_DS_EXE || 'D:/Unreal/Projects/Project_Dedicated/D1/Package/WindowsServer/D1/D1Server.exe',
+            exePath:       process.env.MATCH_DS_EXE || 'D:/Unreal/Projects/Project_Dedicated/D1/Packaged/Server/WindowsServer/D1Server.exe',
             map:           process.env.MATCH_DS_MAP || '/Game/D1/Maps/MP_Ingame', // 미쿡 시 임시로 /Game/Maps/MP_Test
             host:          process.env.MATCH_DS_HOST || '127.0.0.1',
             portMin:       asNumber('MATCH_DS_PORT_MIN', 7777),

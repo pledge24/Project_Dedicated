@@ -55,17 +55,14 @@ coverage/
 .env.local
 .env.*.local
 
-# Builds output — keep placeholder only
-Builds/Client/*
-!Builds/Client/.gitkeep
-Builds/Server/*
-!Builds/Server/.gitkeep
+# Packaged output (D1/Packaged/) — keep placeholder only (구 D1/Package, UE Build/ 와 혼동 피해 개명)
+D1/Packaged/Client/*
+!D1/Packaged/Client/.gitkeep
+D1/Packaged/Server/*
+!D1/Packaged/Server/.gitkeep
 
 # Third-party Unreal plugins (externally managed — see PROJECT_PLAN.md MCP 섹션)
 D1/Plugins/Monolith/
-
-# Unreal Engine — packaging output (Package Project 결과, GitHub 100MB 한도 초과 파일 포함)
-D1/Package/
 
 # Unreal Content — 개인 확인용 에셋 (로컬 PC 전용, Git/LFS 양쪽 모두 제외)
 D1/Content/External/
