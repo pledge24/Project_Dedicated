@@ -283,7 +283,7 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 	}
 
 	const FIntPoint Cell = UD1BomberGridLibrary::WorldToCell(GetActorLocation());
-	if (!UD1BomberGridLibrary::IsInsideGrid(Cell))
+	if (GS && !GS->IsInsideGrid(Cell))
 	{
 		return;
 	}

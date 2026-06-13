@@ -40,6 +40,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Bomber")
 	bool IsWallCell(const FIntPoint& Cell) const;
 
+	/** 파괴 가능 블록(soft block)이 아직 살아있는 셀인지. 폭발 전파가 이 셀까지 닿은 뒤 멈춘다. */
+	UFUNCTION(BlueprintPure, Category = "Bomber")
+	bool IsSoftBlockCell(const FIntPoint& Cell) const;
+
+	/** 셀이 그리드 범위 안인지(GridSize 기준). 맵마다 그리드 크기가 다르므로 GameState가 권위. */
+	UFUNCTION(BlueprintPure, Category = "Bomber")
+	bool IsInsideGrid(const FIntPoint& Cell) const;
+
 	/** 남은 매치 시간(초). 클라/서버 공용. WBP_MatchTimer가 1초마다 호출. */
 	UFUNCTION(BlueprintPure, Category = "Bomber|Match")
 	float GetRemainingTimeSec() const;
@@ -55,6 +63,9 @@ public:
 
 	/** 서버 전용: 최종 결과 스냅샷을 설정하고 OnMatchFinished를 알린다(리슨 서버 자기 클라 포함). */
 	void SetFinalResults(const TArray<FD1MatchResultEntry>& InResults);
+
+	/** 서버 전용: 파괴된 블록 셀을 목록에서 제거 → 이후 폭발이 그 셀을 통과. */
+	void RemoveSoftBlockCell(const FIntPoint& Cell);
 
 	/**-------------------
 	 *	    API Data
@@ -72,9 +83,17 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_MatchPhase, BlueprintReadOnly, Category = "Bomber")
 	EBomberMatchPhase MatchPhase;
 
+	/** 맵 그리드 크기(열, 행). 빌드 시 서버가 데이터에서 세팅. 경계 판정의 권위. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
+	FIntPoint GridSize;
+
 	/** 복제되는 벽 셀 목록. ~64개라 TArray + Contains로 충분. */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
 	TArray<FIntPoint> WallCells;
+
+	/** 복제되는 파괴 가능 블록 셀 목록. 폭발에 파괴되면 RemoveSoftBlockCell로 빠진다. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
+	TArray<FIntPoint> SoftBlockCells;
 
 	/** 매치 시작 서버 시각(초). GameMode가 Playing 진입 시 기록. */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Match")

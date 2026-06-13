@@ -9,6 +9,7 @@
 class APlayerController;
 class AD1BomberPlayerState;
 class AD1WallBlock;
+class UD1MapData;
 enum class EBomberEndReason : uint8;
 
 UCLASS(abstract)
@@ -35,7 +36,9 @@ public:
 	void NotifyPlayerDied(AD1BomberPlayerState* DeadPS);
 
 private:
-	void PopulateWallData();
+	/** 서버 전용: MapData(ASCII)를 파싱해 그리드/벽/소프트블록/스폰/바닥을 런타임 스폰 + GameState 채움. */
+	void BuildMapFromData();
+
 	void EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason);
 	void EnsureAliveListInitialized();
 
@@ -56,6 +59,14 @@ private:
 
 	/** DS 프로세스 종료 요청(RequestExit). 백엔드가 포트/슬롯 자동 회수. */
 	void RequestServerShutdown();
+
+	/** 이 매치에서 빌드할 맵 데이터(BP 기본값). `-MapData=` 커맨드라인으로 오버라이드 가능. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UD1MapData> MapData;
+
+	/** 블록 스폰 Z(셀 중심). 100cm 큐브가 바닥(Z=0)에 앉는 높이 = 50. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
+	float BlockZ = 50.f;
 
 	/** 시작 게이트 대기 상한(초). 예상 인원이 안 차도 이 시간 뒤엔 시작. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))

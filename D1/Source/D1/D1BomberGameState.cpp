@@ -14,6 +14,10 @@ AD1BomberGameState::AD1BomberGameState()
 	MatchPhase = EBomberMatchPhase::Waiting;
 	MatchStartServerTime = 0.0f;
 	MatchDurationSec = 300.0f; // 5분
+	GridSize = FIntPoint::ZeroValue;
+
+	// 서버시간 복제 주기 기본 5초 → 0.5초. HUD 타이머 클라간 드리프트 완화.
+	ServerWorldTimeSecondsUpdateFrequency = 0.5f;
 }
 
 void AD1BomberGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -21,7 +25,9 @@ void AD1BomberGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AD1BomberGameState, MatchPhase);
+	DOREPLIFETIME(AD1BomberGameState, GridSize);
 	DOREPLIFETIME(AD1BomberGameState, WallCells);
+	DOREPLIFETIME(AD1BomberGameState, SoftBlockCells);
 	DOREPLIFETIME(AD1BomberGameState, MatchStartServerTime);
 	DOREPLIFETIME(AD1BomberGameState, MatchDurationSec);
 	DOREPLIFETIME(AD1BomberGameState, FinalResults);
@@ -42,6 +48,16 @@ void AD1BomberGameState::RemovePlayerState(APlayerState* PlayerState)
 bool AD1BomberGameState::IsWallCell(const FIntPoint& Cell) const
 {
 	return WallCells.Contains(Cell);
+}
+
+bool AD1BomberGameState::IsSoftBlockCell(const FIntPoint& Cell) const
+{
+	return SoftBlockCells.Contains(Cell);
+}
+
+bool AD1BomberGameState::IsInsideGrid(const FIntPoint& Cell) const
+{
+	return Cell.X >= 0 && Cell.X < GridSize.X && Cell.Y >= 0 && Cell.Y < GridSize.Y;
 }
 
 float AD1BomberGameState::GetRemainingTimeSec() const
@@ -97,6 +113,11 @@ void AD1BomberGameState::SetFinalResults(const TArray<FD1MatchResultEntry>& InRe
 	{
 		OnMatchFinished.Broadcast();
 	}
+}
+
+void AD1BomberGameState::RemoveSoftBlockCell(const FIntPoint& Cell)
+{
+	SoftBlockCells.Remove(Cell);
 }
 
 void AD1BomberGameState::OnRep_MatchPhase()

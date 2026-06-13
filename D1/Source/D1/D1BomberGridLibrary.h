@@ -10,10 +10,9 @@ class AD1BomberGameState;
 
 /**
  *  봄버맨 맵 그리드 좌표 헬퍼.
- *  - 셀 크기: 100cm (1m)
+ *  - 셀 크기: 100cm (1m) 고정.
  *  - 셀 (X, Y)의 월드 중심: (X*100+50, Y*100+50, 0)
- *  - 전체 그리드 (외벽 포함): 13 x 15
- *  - 플레이어블 영역: X∈[1,11], Y∈[1,13] (클래식 11x13 레이아웃)
+ *  - 그리드 "크기"는 맵마다 다름 → 경계 판정은 AD1BomberGameState::IsInsideGrid(GridSize) 권위.
  */
 UCLASS()
 class UD1BomberGridLibrary : public UBlueprintFunctionLibrary
@@ -27,20 +26,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Bomber|Grid")
 	static FVector CellToWorldCenter(const FIntPoint& Cell, float ZOverride = 0.f);
 
-	UFUNCTION(BlueprintPure, Category = "Bomber|Grid")
-	static bool IsInsideGrid(const FIntPoint& Cell);
-
-	/** 4방향 Range칸씩 진행, 벽/그리드 끝에서 멈춤. 원점 셀은 제외. */
+	/** 4방향 Range칸씩 진행, 벽/그리드 끝에서 멈춤. 원점 셀은 제외.
+	 *  파괴 가능 블록 셀은 OutCells(FX/데미지)에서 빼고 OutSoftBlockHits로 별도 보고 후 정지
+	 *  — 폭발 줄기가 블록 위치엔 그려지지 않게(블록은 파괴 대상으로만 처리). */
 	static void EnumerateCrossCells(
 		const AD1BomberGameState* GameState,
 		const FIntPoint& Origin,
 		int32 Range,
-		TArray<FIntPoint>& OutCells);
-
-	/** 클래식 봄버맨 레이아웃 벽 셀 (외벽 + 짝수 좌표 내부 기둥). */
-	static void BuildDefaultWallCells(TArray<FIntPoint>& OutWallCells);
+		TArray<FIntPoint>& OutCells,
+		TArray<FIntPoint>& OutSoftBlockHits);
 
 	static constexpr float CellSize = 100.f;	// 1m
-	static constexpr int32 GridWidth = 13;   // 플레이어블 11 + 외벽 2열 (X=0, X=12)
-	static constexpr int32 GridHeight = 15;  // 플레이어블 13 + 외벽 2행 (Y=0, Y=14)
 };

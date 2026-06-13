@@ -4,10 +4,13 @@
 #include "D1BomberGameState.h"
 #include "D1BomberPlayerState.h"
 #include "D1BomberGridLibrary.h"
+#include "D1MapData.h"
 #include "D1MatchTypes.h"
+#include "D1SoftBlock.h"
 #include "D1WallBlock.h"
 #include "D1.h"
 #include "Engine/GameInstance.h"
+#include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
 #include "HAL/PlatformMisc.h"
@@ -78,7 +81,7 @@ void AD1BomberGameMode::BeginPlay()
 			*CurrentMatchId, CurrentMatchToken.IsEmpty() ? TEXT("(none)") : TEXT("(set)"), ExpectedPlayerCount);
 	}
 
-	PopulateWallData();
+	BuildMapFromData();
 
 	// 시작 게이트: 예상 인원 0/1(PIE·솔로)이면 즉시 시작, 아니면 전원 입장(PostLogin) 또는 타임아웃까지 Waiting.
 	if (ExpectedPlayerCount <= 1)
@@ -292,20 +295,88 @@ void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 	}
 }
 
-void AD1BomberGameMode::PopulateWallData()
+void AD1BomberGameMode::BuildMapFromData()
 {
 	AD1BomberGameState* BomberGS = GetGameState<AD1BomberGameState>();
-	if (!BomberGS)
+	UWorld* World = GetWorld();
+	if (!BomberGS || !World)
 	{
-		UE_LOG(LogD1, Warning, TEXT("BomberGameMode: GameState is not AD1BomberGameState; skipping wall data"));
+		UE_LOG(LogD1, Warning, TEXT("[Map] GameState/World 없음 — 맵 빌드 스킵"));
 		return;
 	}
 
-	TArray<FIntPoint> Cells;
-	UD1BomberGridLibrary::BuildDefaultWallCells(Cells);
-	BomberGS->WallCells = Cells;
+	// 맵 선택: -MapData= 커맨드라인 오버라이드 우선(백엔드 주입/맵 스왑), 없으면 BP 기본값.
+	const UD1MapData* MapToUse = MapData;
+	FString MapPath;
+	if (FParse::Value(FCommandLine::Get(), TEXT("MapData="), MapPath) && !MapPath.IsEmpty())
+	{
+		if (UD1MapData* Loaded = LoadObject<UD1MapData>(nullptr, *MapPath))
+		{
+			MapToUse = Loaded;
+			UE_LOG(LogD1, Log, TEXT("[Map] -MapData= 오버라이드: %s"), *MapPath);
+		}
+		else
+		{
+			UE_LOG(LogD1, Warning, TEXT("[Map] -MapData= 로드 실패: %s — 기본값 사용"), *MapPath);
+		}
+	}
 
-	UE_LOG(LogD1, Log, TEXT("BomberGameMode: populated %d wall cells"), Cells.Num());
+	if (!MapToUse)
+	{
+		UE_LOG(LogD1, Error, TEXT("[Map] MapData 미지정 — 맵을 빌드할 수 없음"));
+		return;
+	}
+
+	FD1MapLayout Layout;
+	FString Err;
+	if (!MapToUse->BuildLayout(Layout, Err))
+	{
+		UE_LOG(LogD1, Error, TEXT("[Map] 파싱 실패: %s"), *Err);
+		return;
+	}
+
+	// 폭발/경계 판정 권위 데이터(클라에도 복제).
+	BomberGS->GridSize = Layout.GridSize;
+	BomberGS->WallCells = Layout.WallCells;
+	BomberGS->SoftBlockCells = Layout.SoftBlockCells;
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	// 벽(복제) — 메시·콜리전은 액터 생성자에 있어 클라도 동일 구성.
+	if (MapToUse->WallBlockClass)
+	{
+		for (const FIntPoint& Cell : Layout.WallCells)
+		{
+			World->SpawnActor<AD1WallBlock>(MapToUse->WallBlockClass,
+				UD1BomberGridLibrary::CellToWorldCenter(Cell, BlockZ), FRotator::ZeroRotator, Params);
+		}
+	}
+
+	// 소프트블록(복제) — dying 상태는 자체 복제.
+	if (MapToUse->SoftBlockClass)
+	{
+		for (const FIntPoint& Cell : Layout.SoftBlockCells)
+		{
+			World->SpawnActor<AD1SoftBlock>(MapToUse->SoftBlockClass,
+				UD1BomberGridLibrary::CellToWorldCenter(Cell, BlockZ), FRotator::ZeroRotator, Params);
+		}
+	}
+
+	// 스폰 지점(서버 전용) — PlayerStartTag=슬롯 → 기존 FindStartForSlot 태그 경로가 그대로 동작.
+	for (const FD1MapStart& Start : Layout.Starts)
+	{
+		const FVector Loc = UD1BomberGridLibrary::CellToWorldCenter(Start.Cell, 0.f);
+		if (APlayerStart* PS = World->SpawnActor<APlayerStart>(
+			APlayerStart::StaticClass(), Loc, FRotator::ZeroRotator, Params))
+		{
+			PS->PlayerStartTag = FName(*FString::FromInt(Start.Slot));
+		}
+	}
+
+	UE_LOG(LogD1, Log, TEXT("[Map] 빌드 완료 — %dx%d, 벽 %d, 소프트 %d, 스폰 %d"),
+		Layout.GridSize.X, Layout.GridSize.Y,
+		Layout.WallCells.Num(), Layout.SoftBlockCells.Num(), Layout.Starts.Num());
 }
 
 void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason)

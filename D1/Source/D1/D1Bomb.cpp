@@ -16,6 +16,7 @@
 #include "D1BomberGridLibrary.h"
 #include "D1BomberPlayerState.h"
 #include "D1ExplosionFX.h"
+#include "D1SoftBlock.h"
 
 AD1Bomb::AD1Bomb()
 {
@@ -131,27 +132,49 @@ void AD1Bomb::DoExplode()
 	const FIntPoint Origin = UD1BomberGridLibrary::WorldToCell(GetActorLocation());
 
 	TArray<FIntPoint> Cells;
-	UD1BomberGridLibrary::EnumerateCrossCells(GS, Origin, Range, Cells);
+	TArray<FIntPoint> SoftBlockHits;
+	UD1BomberGridLibrary::EnumerateCrossCells(GS, Origin, Range, Cells, SoftBlockHits);
 	Cells.Insert(Origin, 0);
 
+	const TSet<FIntPoint> CellSet(Cells);
+
+	// 폭발 십자에 걸린 다른 폭탄 체인 점화. (블록 셀은 Cells에 없으므로 블록 뒤 폭탄은 보호됨)
+	for (TActorIterator<AD1Bomb> It(GetWorld()); It; ++It)
 	{
-		TSet<FIntPoint> CellSet(Cells);
-		for (TActorIterator<AD1Bomb> It(GetWorld()); It; ++It)
+		AD1Bomb* Other = *It;
+		if (!IsValid(Other) || Other == this)
 		{
-			AD1Bomb* Other = *It;
-			if (!IsValid(Other) || Other == this)
-			{
-				continue;
-			}
-			if (Other->bIsExploding || Other->bChainScheduled)
+			continue;
+		}
+		if (Other->bIsExploding || Other->bChainScheduled)
+		{
+			continue;
+		}
+
+		const FIntPoint OtherCell = UD1BomberGridLibrary::WorldToCell(Other->GetActorLocation());
+		if (CellSet.Contains(OtherCell))
+		{
+			Other->TriggerChainDetonation();
+		}
+	}
+
+	// 폭발 줄기가 닿은 파괴 가능 블록을 "파괴 중"으로 전환. 셀 제거는 블록이 시간 경과 후
+	// 스스로 처리(파괴 중에도 폭발 차단 유지) — 여기선 StartDying만.
+	if (SoftBlockHits.Num() > 0)
+	{
+		const TSet<FIntPoint> HitSet(SoftBlockHits);
+		for (TActorIterator<AD1SoftBlock> It(GetWorld()); It; ++It)
+		{
+			AD1SoftBlock* Block = *It;
+			if (!IsValid(Block) || Block->IsDying())
 			{
 				continue;
 			}
 
-			const FIntPoint OtherCell = UD1BomberGridLibrary::WorldToCell(Other->GetActorLocation());
-			if (CellSet.Contains(OtherCell))
+			const FIntPoint BlockCell = UD1BomberGridLibrary::WorldToCell(Block->GetActorLocation());
+			if (HitSet.Contains(BlockCell))
 			{
-				Other->TriggerChainDetonation();
+				Block->StartDying();
 			}
 		}
 	}
