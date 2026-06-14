@@ -296,36 +296,40 @@ void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 	}
 }
 
-void AD1BomberGameMode::TrySpawnPowerupAt(const FIntPoint& Cell)
+bool AD1BomberGameMode::RollPowerupType(EPowerupType& OutType) const
 {
-	if (!HasAuthority() || !PowerupPickupClass)
-	{
-		return;
-	}
 	if (FMath::FRand() > PowerupDropChance)
 	{
-		return;
+		return false;
 	}
 
 	const int32 TotalWeight = FireDropWeight + BombDropWeight + SpeedDropWeight;
 	if (TotalWeight <= 0)
 	{
-		return;
+		return false;
 	}
 
 	const int32 Roll = FMath::RandRange(0, TotalWeight - 1);
-	EPowerupType Type;
 	if (Roll < FireDropWeight)
 	{
-		Type = EPowerupType::Fire;
+		OutType = EPowerupType::Fire;
 	}
 	else if (Roll < FireDropWeight + BombDropWeight)
 	{
-		Type = EPowerupType::Bomb;
+		OutType = EPowerupType::Bomb;
 	}
 	else
 	{
-		Type = EPowerupType::Speed;
+		OutType = EPowerupType::Speed;
+	}
+	return true;
+}
+
+void AD1BomberGameMode::SpawnPowerupAt(const FIntPoint& Cell, EPowerupType Type)
+{
+	if (!HasAuthority() || !PowerupPickupClass)
+	{
+		return;
 	}
 
 	UWorld* World = GetWorld();
@@ -403,13 +407,24 @@ void AD1BomberGameMode::BuildMapFromData()
 		}
 	}
 
-	// 소프트블록(복제) — dying 상태는 자체 복제.
+	// 소프트블록(복제) — dying 상태는 자체 복제. 빌드 시 보유 아이템 사전 배정.
+	int32 AssignedItems = 0;
 	if (MapToUse->SoftBlockClass)
 	{
 		for (const FIntPoint& Cell : Layout.SoftBlockCells)
 		{
-			World->SpawnActor<AD1SoftBlock>(MapToUse->SoftBlockClass,
+			AD1SoftBlock* Block = World->SpawnActor<AD1SoftBlock>(MapToUse->SoftBlockClass,
 				UD1BomberGridLibrary::CellToWorldCenter(Cell, BlockZ), FRotator::ZeroRotator, Params);
+			if (Block)
+			{
+				// 확률·가중치는 그대로, 굴리는 시점만 빌드로. 파괴 시엔 굴리지 않고 이걸 스폰.
+				EPowerupType HeldType;
+				if (RollPowerupType(HeldType))
+				{
+					Block->SetHeldItem(HeldType);
+					++AssignedItems;
+				}
+			}
 		}
 	}
 
@@ -424,9 +439,9 @@ void AD1BomberGameMode::BuildMapFromData()
 		}
 	}
 
-	UE_LOG(LogD1, Log, TEXT("[Map] 빌드 완료 — %dx%d, 벽 %d, 소프트 %d, 스폰 %d"),
+	UE_LOG(LogD1, Log, TEXT("[Map] 빌드 완료 — %dx%d, 벽 %d, 소프트 %d, 스폰 %d, 아이템 %d"),
 		Layout.GridSize.X, Layout.GridSize.Y,
-		Layout.WallCells.Num(), Layout.SoftBlockCells.Num(), Layout.Starts.Num());
+		Layout.WallCells.Num(), Layout.SoftBlockCells.Num(), Layout.Starts.Num(), AssignedItems);
 }
 
 void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason)

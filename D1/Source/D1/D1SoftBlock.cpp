@@ -10,6 +10,7 @@
 #include "D1BomberGameMode.h"
 #include "D1BomberGameState.h"
 #include "D1BomberGridLibrary.h"
+#include "D1PowerupPickup.h"
 
 AD1SoftBlock::AD1SoftBlock()
 {
@@ -67,6 +68,16 @@ void AD1SoftBlock::StartDying()
 		DyingTimerHandle, this, &AD1SoftBlock::CompleteDestruction, DyingDurationSec, /*bLoop=*/false);
 }
 
+void AD1SoftBlock::SetHeldItem(EPowerupType InType)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	HeldItem = InType;
+	bHasItem = true;
+}
+
 void AD1SoftBlock::OnRep_bDying()
 {
 	if (!bDying)
@@ -92,10 +103,13 @@ void AD1SoftBlock::CompleteDestruction()
 		GS->RemoveSoftBlockCell(Cell);
 	}
 
-	// 파괴 자리에 파워업 드롭(확률·가중표는 GameMode 권위). 서버에서만 실행.
-	if (AD1BomberGameMode* GM = World ? World->GetAuthGameMode<AD1BomberGameMode>() : nullptr)
+	// 빌드 시 사전 배정된 아이템이 있으면 그대로 스폰(서버 권위). 파괴 시점 굴림 없음.
+	if (bHasItem)
 	{
-		GM->TrySpawnPowerupAt(Cell);
+		if (AD1BomberGameMode* GM = World ? World->GetAuthGameMode<AD1BomberGameMode>() : nullptr)
+		{
+			GM->SpawnPowerupAt(Cell, HeldItem);
+		}
 	}
 
 	Destroy();

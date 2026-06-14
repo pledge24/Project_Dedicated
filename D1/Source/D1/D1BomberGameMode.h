@@ -12,6 +12,7 @@ class AD1PowerupPickup;
 class AD1WallBlock;
 class UD1MapData;
 enum class EBomberEndReason : uint8;
+enum class EPowerupType : uint8;
 
 UCLASS(abstract)
 class AD1BomberGameMode : public AD1GameMode
@@ -36,12 +37,15 @@ public:
 	/** 서버 전용: 플레이어 사망 등록, 등수 부여, 1명 남으면 매치 종료. */
 	void NotifyPlayerDied(AD1BomberPlayerState* DeadPS);
 
-	/** 서버 전용: 소프트블록 파괴 자리에 확률·가중표로 파워업 드롭. SoftBlock이 호출. */
-	void TrySpawnPowerupAt(const FIntPoint& Cell);
+	/** 서버 전용: 지정 종류의 파워업을 셀에 스폰(굴림 없음). 사전 배정된 아이템을 SoftBlock 파괴 시 호출. */
+	void SpawnPowerupAt(const FIntPoint& Cell, EPowerupType Type);
 
 private:
 	/** 서버 전용: MapData(ASCII)를 파싱해 그리드/벽/소프트블록/스폰/바닥을 런타임 스폰 + GameState 채움. */
 	void BuildMapFromData();
+
+	/** 빌드 시 호출: 확률·가중치로 블록 1개의 보유 아이템을 추첨. 드롭 없으면 false. */
+	bool RollPowerupType(EPowerupType& OutType) const;
 
 	void EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason);
 	void EnsureAliveListInitialized();
