@@ -20,6 +20,7 @@
 #include "D1BomberGameState.h"
 #include "D1BomberGridLibrary.h"
 #include "D1BomberPlayerState.h"
+#include "D1PowerupPickup.h"
 
 AD1BomberCharacter::AD1BomberCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UD1BomberCharacterMovementComponent>(
@@ -39,7 +40,7 @@ AD1BomberCharacter::AD1BomberCharacter(const FObjectInitializer& ObjectInitializ
 	{
 		Move->bOrientRotationToMovement = true;
 		Move->RotationRate = FRotator(0.f, 500.f, 0.f);
-		Move->MaxWalkSpeed = 500.f;
+		Move->MaxWalkSpeed = BaseWalkSpeed;
 		Move->MinAnalogWalkSpeed = 20.f;
 		Move->BrakingDecelerationWalking = 2000.f;
 	}
@@ -260,7 +261,10 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 	{
 		return;
 	}
-	if (GetActiveBombCount() >= MaxBombCount)
+
+	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
+	const int32 BombCap = PS ? PS->BombCapacity : 1;
+	if (GetActiveBombCount() >= BombCap)
 	{
 		return;
 	}
@@ -276,7 +280,6 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 		return;
 	}
 
-	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
 	if (PS && !PS->bIsAlive)
 	{
 		return;
@@ -322,6 +325,10 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 	}
 
 	Bomb->Initialize(PS);
+	if (PS)
+	{
+		Bomb->SetRange(PS->FirePower); // 설치자 화력 stamp
+	}
 	ActiveBombs.Add(Bomb);
 	// 폭탄이 BeginPlay에서 겹친 캐릭터(소유자 포함)를 모두 IgnoredBombs에 등록함.
 	// 여기선 슬롯만 추적.
@@ -371,6 +378,46 @@ void AD1BomberCharacter::OnPlayerNameRefreshed()
 	if (HasActorBegunPlay())
 	{
 		OnPlayerStateReady();
+	}
+}
+
+void AD1BomberCharacter::OnSpeedLevelChanged()
+{
+	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
+	if (!PS)
+	{
+		return;
+	}
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->MaxWalkSpeed = BaseWalkSpeed + PS->SpeedLevel * SpeedStep;
+	}
+}
+
+void AD1BomberCharacter::ApplyPowerup(EPowerupType Type)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
+	if (!PS)
+	{
+		return;
+	}
+
+	switch (Type)
+	{
+	case EPowerupType::Fire:
+		PS->AddFirePower(1);
+		break;
+	case EPowerupType::Bomb:
+		PS->AddBombCapacity(1);
+		break;
+	case EPowerupType::Speed:
+		PS->AddSpeedLevel(1); // OnRep_SpeedLevel → OnSpeedLevelChanged로 MaxWalkSpeed 반영
+		break;
 	}
 }
 
@@ -471,10 +518,15 @@ void AD1BomberCharacter::RefreshPlayerStateBinding()
 	{
 		Prev->OnAliveStateChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
 		Prev->OnPlayerNameChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
+		Prev->OnSpeedLevelChanged.RemoveDynamic(this, &AD1BomberCharacter::OnSpeedLevelChanged);
 	}
 	PS->OnAliveStateChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
 	PS->OnPlayerNameChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
+	PS->OnSpeedLevelChanged.AddDynamic(this, &AD1BomberCharacter::OnSpeedLevelChanged);
 	BoundPlayerState = PS;
+
+	// 늦게 합류한 클라가 이미 올라간 SpeedLevel을 받았을 때 즉시 반영.
+	OnSpeedLevelChanged();
 
 	// BP가 PS 확보 시점을 받게 함 (이름표 UI 등). BeginPlay 전에는 컴포넌트가 아직 init 안 됐을 수 있어
 	// 신호를 미루고, BeginPlay에서 다시 한 번 발화한다.

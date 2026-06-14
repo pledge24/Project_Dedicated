@@ -4,12 +4,22 @@
 #include "D1BomberGameState.h"
 #include "Net/UnrealNetwork.h"
 
+namespace
+{
+	constexpr int32 MaxFirePower = 10;
+	constexpr int32 MaxBombCapacity = 10;
+	constexpr int32 MaxSpeedLevel = 5;
+}
+
 AD1BomberPlayerState::AD1BomberPlayerState()
 {
 	Lives = 3;
 	bIsAlive = true;
 	Placement = 0;
 	PlayerSlotIndex = -1;
+	FirePower = 2;
+	BombCapacity = 1;
+	SpeedLevel = 0;
 	BackendUserId = 0;
 }
 
@@ -21,6 +31,9 @@ void AD1BomberPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(AD1BomberPlayerState, bIsAlive);
 	DOREPLIFETIME(AD1BomberPlayerState, Placement);
 	DOREPLIFETIME(AD1BomberPlayerState, PlayerSlotIndex);
+	DOREPLIFETIME(AD1BomberPlayerState, FirePower);
+	DOREPLIFETIME(AD1BomberPlayerState, BombCapacity);
+	DOREPLIFETIME(AD1BomberPlayerState, SpeedLevel);
 }
 
 bool AD1BomberPlayerState::ApplyHit()
@@ -57,6 +70,34 @@ void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)
 	OnRep_PlayerSlotIndex(); // Listen Server 대응
 }
 
+void AD1BomberPlayerState::AddFirePower(int32 Delta)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	FirePower = FMath::Clamp(FirePower + Delta, 0, MaxFirePower);
+}
+
+void AD1BomberPlayerState::AddBombCapacity(int32 Delta)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	BombCapacity = FMath::Clamp(BombCapacity + Delta, 1, MaxBombCapacity);
+}
+
+void AD1BomberPlayerState::AddSpeedLevel(int32 Delta)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	SpeedLevel = FMath::Clamp(SpeedLevel + Delta, 0, MaxSpeedLevel);
+	OnRep_SpeedLevel(); // Listen Server 대응 — 서버 캐릭터도 속도 반영
+}
+
 void AD1BomberPlayerState::OnRep_PlayerName()
 {
 	Super::OnRep_PlayerName();
@@ -71,6 +112,11 @@ void AD1BomberPlayerState::OnRep_Lives()
 void AD1BomberPlayerState::OnRep_bIsAlive()
 {
 	OnAliveStateChanged.Broadcast();
+}
+
+void AD1BomberPlayerState::OnRep_SpeedLevel()
+{
+	OnSpeedLevelChanged.Broadcast();
 }
 
 void AD1BomberPlayerState::OnRep_PlayerSlotIndex()

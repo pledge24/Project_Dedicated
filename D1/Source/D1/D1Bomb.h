@@ -23,6 +23,9 @@ public:
 	/** 서버 전용: 폭탄 소유자 연결. */
 	void Initialize(AD1BomberPlayerState* InOwner);
 
+	/** 서버 전용: 설치자의 화력으로 폭발 범위를 덮어쓴다(스폰 직후, 폭발 전). */
+	void SetRange(int32 InRange);
+
 protected:
 	virtual void BeginPlay() override;
 

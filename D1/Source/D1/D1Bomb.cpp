@@ -59,6 +59,15 @@ void AD1Bomb::Initialize(AD1BomberPlayerState* InOwner)
 	OwningPlayerState = InOwner;
 }
 
+void AD1Bomb::SetRange(int32 InRange)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	Range = FMath::Max(1, InRange);
+}
+
 void AD1Bomb::BeginPlay()
 {
 	Super::BeginPlay();

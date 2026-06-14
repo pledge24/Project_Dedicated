@@ -8,6 +8,7 @@
 
 class APlayerController;
 class AD1BomberPlayerState;
+class AD1PowerupPickup;
 class AD1WallBlock;
 class UD1MapData;
 enum class EBomberEndReason : uint8;
@@ -34,6 +35,9 @@ public:
 
 	/** 서버 전용: 플레이어 사망 등록, 등수 부여, 1명 남으면 매치 종료. */
 	void NotifyPlayerDied(AD1BomberPlayerState* DeadPS);
+
+	/** 서버 전용: 소프트블록 파괴 자리에 확률·가중표로 파워업 드롭. SoftBlock이 호출. */
+	void TrySpawnPowerupAt(const FIntPoint& Cell);
 
 private:
 	/** 서버 전용: MapData(ASCII)를 파싱해 그리드/벽/소프트블록/스폰/바닥을 런타임 스폰 + GameState 채움. */
@@ -67,6 +71,28 @@ private:
 	/** 블록 스폰 Z(셀 중심). 100cm 큐브가 바닥(Z=0)에 앉는 높이 = 50. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
 	float BlockZ = 50.f;
+
+	/** 드롭할 파워업 픽업 BP. 미지정이면 드롭 안 함. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Powerup", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<AD1PowerupPickup> PowerupPickupClass;
+
+	/** 소프트블록 1개 파괴당 드롭 확률(0~1). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Powerup", meta = (AllowPrivateAccess = "true", ClampMin = "0", ClampMax = "1"))
+	float PowerupDropChance = 0.3f;
+
+	/** 드롭 시 Fire/Bomb/Speed 가중치. 합이 0이면 드롭 안 함. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Powerup", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
+	int32 FireDropWeight = 1;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Powerup", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
+	int32 BombDropWeight = 1;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Powerup", meta = (AllowPrivateAccess = "true", ClampMin = "0"))
+	int32 SpeedDropWeight = 1;
+
+	/** 파워업 스폰 높이(셀 중심 Z). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Powerup", meta = (AllowPrivateAccess = "true"))
+	float PowerupZ = 40.f;
 
 	/** 시작 게이트 대기 상한(초). 예상 인원이 안 차도 이 시간 뒤엔 시작. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))

@@ -10,6 +10,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLivesChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAliveStateChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerNameChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSlotIndexChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSpeedLevelChanged);
 
 UCLASS()
 class AD1BomberPlayerState : public APlayerState
@@ -28,11 +29,16 @@ public:
 	
 	bool ApplyHit();
 	void SetPlayerSlotIndex(int32 NewIndex);
-	
+
+	/** 파워업 적용(서버 전용). 캡까지만 증가. */
+	void AddFirePower(int32 Delta);
+	void AddBombCapacity(int32 Delta);
+	void AddSpeedLevel(int32 Delta);
+
 	/**-------------------
 	 *	    API Data
 	 *-------------------*/
-	
+
 	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
 	FOnLivesChanged OnLivesChanged;
 
@@ -45,6 +51,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
 	FOnSlotIndexChanged OnSlotIndexChanged;
 
+	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
+	FOnSpeedLevelChanged OnSpeedLevelChanged;
+
 	UPROPERTY(ReplicatedUsing = OnRep_Lives, BlueprintReadOnly, Category = "Bomber")
 	int32 Lives;
 
@@ -56,6 +65,18 @@ public:
 
 	UPROPERTY(ReplicatedUsing = OnRep_PlayerSlotIndex, BlueprintReadOnly, Category = "Bomber")
 	int32 PlayerSlotIndex;
+
+	/** 폭발 범위(칸). 폭탄 설치 시 폭탄에 stamp. 기본 2. Fire 아이템으로 증가. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Powerup")
+	int32 FirePower;
+
+	/** 동시 설치 가능 폭탄 수. 기본 1. Bomb 아이템으로 증가. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Powerup")
+	int32 BombCapacity;
+
+	/** 이동속도 단계. 기본 0. Speed 아이템으로 증가 → 캐릭터가 MaxWalkSpeed에 반영. */
+	UPROPERTY(ReplicatedUsing = OnRep_SpeedLevel, BlueprintReadOnly, Category = "Bomber|Powerup")
+	int32 SpeedLevel;
 
 	// 백엔드 userId — 클라가 travel URL ?userId= 로 전달, 서버가 결과 POST에 사용. 복제 안 함(서버 전용).
 	UPROPERTY(BlueprintReadOnly, Category = "Bomber")
@@ -72,4 +93,7 @@ protected:
 
 	UFUNCTION()
 	void OnRep_PlayerSlotIndex();
+
+	UFUNCTION()
+	void OnRep_SpeedLevel();
 };

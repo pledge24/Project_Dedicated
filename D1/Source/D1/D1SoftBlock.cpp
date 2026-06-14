@@ -7,6 +7,7 @@
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
 
+#include "D1BomberGameMode.h"
 #include "D1BomberGameState.h"
 #include "D1BomberGridLibrary.h"
 
@@ -82,10 +83,19 @@ void AD1SoftBlock::OnRep_bDying()
 
 void AD1SoftBlock::CompleteDestruction()
 {
+	UWorld* World = GetWorld();
+	const FIntPoint Cell = UD1BomberGridLibrary::WorldToCell(GetActorLocation());
+
 	// 이제서야 폭발 차단/통과 차단을 해제 — 셀 목록에서 빼고 액터 제거(복제로 클라 정리).
-	if (AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr)
+	if (AD1BomberGameState* GS = World ? World->GetGameState<AD1BomberGameState>() : nullptr)
 	{
-		GS->RemoveSoftBlockCell(UD1BomberGridLibrary::WorldToCell(GetActorLocation()));
+		GS->RemoveSoftBlockCell(Cell);
+	}
+
+	// 파괴 자리에 파워업 드롭(확률·가중표는 GameMode 권위). 서버에서만 실행.
+	if (AD1BomberGameMode* GM = World ? World->GetAuthGameMode<AD1BomberGameMode>() : nullptr)
+	{
+		GM->TrySpawnPowerupAt(Cell);
 	}
 
 	Destroy();

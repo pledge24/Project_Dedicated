@@ -6,6 +6,7 @@
 #include "D1BomberGridLibrary.h"
 #include "D1MapData.h"
 #include "D1MatchTypes.h"
+#include "D1PowerupPickup.h"
 #include "D1SoftBlock.h"
 #include "D1WallBlock.h"
 #include "D1.h"
@@ -292,6 +293,55 @@ void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 		const bool bHasSurvivor = AlivePlayerStates.Num() == 1;
 		AD1BomberPlayerState* Winner = bHasSurvivor ? AlivePlayerStates[0].Get() : DeadPS;
 		EndMatchWithWinner(Winner, bHasSurvivor ? EBomberEndReason::Winner : EBomberEndReason::Draw);
+	}
+}
+
+void AD1BomberGameMode::TrySpawnPowerupAt(const FIntPoint& Cell)
+{
+	if (!HasAuthority() || !PowerupPickupClass)
+	{
+		return;
+	}
+	if (FMath::FRand() > PowerupDropChance)
+	{
+		return;
+	}
+
+	const int32 TotalWeight = FireDropWeight + BombDropWeight + SpeedDropWeight;
+	if (TotalWeight <= 0)
+	{
+		return;
+	}
+
+	const int32 Roll = FMath::RandRange(0, TotalWeight - 1);
+	EPowerupType Type;
+	if (Roll < FireDropWeight)
+	{
+		Type = EPowerupType::Fire;
+	}
+	else if (Roll < FireDropWeight + BombDropWeight)
+	{
+		Type = EPowerupType::Bomb;
+	}
+	else
+	{
+		Type = EPowerupType::Speed;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	const FVector Loc = UD1BomberGridLibrary::CellToWorldCenter(Cell, PowerupZ);
+
+	if (AD1PowerupPickup* Pickup = World->SpawnActor<AD1PowerupPickup>(
+		PowerupPickupClass, Loc, FRotator::ZeroRotator, Params))
+	{
+		Pickup->SetPowerupType(Type);
 	}
 }
 
