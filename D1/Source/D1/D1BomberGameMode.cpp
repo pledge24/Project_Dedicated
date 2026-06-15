@@ -325,30 +325,6 @@ bool AD1BomberGameMode::RollPowerupType(EPowerupType& OutType) const
 	return true;
 }
 
-void AD1BomberGameMode::SpawnPowerupAt(const FIntPoint& Cell, EPowerupType Type)
-{
-	if (!HasAuthority() || !PowerupPickupClass)
-	{
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	const FVector Loc = UD1BomberGridLibrary::CellToWorldCenter(Cell, PowerupZ);
-
-	if (AD1PowerupPickup* Pickup = World->SpawnActor<AD1PowerupPickup>(
-		PowerupPickupClass, Loc, FRotator::ZeroRotator, Params))
-	{
-		Pickup->SetPowerupType(Type);
-	}
-}
-
 void AD1BomberGameMode::BuildMapFromData()
 {
 	AD1BomberGameState* BomberGS = GetGameState<AD1BomberGameState>();
@@ -421,7 +397,7 @@ void AD1BomberGameMode::BuildMapFromData()
 				EPowerupType HeldType;
 				if (RollPowerupType(HeldType))
 				{
-					Block->SetHeldItem(HeldType);
+					Block->SetHeldItem(HeldType, PowerupPickupClass, PowerupZ);
 					++AssignedItems;
 				}
 			}

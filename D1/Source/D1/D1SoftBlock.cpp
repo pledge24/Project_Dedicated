@@ -7,7 +7,6 @@
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
 
-#include "D1BomberGameMode.h"
 #include "D1BomberGameState.h"
 #include "D1BomberGridLibrary.h"
 #include "D1PowerupPickup.h"
@@ -68,13 +67,15 @@ void AD1SoftBlock::StartDying()
 		DyingTimerHandle, this, &AD1SoftBlock::CompleteDestruction, DyingDurationSec, /*bLoop=*/false);
 }
 
-void AD1SoftBlock::SetHeldItem(EPowerupType InType)
+void AD1SoftBlock::SetHeldItem(EPowerupType InType, TSubclassOf<AD1PowerupPickup> InPickupClass, float InDropZ)
 {
 	if (!HasAuthority())
 	{
 		return;
 	}
 	HeldItem = InType;
+	PickupClass = InPickupClass;
+	DropZ = InDropZ;
 	bHasItem = true;
 }
 
@@ -103,12 +104,15 @@ void AD1SoftBlock::CompleteDestruction()
 		GS->RemoveSoftBlockCell(Cell);
 	}
 
-	// 빌드 시 사전 배정된 아이템이 있으면 그대로 스폰(서버 권위). 파괴 시점 굴림 없음.
-	if (bHasItem)
+	// 빌드 시 사전 배정된 아이템이 있으면 직접 스폰(서버 권위). 파괴 시점 굴림 없음.
+	if (bHasItem && PickupClass && World)
 	{
-		if (AD1BomberGameMode* GM = World ? World->GetAuthGameMode<AD1BomberGameMode>() : nullptr)
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FVector Loc = UD1BomberGridLibrary::CellToWorldCenter(Cell, DropZ);
+		if (AD1PowerupPickup* Pickup = World->SpawnActor<AD1PowerupPickup>(PickupClass, Loc, FRotator::ZeroRotator, Params))
 		{
-			GM->SpawnPowerupAt(Cell, HeldItem);
+			Pickup->SetPowerupType(HeldItem);
 		}
 	}
 

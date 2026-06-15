@@ -37,9 +37,6 @@ public:
 	/** 서버 전용: 플레이어 사망 등록, 등수 부여, 1명 남으면 매치 종료. */
 	void NotifyPlayerDied(AD1BomberPlayerState* DeadPS);
 
-	/** 서버 전용: 지정 종류의 파워업을 셀에 스폰(굴림 없음). 사전 배정된 아이템을 SoftBlock 파괴 시 호출. */
-	void SpawnPowerupAt(const FIntPoint& Cell, EPowerupType Type);
-
 private:
 	/** 서버 전용: MapData(ASCII)를 파싱해 그리드/벽/소프트블록/스폰/바닥을 런타임 스폰 + GameState 채움. */
 	void BuildMapFromData();

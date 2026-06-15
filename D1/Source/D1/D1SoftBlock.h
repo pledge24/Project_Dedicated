@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "D1SoftBlock.generated.h"
 
+class AD1PowerupPickup;
 class UBoxComponent;
 class UMaterialInterface;
 class UStaticMeshComponent;
@@ -25,8 +26,8 @@ public:
 	 *  파괴 중에도 콜리전·폭발 차단은 그대로(셀은 CompleteDestruction에서 제거). */
 	void StartDying();
 
-	/** 서버 전용: 빌드 시 이 블록이 숨길 파워업을 사전 배정. 파괴 완료 시 그대로 스폰. */
-	void SetHeldItem(EPowerupType InType);
+	/** 서버 전용: 빌드 시 이 블록이 숨길 파워업 + 드롭 방법(픽업 클래스·높이)을 사전 배정. 파괴 완료 시 직접 스폰. */
+	void SetHeldItem(EPowerupType InType, TSubclassOf<AD1PowerupPickup> InPickupClass, float InDropZ);
 
 	bool IsDying() const { return bDying; }
 
@@ -59,6 +60,11 @@ private:
 
 	/** 빌드 시 사전 배정된 보유 아이템(서버 전용, 비복제 — 파괴 전엔 숨김). */
 	EPowerupType HeldItem{};
+
+	/** 드롭할 픽업 클래스·높이(서버 전용, 빌드 시 GameMode가 주입). UClass는 GC 루트라 비-UPROPERTY 안전. */
+	TSubclassOf<AD1PowerupPickup> PickupClass;
+
+	float DropZ = 40.f;
 
 	/** 보유 아이템 유무. true일 때만 파괴 시 스폰. */
 	bool bHasItem = false;
