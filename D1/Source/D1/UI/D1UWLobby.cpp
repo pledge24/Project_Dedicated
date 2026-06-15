@@ -5,11 +5,11 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
-#include "D1.h"
+#include "Core/D1LogChannels.h"
 #include "Kismet/GameplayStatics.h"
-#include "Online/BackendErrorMessages.h"
-#include "Online/BackendSubsystem.h"
-#include "Online/D1GameInstance.h"
+#include "Network/BackendErrorMessages.h"
+#include "Network/BackendSubsystem.h"
+#include "Network/D1GameInstance.h"
 
 void UD1UWLobby::NativeConstruct()
 {

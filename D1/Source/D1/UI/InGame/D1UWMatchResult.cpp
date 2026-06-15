@@ -7,7 +7,7 @@
 #include "Components/VerticalBox.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
-#include "D1.h"
+#include "Core/D1LogChannels.h"
 #include "UI/InGame/D1UWMatchResultRow.h"
 
 void UD1UWMatchResult::NativeConstruct()

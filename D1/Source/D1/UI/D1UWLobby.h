@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UI/D1UserWidget.h"
-#include "Online/BackendTypes.h"
+#include "Network/BackendTypes.h"
 #include "D1UWLobby.generated.h"
 
 class UButton;

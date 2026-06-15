@@ -4,11 +4,11 @@
 
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
-#include "D1.h"
+#include "Core/D1LogChannels.h"
 #include "Kismet/GameplayStatics.h"
-#include "Menu/D1MenuPlayerController.h"
-#include "Online/BackendErrorMessages.h"
-#include "Online/BackendSubsystem.h"
+#include "Framework/Menu/D1MenuPlayerController.h"
+#include "Network/BackendErrorMessages.h"
+#include "Network/BackendSubsystem.h"
 
 void UD1UWLogin::NativeConstruct()
 {

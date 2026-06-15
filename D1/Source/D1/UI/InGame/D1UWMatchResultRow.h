@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UI/D1UserWidget.h"
-#include "D1MatchTypes.h"
+#include "Framework/D1MatchTypes.h"
 #include "D1UWMatchResultRow.generated.h"
 
 class UTextBlock;
