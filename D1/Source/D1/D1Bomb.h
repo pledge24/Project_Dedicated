@@ -6,7 +6,6 @@
 #include "GameFramework/Actor.h"
 #include "D1Bomb.generated.h"
 
-class AD1BomberPlayerState;
 class UBoxComponent;
 class UStaticMeshComponent;
 
@@ -19,9 +18,6 @@ public:
 	AD1Bomb();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
-	/** 서버 전용: 폭탄 소유자 연결. */
-	void Initialize(AD1BomberPlayerState* InOwner);
 
 	/** 서버 전용: 설치자의 화력으로 폭발 범위를 덮어쓴다(스폰 직후, 폭발 전). */
 	void SetRange(int32 InRange);
@@ -53,9 +49,6 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	float FuseSeconds;
-
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<AD1BomberPlayerState> OwningPlayerState;
 
 	UPROPERTY(ReplicatedUsing = OnRep_DetonationServerTime, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	float DetonationServerTime;

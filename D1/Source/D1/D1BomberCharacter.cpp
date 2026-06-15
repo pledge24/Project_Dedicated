@@ -323,7 +323,6 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 		return;
 	}
 
-	Bomb->Initialize(PS);
 	if (PS)
 	{
 		Bomb->SetRange(PS->FirePower); // 설치자 화력 stamp

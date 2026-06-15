@@ -50,13 +50,7 @@ AD1Bomb::AD1Bomb()
 void AD1Bomb::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AD1Bomb, OwningPlayerState);
 	DOREPLIFETIME(AD1Bomb, DetonationServerTime);
-}
-
-void AD1Bomb::Initialize(AD1BomberPlayerState* InOwner)
-{
-	OwningPlayerState = InOwner;
 }
 
 void AD1Bomb::SetRange(int32 InRange)
@@ -255,16 +249,10 @@ void AD1Bomb::DoExplode()
 
 	MulticastOnExploded(Cells);
 
-	// 소유자 폭탄 슬롯 회수.
-	if (OwningPlayerState)
+	// 소유자 폭탄 슬롯 회수 — Owner(설치 캐릭터)에서 직접.
+	if (AD1BomberCharacter* OwnerBC = GetOwner<AD1BomberCharacter>())
 	{
-		if (APawn* Pawn = OwningPlayerState->GetPawn())
-		{
-			if (AD1BomberCharacter* OwnerBC = Cast<AD1BomberCharacter>(Pawn))
-			{
-				OwnerBC->NotifyBombDestroyed(this);
-			}
-		}
+		OwnerBC->NotifyBombDestroyed(this);
 	}
 
 	Destroy();
