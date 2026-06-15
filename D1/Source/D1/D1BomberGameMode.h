@@ -13,6 +13,13 @@ class AD1WallBlock;
 class UD1MapData;
 enum class EBomberEndReason : uint8;
 
+/** 백엔드가 cmdline -Roster= 로 주입한 입장 토큰 → 권위 신원 매핑 항목. */
+struct FD1JoinEntry
+{
+	int64 UserId = 0;
+	int32 Slot = -1;
+};
+
 UCLASS(abstract)
 class AD1BomberGameMode : public AD1GameMode
 {
@@ -24,7 +31,7 @@ public:
 	virtual void BeginPlay() override;
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
-	/** 접속 시 travel URL의 ?userId=/?slot= 를 PlayerState에 저장(서버 결과 POST·권위 슬롯용). */
+	/** 접속 시 travel URL의 ?join= 토큰을 백엔드 권위 roster로 해석해 userId·슬롯을 확정(서버권위). */
 	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
 
 	/** 퇴장 시 점유 PlayerStart 해제 — fallback(순번) 경로 슬롯 누수 방지. */
@@ -109,4 +116,7 @@ private:
 	/** 백엔드가 spawn 시 -MatchId/-MatchToken 으로 주입. 결과 POST 인증에 사용(비면 스킵). */
 	FString CurrentMatchId;
 	FString CurrentMatchToken;
+
+	/** 백엔드가 spawn 시 -Roster= 로 주입(token→{userId,slot}). InitNewPlayer가 ?join= 토큰으로 권위 신원 매핑. */
+	TMap<FString, FD1JoinEntry> JoinRoster;
 };

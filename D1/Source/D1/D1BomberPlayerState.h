@@ -78,7 +78,7 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_SpeedLevel, BlueprintReadOnly, Category = "Bomber|Powerup")
 	int32 SpeedLevel;
 
-	// 백엔드 userId — 클라가 travel URL ?userId= 로 전달, 서버가 결과 POST에 사용. 복제 안 함(서버 전용).
+	// 백엔드 userId — DS가 ?join= 토큰을 권위 roster로 해석해 설정, 결과 POST에 사용. 복제 안 함(서버 전용).
 	UPROPERTY(BlueprintReadOnly, Category = "Bomber")
 	int64 BackendUserId;
 

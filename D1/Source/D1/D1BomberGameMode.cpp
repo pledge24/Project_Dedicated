@@ -79,6 +79,27 @@ void AD1BomberGameMode::BeginPlay()
 			*CurrentMatchId, CurrentMatchToken.IsEmpty() ? TEXT("(none)") : TEXT("(set)"), ExpectedPlayerCount);
 	}
 
+	// 백엔드 권위 roster 주입(token:userId:slot;…). InitNewPlayer가 ?join= 토큰으로 신원을 확정한다.
+	FString RosterStr;
+	if (FParse::Value(FCommandLine::Get(), TEXT("Roster="), RosterStr) && !RosterStr.IsEmpty())
+	{
+		TArray<FString> Entries;
+		RosterStr.ParseIntoArray(Entries, TEXT(";"), /*CullEmpty=*/true);
+		for (const FString& Entry : Entries)
+		{
+			TArray<FString> Parts;
+			Entry.ParseIntoArray(Parts, TEXT(":"), /*CullEmpty=*/true);
+			if (Parts.Num() == 3)
+			{
+				FD1JoinEntry JE;
+				JE.UserId = FCString::Atoi64(*Parts[1]);
+				JE.Slot = FCString::Atoi(*Parts[2]);
+				JoinRoster.Add(Parts[0], JE);
+			}
+		}
+		UE_LOG(LogD1, Log, TEXT("[Match] roster 주입 %d명"), JoinRoster.Num());
+	}
+
 	// 맵 빌드는 전용 헬퍼로 위임(GameMode는 config만 보유·전달).
 	FD1MapBuildConfig MapCfg;
 	MapCfg.DefaultMap  = MapData;
@@ -125,7 +146,7 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 
 	AD1BomberPlayerState* BomberPS = Player ? Player->GetPlayerState<AD1BomberPlayerState>() : nullptr;
 
-	// 백엔드 권위 슬롯(InitNewPlayer가 ?slot= 로 세팅)이 있으면 그 슬롯 자리로 고정 배치.
+	// 백엔드 권위 슬롯(InitNewPlayer가 ?join= roster로 세팅)이 있으면 그 슬롯 자리로 고정 배치.
 	// userId별 슬롯이 고정되므로 이중접속/유령 연결이 있어도 색·위치가 안 꼬인다.
 	if (BomberPS && BomberPS->PlayerSlotIndex >= 0)
 	{
@@ -198,23 +219,21 @@ FString AD1BomberGameMode::InitNewPlayer(APlayerController* NewPlayerController,
 	AD1BomberPlayerState* PS = NewPlayerController ? NewPlayerController->GetPlayerState<AD1BomberPlayerState>() : nullptr;
 	if (PS)
 	{
-		// travel URL의 ?userId= 를 PlayerState에 보관 → 매치 종료 시 결과 POST에 사용.
-		const FString UserIdStr = UGameplayStatics::ParseOption(Options, TEXT("userId"));
-		if (!UserIdStr.IsEmpty())
+		// travel URL의 ?join= 토큰을 백엔드 권위 roster로 해석 → 신원(userId)·슬롯을 서버가 확정.
+		// 클라가 주장하는 userId/slot은 신뢰하지 않는다(서버권위). PIE/standalone은 토큰 없어 no-op.
+		const FString JoinToken = UGameplayStatics::ParseOption(Options, TEXT("join"));
+		if (!JoinToken.IsEmpty())
 		{
-			PS->BackendUserId = FCString::Atoi64(*UserIdStr);
-			UE_LOG(LogD1, Log, TEXT("[Match] InitNewPlayer %s userId=%lld"), *PS->GetPlayerName(), PS->BackendUserId);
-		}
-
-		// travel URL의 ?slot= 을 백엔드 권위 슬롯으로 채택 → ChoosePlayerStart가 이 자리로 배치.
-		const FString SlotStr = UGameplayStatics::ParseOption(Options, TEXT("slot"));
-		if (SlotStr.IsNumeric())
-		{
-			const int32 Slot = FCString::Atoi(*SlotStr);
-			if (Slot >= 0 && Slot <= 3)
+			if (const FD1JoinEntry* Entry = JoinRoster.Find(JoinToken))
 			{
-				PS->SetPlayerSlotIndex(Slot);
-				UE_LOG(LogD1, Log, TEXT("[Match] InitNewPlayer %s slot=%d"), *PS->GetPlayerName(), Slot);
+				PS->BackendUserId = Entry->UserId;
+				PS->SetPlayerSlotIndex(Entry->Slot);
+				UE_LOG(LogD1, Log, TEXT("[Match] InitNewPlayer %s userId=%lld slot=%d (roster)"),
+					*PS->GetPlayerName(), Entry->UserId, Entry->Slot);
+			}
+			else
+			{
+				UE_LOG(LogD1, Warning, TEXT("[Match] InitNewPlayer %s — join 토큰이 roster에 없음"), *PS->GetPlayerName());
 			}
 		}
 	}
