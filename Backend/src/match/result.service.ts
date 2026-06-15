@@ -1,6 +1,5 @@
 // 매치 결과 처리 (service 레이어) — roster 검증 + 서버 토큰 + 무결성 → 트랜잭션 저장.
 // 서버 권위 모델: 결과는 DS만 보고 가능하며 매치당 발급된 serverToken으로만 통과한다.
-import { config } from '../common/config.js';
 import { AppError, Codes } from '../common/errors.js';
 import type { MatchResultRequest, MatchResultResponse } from '../common/types.js';
 import * as repo from './result.repository.js';
@@ -46,8 +45,6 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
             endReason: req.endReason,
             winnerUserId: soleWinner(req.results),
             participants,
-            eloK: config.match.eloK,
-            scoreFloor: config.match.scoreFloor,
         });
 
         return {

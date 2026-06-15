@@ -2,6 +2,7 @@
 // ELO는 현재 점수에 의존하므로 트랜잭션 안에서 FOR UPDATE로 점수를 잠그고 재조회한 뒤 계산한다.
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 
+import { config } from '../common/config.js';
 import { getPool } from '../common/db.js';
 import type { MatchEndReason } from '../common/types.js';
 import { computeFfaEloDeltas } from './elo.js';
@@ -25,8 +26,6 @@ export interface SaveResultInput
     endReason: MatchEndReason;
     winnerUserId: number | null;
     participants: SaveResultParticipant[];
-    eloK: number;
-    scoreFloor: number;
 }
 
 export interface SavedParticipant
@@ -81,7 +80,7 @@ export async function saveResult(input: SaveResultInput): Promise<SavedParticipa
 
         const ratings = input.participants.map((p) => scoreByUser.get(p.userId) ?? 0);
         const placements = input.participants.map((p) => p.placement);
-        const deltas = computeFfaEloDeltas(ratings, placements, input.eloK);
+        const deltas = computeFfaEloDeltas(ratings, placements, config.match.eloK);
 
         const saved: SavedParticipant[] = [];
         for (let i = 0; i < input.participants.length; i++)
@@ -89,7 +88,7 @@ export async function saveResult(input: SaveResultInput): Promise<SavedParticipa
             const p = input.participants[i];
             const before = ratings[i];
             const delta = deltas[i];
-            const after = Math.max(input.scoreFloor, before + delta);
+            const after = Math.max(config.match.scoreFloor, before + delta);
             const isWin = p.placement === 1 ? 1 : 0;
             const expGained = PLACEMENT_EXP[p.placement - 1] ?? PLACEMENT_EXP[PLACEMENT_EXP.length - 1];
 
