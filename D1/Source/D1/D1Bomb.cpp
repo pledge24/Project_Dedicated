@@ -100,6 +100,13 @@ void AD1Bomb::BeginPlay()
 	}
 }
 
+void AD1Bomb::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// 소멸 경로 일원화: 미발화 도화선 타이머 정리(엔진 자동 취소의 명시적 보강).
+	GetWorldTimerManager().ClearAllTimersForObject(this);
+	Super::EndPlay(EndPlayReason);
+}
+
 void AD1Bomb::MulticastOnExploded_Implementation(const TArray<FIntPoint>& AffectedCells)
 {
 	UWorld* World = GetWorld();
@@ -135,7 +142,6 @@ void AD1Bomb::DoExplode()
 		return;
 	}
 	bIsExploding = true;
-	GetWorldTimerManager().ClearTimer(FuseTimerHandle);
 
 	AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
 	const FIntPoint Origin = UD1BomberGridLibrary::WorldToCell(GetActorLocation());
@@ -272,6 +278,6 @@ void AD1Bomb::TriggerChainDetonation()
 	}
 
 	bChainScheduled = true;
-	GetWorldTimerManager().ClearTimer(FuseTimerHandle);
+	// SetTimer가 같은 핸들의 도화선 타이머를 자동으로 clear 후 교체한다.
 	GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, 0.05f, false);
 }
