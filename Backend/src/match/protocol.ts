@@ -16,12 +16,14 @@ export interface MatchPlayer
     slotIndex: number;
 }
 
-/** match:found data. server 주소는 이번 슬라이스에서 stub. */
+/** match:found data. joinToken은 수신자 본인 것(per-recipient). */
 export interface MatchFoundData
 {
     matchId: string;
     server: { host: string; port: number };
     players: MatchPlayer[];
+    /** 수신자 본인의 입장 토큰. DS에 ?join= 으로 제시 → 권위 신원 매핑. */
+    joinToken: string;
 }
 
 export type ServerMessageType = 'queue:joined' | 'queue:left' | 'match:found' | 'error';

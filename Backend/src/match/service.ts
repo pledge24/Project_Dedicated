@@ -70,6 +70,7 @@ export function buildMatchFound(
         matchId,
         server: { host: server.host, port: server.port },
         players,
+        joinToken: '', // per-recipient — ws.handleMatch가 수신자별로 채움
     };
 
     return { data, targets: group.entries.map((e) => e.ref) };

@@ -58,7 +58,7 @@ async function main(): Promise<void>
         serverToken,
         mapName: MAP,
         startedAt: Date.now(),
-        players: users.map((u, i) => ({ userId: u.userId, slotIndex: i, nickname: u.nickname })),
+        players: users.map((u, i) => ({ userId: u.userId, slotIndex: i, nickname: u.nickname, joinToken: `simjoin${i}` })),
     });
 
     const resultBody = {

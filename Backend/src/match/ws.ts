@@ -249,13 +249,25 @@ function runMatchCycle(): void
 async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
 {
     const matchId = randomUUID();
-    // DS 결과 보고 인증용 매치별 서버 토큰. F5b에서 DS spawn에 주입되며, 클라엔 보내지 않는다.
+    // DS 결과 보고 인증용 매치별 서버 토큰. DS spawn에 주입되며, 클라엔 보내지 않는다.
     const serverToken = randomBytes(24).toString('base64url');
+
+    // per-player 입장 토큰(권위 신원용) + 슬롯(입장 인덱스). 클라는 본인 토큰만 받고, DS는 roster로 신원 확정.
+    const joinPlayers = group.entries.map((e, i) => ({
+        ref: e.ref,
+        userId: e.userId,
+        nickname: e.nickname,
+        slotIndex: i,
+        joinToken: randomBytes(16).toString('base64url'),
+    }));
 
     let server: { host: string; port: number };
     try
     {
-        server = config.match.ds.enabled ? await ds.allocate(matchId, serverToken, group.entries.length) : config.match.stubServer;
+        server = config.match.ds.enabled
+            ? await ds.allocate(matchId, serverToken, group.entries.length,
+                joinPlayers.map((p) => ({ joinToken: p.joinToken, userId: p.userId, slotIndex: p.slotIndex })))
+            : config.match.stubServer;
     }
     catch (err)
     {
@@ -268,20 +280,26 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
         return;
     }
 
-    const { data, targets } = service.buildMatchFound(group, matchId, server);
+    const { data } = service.buildMatchFound(group, matchId, server);
 
-    // 결과 POST 검증용 roster 등록(matchId → 4명 신원 + 서버 토큰).
+    // 결과 POST 검증용 roster 등록(matchId → 신원 + 서버 토큰 + 입장 토큰).
     roster.register({
         matchId,
         serverToken,
         mapName: config.match.ds.map,
         startedAt: Date.now(),
-        players: data.players.map((p) => ({ userId: p.userId, slotIndex: p.slotIndex, nickname: p.nickname })),
+        players: joinPlayers.map((p) => ({
+            userId: p.userId,
+            slotIndex: p.slotIndex,
+            nickname: p.nickname,
+            joinToken: p.joinToken,
+        })),
     });
 
-    for (const ref of targets)
+    // 각 클라에 본인 입장 토큰만 실어 보낸다.
+    for (const p of joinPlayers)
     {
-        send(ref, { type: 'match:found', ok: true, data });
+        send(p.ref, { type: 'match:found', ok: true, data: { ...data, joinToken: p.joinToken } });
     }
-    logger.info({ matchId, server, players: data.players.map((p) => p.userId) }, '매치 성사');
+    logger.info({ matchId, server, players: joinPlayers.map((p) => p.userId) }, '매치 성사');
 }
