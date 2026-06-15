@@ -31,8 +31,9 @@ void AD1BomberPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(AD1BomberPlayerState, bIsAlive);
 	DOREPLIFETIME(AD1BomberPlayerState, Placement);
 	DOREPLIFETIME(AD1BomberPlayerState, PlayerSlotIndex);
-	DOREPLIFETIME(AD1BomberPlayerState, FirePower);
-	DOREPLIFETIME(AD1BomberPlayerState, BombCapacity);
+	// 화력·폭탄수는 소유자 HUD 표시용 → 소유 클라에만 복제(대역폭↓). 서버 권위 값은 그대로.
+	DOREPLIFETIME_CONDITION(AD1BomberPlayerState, FirePower, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AD1BomberPlayerState, BombCapacity, COND_OwnerOnly);
 	DOREPLIFETIME(AD1BomberPlayerState, SpeedLevel);
 }
 
