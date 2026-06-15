@@ -12,7 +12,6 @@ class AD1PowerupPickup;
 class AD1WallBlock;
 class UD1MapData;
 enum class EBomberEndReason : uint8;
-enum class EPowerupType : uint8;
 
 UCLASS(abstract)
 class AD1BomberGameMode : public AD1GameMode
@@ -38,12 +37,6 @@ public:
 	void NotifyPlayerDied(AD1BomberPlayerState* DeadPS);
 
 private:
-	/** 서버 전용: MapData(ASCII)를 파싱해 그리드/벽/소프트블록/스폰/바닥을 런타임 스폰 + GameState 채움. */
-	void BuildMapFromData();
-
-	/** 빌드 시 호출: 확률·가중치로 블록 1개의 보유 아이템을 추첨. 드롭 없으면 false. */
-	bool RollPowerupType(EPowerupType& OutType) const;
-
 	void EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason);
 	void EnsureAliveListInitialized();
 
@@ -55,15 +48,6 @@ private:
 
 	/** 매치 시간 만료 → 매치 종료. placement 룰은 v2에서 정의. */
 	void OnMatchTimeExpired();
-
-	/** 매치 종료 후 DS 자가 종료 감시 시작(DS 전용). 전원 퇴장 또는 하드캡 시 종료. */
-	void StartShutdownWatchdog();
-
-	/** 1초마다 인원 확인 — 0명이거나 하드캡 도달 시 DS 종료 요청. */
-	void TickShutdownWatchdog();
-
-	/** DS 프로세스 종료 요청(RequestExit). 백엔드가 포트/슬롯 자동 회수. */
-	void RequestServerShutdown();
 
 	/** 이 매치에서 빌드할 맵 데이터(BP 기본값). `-MapData=` 커맨드라인으로 오버라이드 가능. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
@@ -118,12 +102,6 @@ private:
 
 	/** 시작 게이트 대기 타임아웃용 타이머. */
 	FTimerHandle WaitForPlayersTimerHandle;
-
-	/** 매치 종료 후 종료 감시용 타이머. */
-	FTimerHandle ShutdownWatchdogHandle;
-
-	/** 종료 감시 누적 경과(초). ShutdownGraceSec 도달 시 하드캡 종료. */
-	float ShutdownElapsed = 0.f;
 
 	/** 백엔드가 spawn 시 -ExpectedPlayers= 로 주입. 이 수만큼 접속하면 매치 시작(0/1=즉시). */
 	int32 ExpectedPlayerCount = 0;

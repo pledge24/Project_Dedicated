@@ -3,18 +3,15 @@
 #include "D1BomberGameMode.h"
 #include "D1BomberGameState.h"
 #include "D1BomberPlayerState.h"
-#include "D1BomberGridLibrary.h"
+#include "D1DedicatedServerSubsystem.h"
+#include "D1MapBuilder.h"
 #include "D1MapData.h"
 #include "D1MatchTypes.h"
-#include "D1PowerupPickup.h"
-#include "D1SoftBlock.h"
-#include "D1WallBlock.h"
 #include "D1.h"
 #include "Engine/GameInstance.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
-#include "HAL/PlatformMisc.h"
 #include "Kismet/GameplayStatics.h"
 #include "Online/BackendSubsystem.h"
 
@@ -82,7 +79,21 @@ void AD1BomberGameMode::BeginPlay()
 			*CurrentMatchId, CurrentMatchToken.IsEmpty() ? TEXT("(none)") : TEXT("(set)"), ExpectedPlayerCount);
 	}
 
-	BuildMapFromData();
+	// 맵 빌드는 전용 헬퍼로 위임(GameMode는 config만 보유·전달).
+	FD1MapBuildConfig MapCfg;
+	MapCfg.DefaultMap  = MapData;
+	MapCfg.BlockZ      = BlockZ;
+	MapCfg.PickupClass = PowerupPickupClass;
+	MapCfg.DropChance  = PowerupDropChance;
+	MapCfg.FireWeight  = FireDropWeight;
+	MapCfg.BombWeight  = BombDropWeight;
+	MapCfg.SpeedWeight = SpeedDropWeight;
+	MapCfg.PowerupZ    = PowerupZ;
+	FString MapErr;
+	if (!UD1MapBuilder::Build(GetWorld(), GetGameState<AD1BomberGameState>(), MapCfg, MapErr))
+	{
+		UE_LOG(LogD1, Error, TEXT("[Map] 빌드 실패: %s"), *MapErr);
+	}
 
 	// 시작 게이트: 예상 인원 0/1(PIE·솔로)이면 즉시 시작, 아니면 전원 입장(PostLogin) 또는 타임아웃까지 Waiting.
 	if (ExpectedPlayerCount <= 1)
@@ -296,130 +307,6 @@ void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 	}
 }
 
-bool AD1BomberGameMode::RollPowerupType(EPowerupType& OutType) const
-{
-	if (FMath::FRand() > PowerupDropChance)
-	{
-		return false;
-	}
-
-	const int32 TotalWeight = FireDropWeight + BombDropWeight + SpeedDropWeight;
-	if (TotalWeight <= 0)
-	{
-		return false;
-	}
-
-	const int32 Roll = FMath::RandRange(0, TotalWeight - 1);
-	if (Roll < FireDropWeight)
-	{
-		OutType = EPowerupType::Fire;
-	}
-	else if (Roll < FireDropWeight + BombDropWeight)
-	{
-		OutType = EPowerupType::Bomb;
-	}
-	else
-	{
-		OutType = EPowerupType::Speed;
-	}
-	return true;
-}
-
-void AD1BomberGameMode::BuildMapFromData()
-{
-	AD1BomberGameState* BomberGS = GetGameState<AD1BomberGameState>();
-	UWorld* World = GetWorld();
-	if (!BomberGS || !World)
-	{
-		UE_LOG(LogD1, Warning, TEXT("[Map] GameState/World 없음 — 맵 빌드 스킵"));
-		return;
-	}
-
-	// 맵 선택: -MapData= 커맨드라인 오버라이드 우선(백엔드 주입/맵 스왑), 없으면 BP 기본값.
-	const UD1MapData* MapToUse = MapData;
-	FString MapPath;
-	if (FParse::Value(FCommandLine::Get(), TEXT("MapData="), MapPath) && !MapPath.IsEmpty())
-	{
-		if (UD1MapData* Loaded = LoadObject<UD1MapData>(nullptr, *MapPath))
-		{
-			MapToUse = Loaded;
-			UE_LOG(LogD1, Log, TEXT("[Map] -MapData= 오버라이드: %s"), *MapPath);
-		}
-		else
-		{
-			UE_LOG(LogD1, Warning, TEXT("[Map] -MapData= 로드 실패: %s — 기본값 사용"), *MapPath);
-		}
-	}
-
-	if (!MapToUse)
-	{
-		UE_LOG(LogD1, Error, TEXT("[Map] MapData 미지정 — 맵을 빌드할 수 없음"));
-		return;
-	}
-
-	FD1MapLayout Layout;
-	FString Err;
-	if (!MapToUse->BuildLayout(Layout, Err))
-	{
-		UE_LOG(LogD1, Error, TEXT("[Map] 파싱 실패: %s"), *Err);
-		return;
-	}
-
-	// 폭발/경계 판정 권위 데이터(클라에도 복제).
-	BomberGS->GridSize = Layout.GridSize;
-	BomberGS->WallCells = Layout.WallCells;
-	BomberGS->SoftBlockCells = Layout.SoftBlockCells;
-
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	// 벽(복제) — 메시·콜리전은 액터 생성자에 있어 클라도 동일 구성.
-	if (MapToUse->WallBlockClass)
-	{
-		for (const FIntPoint& Cell : Layout.WallCells)
-		{
-			World->SpawnActor<AD1WallBlock>(MapToUse->WallBlockClass,
-				UD1BomberGridLibrary::CellToWorldCenter(Cell, BlockZ), FRotator::ZeroRotator, Params);
-		}
-	}
-
-	// 소프트블록(복제) — dying 상태는 자체 복제. 빌드 시 보유 아이템 사전 배정.
-	int32 AssignedItems = 0;
-	if (MapToUse->SoftBlockClass)
-	{
-		for (const FIntPoint& Cell : Layout.SoftBlockCells)
-		{
-			AD1SoftBlock* Block = World->SpawnActor<AD1SoftBlock>(MapToUse->SoftBlockClass,
-				UD1BomberGridLibrary::CellToWorldCenter(Cell, BlockZ), FRotator::ZeroRotator, Params);
-			if (Block)
-			{
-				// 확률·가중치는 그대로, 굴리는 시점만 빌드로. 파괴 시엔 굴리지 않고 이걸 스폰.
-				EPowerupType HeldType;
-				if (RollPowerupType(HeldType))
-				{
-					Block->SetHeldItem(HeldType, PowerupPickupClass, PowerupZ);
-					++AssignedItems;
-				}
-			}
-		}
-	}
-
-	// 스폰 지점(서버 전용) — PlayerStartTag=슬롯 → 기존 FindStartForSlot 태그 경로가 그대로 동작.
-	for (const FD1MapStart& Start : Layout.Starts)
-	{
-		const FVector Loc = UD1BomberGridLibrary::CellToWorldCenter(Start.Cell, 0.f);
-		if (APlayerStart* PS = World->SpawnActor<APlayerStart>(
-			APlayerStart::StaticClass(), Loc, FRotator::ZeroRotator, Params))
-		{
-			PS->PlayerStartTag = FName(*FString::FromInt(Start.Slot));
-		}
-	}
-
-	UE_LOG(LogD1, Log, TEXT("[Map] 빌드 완료 — %dx%d, 벽 %d, 소프트 %d, 스폰 %d, 아이템 %d"),
-		Layout.GridSize.X, Layout.GridSize.Y,
-		Layout.WallCells.Num(), Layout.SoftBlockCells.Num(), Layout.Starts.Num(), AssignedItems);
-}
-
 void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason)
 {
 	if (bMatchEnded)
@@ -511,7 +398,10 @@ void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomb
 	}
 
 	// 클라들이 결과 화면 카운트다운 후 ClientTravel로 빠지면 DS가 스스로 종료.
-	StartShutdownWatchdog();
+	if (UD1DedicatedServerSubsystem* DS = GetWorld()->GetSubsystem<UD1DedicatedServerSubsystem>())
+	{
+		DS->BeginShutdownWatch(ShutdownGraceSec);
+	}
 }
 
 void AD1BomberGameMode::EnsureAliveListInitialized()
@@ -579,43 +469,4 @@ void AD1BomberGameMode::OnMatchTimeExpired()
 	UE_LOG(LogD1, Log, TEXT("Match time expired -> ending match"));
 	// 생존자는 EndMatchWithWinner에서 공동 1위로 보정된다.
 	EndMatchWithWinner(nullptr, EBomberEndReason::TimeExpired);
-}
-
-void AD1BomberGameMode::StartShutdownWatchdog()
-{
-	// PIE/Listen 서버는 에디터를 죽이면 안 됨 — 실 DS에서만 자가 종료.
-	if (!IsRunningDedicatedServer())
-	{
-		return;
-	}
-
-	ShutdownElapsed = 0.f;
-	GetWorldTimerManager().SetTimer(
-		ShutdownWatchdogHandle, this, &AD1BomberGameMode::TickShutdownWatchdog, 1.f, /*bLoop=*/true);
-	UE_LOG(LogD1, Log, TEXT("[Match] 종료 감시 시작 — 전원 퇴장 또는 %.0fs 후 DS 종료"), ShutdownGraceSec);
-}
-
-void AD1BomberGameMode::TickShutdownWatchdog()
-{
-	// 클라들이 ClientTravel로 빠지면 Logout → NumPlayers 감소. 0 도달 시 정상 종료.
-	if (GetNumPlayers() <= 0)
-	{
-		UE_LOG(LogD1, Log, TEXT("[Match] 전원 퇴장 — DS 종료"));
-		RequestServerShutdown();
-		return;
-	}
-
-	ShutdownElapsed += 1.f;
-	if (ShutdownElapsed >= ShutdownGraceSec)
-	{
-		UE_LOG(LogD1, Warning, TEXT("[Match] 종료 하드캡(%.0fs) 도달 — 잔류 클라 무시하고 DS 종료"), ShutdownGraceSec);
-		RequestServerShutdown();
-	}
-}
-
-void AD1BomberGameMode::RequestServerShutdown()
-{
-	GetWorldTimerManager().ClearTimer(ShutdownWatchdogHandle);
-	UE_LOG(LogD1, Log, TEXT("[Match] DS 프로세스 종료 요청(RequestExit)"));
-	FPlatformMisc::RequestExit(false);
 }
