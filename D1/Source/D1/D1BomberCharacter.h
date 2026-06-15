@@ -13,7 +13,6 @@ class UAnimSequenceBase;
 class UInputAction;
 class UInputComponent;
 struct FInputActionValue;
-enum class EPowerupType : uint8;
 
 UCLASS(abstract)
 class AD1BomberCharacter : public ACharacter
@@ -49,9 +48,6 @@ public:
 
 	void NotifyBombDestroyed(AD1Bomb* Bomb);
 	void AddIgnoredBomb(AD1Bomb* Bomb);
-
-	/** 서버 전용: 파워업 적용. PlayerState 스탯을 올리고(Speed는 이동속도 반영). */
-	void ApplyPowerup(EPowerupType Type);
 
 protected:
 	UFUNCTION(Server, Reliable)

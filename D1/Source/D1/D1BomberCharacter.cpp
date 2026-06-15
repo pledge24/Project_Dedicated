@@ -20,7 +20,6 @@
 #include "D1BomberGameState.h"
 #include "D1BomberGridLibrary.h"
 #include "D1BomberPlayerState.h"
-#include "D1PowerupPickup.h"
 
 AD1BomberCharacter::AD1BomberCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UD1BomberCharacterMovementComponent>(
@@ -391,33 +390,6 @@ void AD1BomberCharacter::OnSpeedLevelChanged()
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
 		Move->MaxWalkSpeed = BaseWalkSpeed + PS->SpeedLevel * SpeedStep;
-	}
-}
-
-void AD1BomberCharacter::ApplyPowerup(EPowerupType Type)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-
-	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
-	if (!PS)
-	{
-		return;
-	}
-
-	switch (Type)
-	{
-	case EPowerupType::Fire:
-		PS->AddFirePower(1);
-		break;
-	case EPowerupType::Bomb:
-		PS->AddBombCapacity(1);
-		break;
-	case EPowerupType::Speed:
-		PS->AddSpeedLevel(1); // OnRep_SpeedLevel → OnSpeedLevelChanged로 MaxWalkSpeed 반영
-		break;
 	}
 }
 

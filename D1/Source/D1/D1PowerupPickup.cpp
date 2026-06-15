@@ -98,7 +98,18 @@ void AD1PowerupPickup::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComp,
 		return;
 	}
 
-	BC->ApplyPowerup(PowerupType);
+	switch (PowerupType)
+	{
+	case EPowerupType::Fire:
+		PS->AddFirePower(1);
+		break;
+	case EPowerupType::Bomb:
+		PS->AddBombCapacity(1);
+		break;
+	case EPowerupType::Speed:
+		PS->AddSpeedLevel(1); // OnRep_SpeedLevel → 캐릭터 MaxWalkSpeed 반영
+		break;
+	}
 	Destroy(); // 복제로 클라에서도 사라짐
 }
 
