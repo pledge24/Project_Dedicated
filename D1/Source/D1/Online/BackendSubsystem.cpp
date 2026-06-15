@@ -460,6 +460,7 @@ void UBackendSubsystem::HandleSocketMessage(const FString& Message)
 		if (Root->TryGetObjectField(TEXT("data"), DataObj) && DataObj && DataObj->IsValid())
 		{
 			(*DataObj)->TryGetStringField(TEXT("matchId"), Match.MatchId);
+			(*DataObj)->TryGetStringField(TEXT("joinToken"), Match.JoinToken);
 
 			const TSharedPtr<FJsonObject>* ServerObj = nullptr;
 			if ((*DataObj)->TryGetObjectField(TEXT("server"), ServerObj) && ServerObj && ServerObj->IsValid())
@@ -500,35 +501,15 @@ void UBackendSubsystem::HandleSocketMessage(const FString& Message)
 		{
 			if (APlayerController* PC = GetGameInstance()->GetFirstLocalPlayerController())
 			{
-				// 내 백엔드 userId를 ?userId= 로 동봉 → DS가 결과 POST 시 사용. (UE URL 옵션은 ? 로 구분.)
-				int32 MyUserId = 0;
-				if (const UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance()))
+				// 본인 입장 토큰을 ?join= 으로 동봉 → DS가 roster로 권위 신원(userId·slot) 확정.
+				// userId/slot은 클라가 주장하지 않는다(서버권위). UE URL 옵션은 ? 로 구분.
+				if (Match.JoinToken.IsEmpty())
 				{
-					MyUserId = GI->GetCurrentUser().UserId;
+					UE_LOG(LogD1, Warning, TEXT("[Match] match:found에 join 토큰 없음 — 신원 매핑 실패 가능"));
 				}
 
-				// 백엔드 권위 슬롯을 ?slot= 으로 동봉 → DS가 이 자리로 고정 배치(색·위치 일관). 못 찾으면 생략.
-				int32 MySlot = -1;
-				for (const FMatchPlayerDTO& P : Match.Players)
-				{
-					if (P.UserId == MyUserId)
-					{
-						MySlot = P.SlotIndex;
-						break;
-					}
-				}
-				FString SlotSuffix;
-				if (MySlot >= 0)
-				{
-					SlotSuffix = FString::Printf(TEXT("?slot=%d"), MySlot);
-				}
-				else
-				{
-					UE_LOG(LogD1, Warning, TEXT("[Match] match:found에서 내 슬롯(userId=%d) 못 찾음 — slot 생략"), MyUserId);
-				}
-
-				const FString Url = FString::Printf(TEXT("%s:%d?matchId=%s?userId=%d%s"),
-					*Match.ServerHost, Match.ServerPort, *Match.MatchId, MyUserId, *SlotSuffix);
+				const FString Url = FString::Printf(TEXT("%s:%d?matchId=%s?join=%s"),
+					*Match.ServerHost, Match.ServerPort, *Match.MatchId, *Match.JoinToken);
 				UE_LOG(LogD1, Log, TEXT("[Match] DS 입장: %s"), *Url);
 				PC->ClientTravel(Url, TRAVEL_Absolute);
 			}

@@ -105,6 +105,10 @@ struct FMatchFoundDTO
 
 	UPROPERTY(BlueprintReadOnly, Category = "Backend")
 	TArray<FMatchPlayerDTO> Players;
+
+	/** 본인 입장 토큰. DS travel 시 ?join= 으로 제시(서버권위 신원). */
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	FString JoinToken;
 };
 
 /** DS가 백엔드에 보고할 매치 결과 한 명분 (서버 내부용 — BP 비노출, USTRUCT 아님). */
