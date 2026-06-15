@@ -486,6 +486,13 @@ void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomb
 			ResultPlayers.Add(RP);
 		}
 	}
+
+	// UI 표시용 결정적 순서: 등수 오름차순, 동률은 슬롯 순. (PlayerArray 순서는 비결정)
+	Entries.Sort([](const FD1MatchResultEntry& A, const FD1MatchResultEntry& B)
+	{
+		return A.Placement != B.Placement ? A.Placement < B.Placement : A.SlotIndex < B.SlotIndex;
+	});
+
 	GS->SetFinalResults(Entries);
 
 	// 백엔드가 띄운 DS일 때만 결과 보고(토큰 없으면 PIE/standalone → 스킵).
