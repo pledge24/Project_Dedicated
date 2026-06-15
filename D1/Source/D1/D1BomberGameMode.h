@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "D1GameMode.h"
+#include "GameFramework/GameModeBase.h"
 #include "D1BomberGameMode.generated.h"
 
 class APlayerController;
@@ -21,7 +21,7 @@ struct FD1JoinEntry
 };
 
 UCLASS(abstract)
-class AD1BomberGameMode : public AD1GameMode
+class AD1BomberGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 

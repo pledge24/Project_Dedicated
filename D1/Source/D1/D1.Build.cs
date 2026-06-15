@@ -29,20 +29,7 @@ public class D1 : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
 		PublicIncludePaths.AddRange(new string[] {
-			"D1",
-			"D1/Variant_Platforming",
-			"D1/Variant_Platforming/Animation",
-			"D1/Variant_Combat",
-			"D1/Variant_Combat/AI",
-			"D1/Variant_Combat/Animation",
-			"D1/Variant_Combat/Gameplay",
-			"D1/Variant_Combat/Interfaces",
-			"D1/Variant_Combat/UI",
-			"D1/Variant_SideScrolling",
-			"D1/Variant_SideScrolling/AI",
-			"D1/Variant_SideScrolling/Gameplay",
-			"D1/Variant_SideScrolling/Interfaces",
-			"D1/Variant_SideScrolling/UI"
+			"D1"
 		});
 
 		// Uncomment if you are using Slate UI
