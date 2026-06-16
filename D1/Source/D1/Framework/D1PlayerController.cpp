@@ -18,6 +18,29 @@ AD1PlayerController::AD1PlayerController()
 	PlayerCameraManagerClass = AD1MapCameraManager::StaticClass();
 }
 
+void AD1PlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+
+	// 로컬 플레이어 컨트롤러에만 IMC 추가
+	if (IsLocalPlayerController())
+	{
+		// 입력 매핑 컨텍스트 등록
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+		{
+			for (UInputMappingContext* CurrentContext : DefaultMappingContexts)
+			{
+				Subsystem->AddMappingContext(CurrentContext, 0);
+			}
+
+			for (UInputMappingContext* CurrentContext : MobileExcludedMappingContexts)
+			{
+				Subsystem->AddMappingContext(CurrentContext, 0);
+			}
+		}
+	}
+}
+
 void AD1PlayerController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -47,27 +70,6 @@ void AD1PlayerController::BeginPlay()
 	TryBindMatchFinished();
 }
 
-void AD1PlayerController::TryBindMatchFinished()
-{
-	AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
-	if (!GS)
-	{
-		// GameState 복제 전 — 짧게 재시도.
-		GetWorldTimerManager().SetTimer(
-			BindRetryHandle, this, &AD1PlayerController::TryBindMatchFinished, 0.2f, /*bLoop=*/false);
-		return;
-	}
-
-	GetWorldTimerManager().ClearTimer(BindRetryHandle);
-	GS->OnMatchFinished.AddDynamic(this, &AD1PlayerController::HandleMatchFinished);
-
-	// 이미 끝난 매치에 늦게 구독한 경우(재접속 등) 즉시 표시.
-	if (GS->FinalResults.Num() > 0)
-	{
-		HandleMatchFinished();
-	}
-}
-
 void AD1PlayerController::HandleMatchFinished()
 {
 	AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
@@ -95,25 +97,23 @@ void AD1PlayerController::HandleMatchFinished()
 	SetInputMode(FInputModeUIOnly());
 }
 
-void AD1PlayerController::SetupInputComponent()
+void AD1PlayerController::TryBindMatchFinished()
 {
-	Super::SetupInputComponent();
-
-	// 로컬 플레이어 컨트롤러에만 IMC 추가
-	if (IsLocalPlayerController())
+	AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
+	if (!GS)
 	{
-		// 입력 매핑 컨텍스트 등록
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
-		{
-			for (UInputMappingContext* CurrentContext : DefaultMappingContexts)
-			{
-				Subsystem->AddMappingContext(CurrentContext, 0);
-			}
-			
-			for (UInputMappingContext* CurrentContext : MobileExcludedMappingContexts)
-			{
-				Subsystem->AddMappingContext(CurrentContext, 0);
-			}
-		}
+		// GameState 복제 전 — 짧게 재시도.
+		GetWorldTimerManager().SetTimer(
+			BindRetryHandle, this, &AD1PlayerController::TryBindMatchFinished, 0.2f, /*bLoop=*/false);
+		return;
+	}
+
+	GetWorldTimerManager().ClearTimer(BindRetryHandle);
+	GS->OnMatchFinished.AddDynamic(this, &AD1PlayerController::HandleMatchFinished);
+
+	// 이미 끝난 매치에 늦게 구독한 경우(재접속 등) 즉시 표시.
+	if (GS->FinalResults.Num() > 0)
+	{
+		HandleMatchFinished();
 	}
 }

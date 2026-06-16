@@ -10,29 +10,6 @@
 #include "Core/D1LogChannels.h"
 #include "UI/InGame/D1UWMatchResultRow.h"
 
-void UD1UWMatchResult::NativeConstruct()
-{
-	Super::NativeConstruct();
-
-	// 결과 위젯은 매치 종료 시에만 생성 → 여기서 복귀 카운트다운 시작.
-	if (LeaveButton)
-	{
-		LeaveButton->OnClicked.AddDynamic(this, &UD1UWMatchResult::HandleLeaveClicked);
-	}
-
-	RemainingSec = FMath::Max(1, FMath::CeilToInt(ReturnCountdownSec));
-	if (CountdownLabel)
-	{
-		CountdownLabel->SetText(FText::AsNumber(RemainingSec));
-	}
-
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().SetTimer(
-			CountdownTimerHandle, this, &UD1UWMatchResult::OnCountdownTick, 1.f, /*bLoop=*/true);
-	}
-}
-
 void UD1UWMatchResult::SetResults(const TArray<FD1MatchResultEntry>& Results)
 {
 	if (!ResultListPanel || !RowWidgetClass)
@@ -58,6 +35,29 @@ void UD1UWMatchResult::SetResults(const TArray<FD1MatchResultEntry>& Results)
 			Row->SetEntry(Entry);
 			ResultListPanel->AddChildToVerticalBox(Row);
 		}
+	}
+}
+
+void UD1UWMatchResult::NativeConstruct()
+{
+	Super::NativeConstruct();
+
+	// 결과 위젯은 매치 종료 시에만 생성 → 여기서 복귀 카운트다운 시작.
+	if (LeaveButton)
+	{
+		LeaveButton->OnClicked.AddDynamic(this, &UD1UWMatchResult::HandleLeaveClicked);
+	}
+
+	RemainingSec = FMath::Max(1, FMath::CeilToInt(ReturnCountdownSec));
+	if (CountdownLabel)
+	{
+		CountdownLabel->SetText(FText::AsNumber(RemainingSec));
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			CountdownTimerHandle, this, &UD1UWMatchResult::OnCountdownTick, 1.f, /*bLoop=*/true);
 	}
 }
 
