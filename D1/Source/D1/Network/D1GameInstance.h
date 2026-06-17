@@ -43,6 +43,6 @@ private:
 	UPROPERTY(Transient)
 	bool bLoggedIn = false;
 
-	// JWT는 UPROPERTY로 두지 않는다 (BP/리플렉션 노출 방지).
+	/** UPROPERTY로 두지 않음 — BP/리플렉션 노출 방지. */
 	FString CurrentJwt;
 };

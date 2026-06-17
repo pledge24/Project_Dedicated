@@ -23,7 +23,6 @@ public:
 
 protected:
 	//~ APlayerController
-	/** 입력 매핑 컨텍스트 설정 */
 	virtual void SetupInputComponent() override;
 
 	virtual void BeginPlay() override;
@@ -32,11 +31,9 @@ protected:
 	UFUNCTION()
 	void HandleMatchFinished();
 
-	/** 입력 매핑 컨텍스트 */
 	UPROPERTY(EditAnywhere, Category ="Input|Input Mappings")
 	TArray<UInputMappingContext*> DefaultMappingContexts;
 
-	/** 입력 매핑 컨텍스트 */
 	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")
 	TArray<UInputMappingContext*> MobileExcludedMappingContexts;
 

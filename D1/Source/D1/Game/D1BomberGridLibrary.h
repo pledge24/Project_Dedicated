@@ -26,9 +26,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Bomber|Grid")
 	static FVector CellToWorldCenter(const FIntPoint& Cell, float ZOverride = 0.f);
 
-	/** 4방향 Range칸씩 진행, 벽/그리드 끝에서 멈춤. 원점 셀은 제외.
-	 *  파괴 가능 블록 셀은 OutCells(FX/데미지)에서 빼고 OutSoftBlockHits로 별도 보고 후 정지
-	 *  — 폭발 줄기가 블록 위치엔 그려지지 않게(블록은 파괴 대상으로만 처리). */
+	/** 4방향 Range칸 진행, 벽/그리드 끝에서 멈춤(원점 제외).
+	 *  파괴 블록 셀은 OutCells에서 빼고 OutSoftBlockHits로 보고 후 정지. */
 	static void EnumerateCrossCells(
 		const AD1BomberGameState* GameState,
 		const FIntPoint& Origin,
@@ -36,6 +35,7 @@ public:
 		TArray<FIntPoint>& OutCells,
 		TArray<FIntPoint>& OutSoftBlockHits);
 
-	static constexpr float CellSize = 100.f;	// 1m
-	static constexpr float CellHalf = CellSize * 0.5f;	// 셀 중심 높이·블록 반폭·폭탄칸 풋프린트 공용(=50)
+	static constexpr float CellSize = 100.f;
+	/** 셀 중심 높이·블록 반폭·폭탄칸 풋프린트 공용(=50). */
+	static constexpr float CellHalf = CellSize * 0.5f;
 };

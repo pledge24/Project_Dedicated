@@ -22,23 +22,16 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	/**-------------------
-	 *	  API Function
-	 *	  (Server-Only)
-	 *-------------------*/
-	
+	//~ 외부 API (서버 전용)
 	bool ApplyHit();
 	void SetPlayerSlotIndex(int32 NewIndex);
 
-	/** 파워업 적용(서버 전용). 캡까지만 증가. */
+	/** 캡까지만 증가. */
 	void AddFirePower(int32 Delta);
 	void AddBombCapacity(int32 Delta);
 	void AddSpeedLevel(int32 Delta);
 
-	/**-------------------
-	 *	    API Data
-	 *-------------------*/
-
+	//~ 이벤트
 	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
 	FOnLivesChanged OnLivesChanged;
 
@@ -54,6 +47,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
 	FOnSpeedLevelChanged OnSpeedLevelChanged;
 
+	//~ 복제 상태
 	UPROPERTY(ReplicatedUsing = OnRep_Lives, BlueprintReadOnly, Category = "Bomber")
 	int32 Lives;
 
@@ -66,19 +60,19 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_PlayerSlotIndex, BlueprintReadOnly, Category = "Bomber")
 	int32 PlayerSlotIndex;
 
-	/** 폭발 범위(칸). 폭탄 설치 시 폭탄에 stamp. 기본 2. Fire 아이템으로 증가. */
+	/** 폭발 범위(칸). 설치 시 폭탄에 stamp. Fire로 증가. */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Powerup")
 	int32 FirePower;
 
-	/** 동시 설치 가능 폭탄 수. 기본 1. Bomb 아이템으로 증가. */
+	/** 동시 설치 가능 폭탄 수. Bomb로 증가. */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Powerup")
 	int32 BombCapacity;
 
-	/** 이동속도 단계. 기본 0. Speed 아이템으로 증가 → 캐릭터가 MaxWalkSpeed에 반영. */
+	/** 이동속도 단계. Speed로 증가 → 캐릭터 MaxWalkSpeed에 반영. */
 	UPROPERTY(ReplicatedUsing = OnRep_SpeedLevel, BlueprintReadOnly, Category = "Bomber|Powerup")
 	int32 SpeedLevel;
 
-	// 백엔드 userId — DS가 ?join= 토큰을 권위 roster로 해석해 설정, 결과 POST에 사용. 복제 안 함(서버 전용).
+	/** DS가 ?join= 토큰을 권위 roster로 해석해 설정. 결과 POST에 사용, 복제 안 함. */
 	UPROPERTY(BlueprintReadOnly, Category = "Bomber")
 	int64 BackendUserId;
 

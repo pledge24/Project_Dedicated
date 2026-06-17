@@ -19,7 +19,7 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	/** 서버 전용: 설치자의 화력으로 폭발 범위를 덮어쓴다(스폰 직후, 폭발 전). */
+	/** 서버 전용: 설치자 화력으로 폭발 범위 덮어쓰기(스폰 직후). */
 	void SetRange(int32 InRange);
 
 protected:

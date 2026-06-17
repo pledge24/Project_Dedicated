@@ -22,11 +22,10 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	/** 서버 전용: 폭발에 맞아 "파괴 중" 진입. 일정 시간 반투명 유지 후 Destroy.
-	 *  파괴 중에도 콜리전·폭발 차단은 그대로(셀은 CompleteDestruction에서 제거). */
+	/** 서버 전용: "파괴 중" 진입. 반투명 유지 후 Destroy. 콜리전·폭발 차단은 유지. */
 	void StartDying();
 
-	/** 서버 전용: 빌드 시 이 블록이 숨길 파워업 + 드롭 방법(픽업 클래스·높이)을 사전 배정. 파괴 완료 시 직접 스폰. */
+	/** 서버 전용: 빌드 시 숨길 파워업·드롭 방법 사전 배정. 파괴 시 스폰. */
 	void SetHeldItem(EPowerupType InType, TSubclassOf<AD1PowerupPickup> InPickupClass, float InDropZ);
 
 	bool IsDying() const { return bDying; }
@@ -66,6 +65,6 @@ private:
 
 	float DropZ = 40.f;
 
-	/** 보유 아이템 유무. true일 때만 파괴 시 스폰. */
+	/** true일 때만 파괴 시 스폰. */
 	bool bHasItem = false;
 };
