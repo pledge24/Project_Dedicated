@@ -3,7 +3,7 @@
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 
 import { config } from '../common/config.js';
-import { getPool } from '../common/db.js';
+import { withTransaction } from '../common/db.js';
 import type { MatchEndReason } from '../common/types.js';
 import { computeFfaEloDeltas } from './elo.js';
 
@@ -49,11 +49,8 @@ const PLACEMENT_EXP = [100, 70, 40, 20];
 /** 결과를 원자적으로 기록하고 ELO로 점수를 갱신한다. matchId 중복 시 ER_DUP_ENTRY를 throw. */
 export async function saveResult(input: SaveResultInput): Promise<SavedParticipant[]>
 {
-    const conn = await getPool().getConnection();
-    try
+    return withTransaction(async (conn) =>
     {
-        await conn.beginTransaction();
-
         const [matchRes] = await conn.execute<ResultSetHeader>(
             'INSERT INTO matches ' +
             '(client_match_id, map_name, started_at, ended_at, duration_sec, end_reason, winner_user_id) ' +
@@ -109,17 +106,6 @@ export async function saveResult(input: SaveResultInput): Promise<SavedParticipa
             saved.push({ userId: p.userId, placement: p.placement, scoreBefore: before, scoreDelta: delta, scoreAfter: after });
         }
 
-        await conn.commit();
-
         return saved;
-    }
-    catch (err)
-    {
-        await conn.rollback();
-        throw err;
-    }
-    finally
-    {
-        conn.release();
-    }
+    });
 }

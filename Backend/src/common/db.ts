@@ -1,6 +1,7 @@
 // MySQL2 풀 싱글톤
+import type { ExecuteValues, RowDataPacket } from 'mysql2';
 import mysql from 'mysql2/promise';
-import type { Pool } from 'mysql2/promise';
+import type { Pool, PoolConnection } from 'mysql2/promise';
 
 import { config } from './config.js';
 
@@ -32,6 +33,37 @@ export function getPool(): Pool
     });
 
     return pool;
+}
+
+/** SELECT … LIMIT 1 단건 조회. 행이 없으면 null. */
+export async function queryOne<T extends RowDataPacket>(sql: string, params?: ExecuteValues[]): Promise<T | null>
+{
+    const [rows] = await getPool().execute<T[]>(sql, params);
+
+    return rows.length ? rows[0] : null;
+}
+
+/** 트랜잭션 경계 헬퍼 — begin→fn→commit, 실패 시 rollback, 항상 release. */
+export async function withTransaction<T>(fn: (conn: PoolConnection) => Promise<T>): Promise<T>
+{
+    const conn = await getPool().getConnection();
+    try
+    {
+        await conn.beginTransaction();
+        const result = await fn(conn);
+        await conn.commit();
+
+        return result;
+    }
+    catch (err)
+    {
+        await conn.rollback();
+        throw err;
+    }
+    finally
+    {
+        conn.release();
+    }
 }
 
 /** 레디니스 프로브용 — 풀에서 커넥션 받아 ping 후 반환. 실패 시 throw. */
