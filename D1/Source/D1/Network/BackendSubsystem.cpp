@@ -35,19 +35,7 @@ void UBackendSubsystem::Register(const FString& LoginId, const FString& Password
 	Body->SetStringField(TEXT("password"), Password);
 	Body->SetStringField(TEXT("nickname"), Nickname);
 
-	const TSharedRef<IHttpRequest> Request = BuildPostJson(TEXT("/api/auth/register"), Body, /*bAttachAuth=*/false);
-
-	TWeakObjectPtr<UBackendSubsystem> WeakThis(this);
-	const FOnAuthCompleted Forward = OnCompleted;
-	Request->OnProcessRequestComplete().BindLambda(
-		[WeakThis, Forward](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded)
-		{
-			if (UBackendSubsystem* Self = WeakThis.Get())
-			{
-				Self->HandleAuthResponse(Req, Resp, bSucceeded, Forward);
-			}
-		});
-	Request->ProcessRequest();
+	SendAuthRequest(TEXT("/api/auth/register"), Body, OnCompleted);
 }
 
 void UBackendSubsystem::Login(const FString& LoginId, const FString& Password, const FOnAuthCompleted& OnCompleted)
@@ -56,19 +44,7 @@ void UBackendSubsystem::Login(const FString& LoginId, const FString& Password, c
 	Body->SetStringField(TEXT("loginId"),  LoginId);
 	Body->SetStringField(TEXT("password"), Password);
 
-	const TSharedRef<IHttpRequest> Request = BuildPostJson(TEXT("/api/auth/login"), Body, /*bAttachAuth=*/false);
-
-	TWeakObjectPtr<UBackendSubsystem> WeakThis(this);
-	const FOnAuthCompleted Forward = OnCompleted;
-	Request->OnProcessRequestComplete().BindLambda(
-		[WeakThis, Forward](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded)
-		{
-			if (UBackendSubsystem* Self = WeakThis.Get())
-			{
-				Self->HandleAuthResponse(Req, Resp, bSucceeded, Forward);
-			}
-		});
-	Request->ProcessRequest();
+	SendAuthRequest(TEXT("/api/auth/login"), Body, OnCompleted);
 }
 
 void UBackendSubsystem::StartMatchmaking()
@@ -100,7 +76,7 @@ void UBackendSubsystem::StartMatchmaking()
 	}
 
 	TMap<FString, FString> UpgradeHeaders;
-	UpgradeHeaders.Add(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *Jwt));
+	UpgradeHeaders.Add(TEXT("Authorization"), MakeBearer(Jwt));
 
 	const FString Url = BuildMatchWsUrl();
 	MatchSocket = FWebSocketsModule::Get().CreateWebSocket(Url, TArray<FString>(), UpgradeHeaders);
@@ -145,7 +121,7 @@ void UBackendSubsystem::RefreshMyProfile()
 	const TSharedRef<IHttpRequest> Request = FHttpModule::Get().CreateRequest();
 	Request->SetURL(GetBaseUrl() + TEXT("/api/auth/me"));
 	Request->SetVerb(TEXT("GET"));
-	Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *Jwt));
+	Request->SetHeader(TEXT("Authorization"), MakeBearer(Jwt));
 
 	TWeakObjectPtr<UBackendSubsystem> WeakThis(this);
 	Request->OnProcessRequestComplete().BindLambda(
@@ -186,7 +162,7 @@ void UBackendSubsystem::ReportMatchResult(const FString& MatchId, const FString&
 
 	// 매치별 서버 토큰을 Bearer로 — 유저 JWT가 아니라 DS 인증 채널. (BuildPostJson은 auth 미첨부로 호출.)
 	const TSharedRef<IHttpRequest> Request = BuildPostJson(TEXT("/api/match/result"), Body, /*bAttachAuth=*/false);
-	Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *MatchToken));
+	Request->SetHeader(TEXT("Authorization"), MakeBearer(MatchToken));
 
 	Request->OnProcessRequestComplete().BindLambda(
 		[](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded)
@@ -207,18 +183,30 @@ void UBackendSubsystem::ReportMatchResult(const FString& MatchId, const FString&
 	UE_LOG(LogD1, Log, TEXT("[Match] 결과 POST 전송 matchId=%s reason=%s players=%d"), *MatchId, *EndReason, Players.Num());
 }
 
+void UBackendSubsystem::SendAuthRequest(const FString& Path, const TSharedRef<FJsonObject>& Body, const FOnAuthCompleted& OnCompleted)
+{
+	const TSharedRef<IHttpRequest> Request = BuildPostJson(Path, Body, /*bAttachAuth=*/false);
+
+	TWeakObjectPtr<UBackendSubsystem> WeakThis(this);
+	const FOnAuthCompleted Forward = OnCompleted;
+	Request->OnProcessRequestComplete().BindLambda(
+		[WeakThis, Forward](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded)
+		{
+			if (UBackendSubsystem* Self = WeakThis.Get())
+			{
+				Self->HandleAuthResponse(Req, Resp, bSucceeded, Forward);
+			}
+		});
+	Request->ProcessRequest();
+}
+
 TSharedRef<IHttpRequest> UBackendSubsystem::BuildPostJson(const FString& Path, const TSharedRef<FJsonObject>& Body, bool bAttachAuth) const
 {
-	FString Serialized;
-	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer
-		= TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Serialized);
-	FJsonSerializer::Serialize(Body, Writer);
-
 	const TSharedRef<IHttpRequest> Request = FHttpModule::Get().CreateRequest();
 	Request->SetURL(GetBaseUrl() + Path);
 	Request->SetVerb(TEXT("POST"));
 	Request->SetHeader(TEXT("Content-Type"), TEXT("application/json; charset=utf-8"));
-	Request->SetContentAsString(Serialized);
+	Request->SetContentAsString(SerializeJson(Body));
 
 	if (bAttachAuth)
 	{
@@ -227,7 +215,7 @@ TSharedRef<IHttpRequest> UBackendSubsystem::BuildPostJson(const FString& Path, c
 			const FString& Jwt = GI->GetCurrentJwt();
 			if (!Jwt.IsEmpty())
 			{
-				Request->SetHeader(TEXT("Authorization"), FString::Printf(TEXT("Bearer %s"), *Jwt));
+				Request->SetHeader(TEXT("Authorization"), MakeBearer(Jwt));
 			}
 		}
 	}
@@ -252,9 +240,8 @@ void UBackendSubsystem::HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr
 	}
 
 	const FString Content = Resp->GetContentAsString();
-	const TSharedRef<TJsonReader<TCHAR>> Reader = TJsonReaderFactory<TCHAR>::Create(Content);
 	TSharedPtr<FJsonObject> Root;
-	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
+	if (!ParseJsonObject(Content, Root))
 	{
 		Out.bOk = false;
 		Out.ErrorCode = EBackendErrorCode::Unknown;
@@ -268,7 +255,7 @@ void UBackendSubsystem::HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr
 	if (bOk)
 	{
 		const TSharedPtr<FJsonObject>* DataObj = nullptr;
-		if (Root->TryGetObjectField(TEXT("data"), DataObj) && DataObj && DataObj->IsValid())
+		if (GetObjectField(Root, TEXT("data"), DataObj))
 		{
 			User.UserId   = static_cast<int32>((*DataObj)->GetNumberField(TEXT("userId")));
 			User.Nickname = (*DataObj)->GetStringField(TEXT("nickname"));
@@ -306,7 +293,7 @@ void UBackendSubsystem::HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr
 
 	// 실패 envelope
 	const TSharedPtr<FJsonObject>* ErrorObj = nullptr;
-	if (Root->TryGetObjectField(TEXT("error"), ErrorObj) && ErrorObj && ErrorObj->IsValid())
+	if (GetObjectField(Root, TEXT("error"), ErrorObj))
 	{
 		const FString CodeStr = (*ErrorObj)->GetStringField(TEXT("code"));
 		Out.ErrorCode    = ParseErrorCode(CodeStr);
@@ -329,9 +316,8 @@ void UBackendSubsystem::HandleProfileResponse(FHttpRequestPtr Req, FHttpResponse
 	}
 
 	const FString Content = Resp->GetContentAsString();
-	const TSharedRef<TJsonReader<TCHAR>> Reader = TJsonReaderFactory<TCHAR>::Create(Content);
 	TSharedPtr<FJsonObject> Root;
-	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid()
+	if (!ParseJsonObject(Content, Root)
 		|| !(Root->HasField(TEXT("ok")) && Root->GetBoolField(TEXT("ok"))))
 	{
 		UE_LOG(LogD1, Warning, TEXT("[Profile] /me 응답 파싱 실패: %s"), *Content);
@@ -339,7 +325,7 @@ void UBackendSubsystem::HandleProfileResponse(FHttpRequestPtr Req, FHttpResponse
 	}
 
 	const TSharedPtr<FJsonObject>* DataObj = nullptr;
-	if (!Root->TryGetObjectField(TEXT("data"), DataObj) || !DataObj || !DataObj->IsValid())
+	if (!GetObjectField(Root, TEXT("data"), DataObj))
 	{
 		return;
 	}
@@ -372,6 +358,31 @@ EBackendErrorCode UBackendSubsystem::ParseErrorCode(const FString& CodeStr)
 	return EBackendErrorCode::Unknown;
 }
 
+bool UBackendSubsystem::ParseJsonObject(const FString& Content, TSharedPtr<FJsonObject>& OutRoot)
+{
+	const TSharedRef<TJsonReader<TCHAR>> Reader = TJsonReaderFactory<TCHAR>::Create(Content);
+	return FJsonSerializer::Deserialize(Reader, OutRoot) && OutRoot.IsValid();
+}
+
+bool UBackendSubsystem::GetObjectField(const TSharedPtr<FJsonObject>& Obj, const TCHAR* Field, const TSharedPtr<FJsonObject>*& Out)
+{
+	return Obj.IsValid() && Obj->TryGetObjectField(Field, Out) && Out && Out->IsValid();
+}
+
+FString UBackendSubsystem::SerializeJson(const TSharedRef<FJsonObject>& Body)
+{
+	FString Serialized;
+	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer
+		= TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Serialized);
+	FJsonSerializer::Serialize(Body, Writer);
+	return Serialized;
+}
+
+FString UBackendSubsystem::MakeBearer(const FString& Token)
+{
+	return FString::Printf(TEXT("Bearer %s"), *Token);
+}
+
 FString UBackendSubsystem::BuildMatchWsUrl() const
 {
 	FString Url = GetBaseUrl();
@@ -396,12 +407,7 @@ void UBackendSubsystem::SendType(const FString& Type)
 	const TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
 	Body->SetStringField(TEXT("type"), Type);
 
-	FString Serialized;
-	const TSharedRef<TJsonWriter<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>> Writer
-		= TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Serialized);
-	FJsonSerializer::Serialize(Body, Writer);
-
-	MatchSocket->Send(Serialized);
+	MatchSocket->Send(SerializeJson(Body));
 }
 
 void UBackendSubsystem::CloseMatchSocket()
@@ -430,9 +436,8 @@ void UBackendSubsystem::HandleSocketConnected()
 
 void UBackendSubsystem::HandleSocketMessage(const FString& Message)
 {
-	const TSharedRef<TJsonReader<TCHAR>> Reader = TJsonReaderFactory<TCHAR>::Create(Message);
 	TSharedPtr<FJsonObject> Root;
-	if (!FJsonSerializer::Deserialize(Reader, Root) || !Root.IsValid())
+	if (!ParseJsonObject(Message, Root))
 	{
 		UE_LOG(LogD1, Warning, TEXT("[Match] WS 메시지 파싱 실패: %s"), *Message);
 		return;
@@ -457,13 +462,13 @@ void UBackendSubsystem::HandleSocketMessage(const FString& Message)
 	{
 		FMatchFoundDTO Match;
 		const TSharedPtr<FJsonObject>* DataObj = nullptr;
-		if (Root->TryGetObjectField(TEXT("data"), DataObj) && DataObj && DataObj->IsValid())
+		if (GetObjectField(Root, TEXT("data"), DataObj))
 		{
 			(*DataObj)->TryGetStringField(TEXT("matchId"), Match.MatchId);
 			(*DataObj)->TryGetStringField(TEXT("joinToken"), Match.JoinToken);
 
 			const TSharedPtr<FJsonObject>* ServerObj = nullptr;
-			if ((*DataObj)->TryGetObjectField(TEXT("server"), ServerObj) && ServerObj && ServerObj->IsValid())
+			if (GetObjectField(*DataObj, TEXT("server"), ServerObj))
 			{
 				(*ServerObj)->TryGetStringField(TEXT("host"), Match.ServerHost);
 				(*ServerObj)->TryGetNumberField(TEXT("port"), Match.ServerPort);
@@ -526,7 +531,7 @@ void UBackendSubsystem::HandleSocketMessage(const FString& Message)
 		FBackendResponse Err;
 		Err.bOk = false;
 		const TSharedPtr<FJsonObject>* ErrorObj = nullptr;
-		if (Root->TryGetObjectField(TEXT("error"), ErrorObj) && ErrorObj && ErrorObj->IsValid())
+		if (GetObjectField(Root, TEXT("error"), ErrorObj))
 		{
 			Err.ErrorCode = ParseErrorCode((*ErrorObj)->GetStringField(TEXT("code")));
 			(*ErrorObj)->TryGetStringField(TEXT("message"), Err.ErrorMessage);

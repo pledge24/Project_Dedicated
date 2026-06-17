@@ -71,10 +71,17 @@ public:
 
 private:
 	//~ 내부 헬퍼 — HTTP 인증
+	void SendAuthRequest(const FString& Path, const TSharedRef<FJsonObject>& Body, const FOnAuthCompleted& OnCompleted);
 	TSharedRef<IHttpRequest> BuildPostJson(const FString& Path, const TSharedRef<FJsonObject>& Body, bool bAttachAuth) const;
 	void HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded, FOnAuthCompleted Forward);
 	void HandleProfileResponse(FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded);
 	static EBackendErrorCode ParseErrorCode(const FString& CodeStr);
+
+	//~ 내부 헬퍼 — JSON/헤더 공용
+	static bool ParseJsonObject(const FString& Content, TSharedPtr<FJsonObject>& OutRoot);
+	static bool GetObjectField(const TSharedPtr<FJsonObject>& Obj, const TCHAR* Field, const TSharedPtr<FJsonObject>*& Out);
+	static FString SerializeJson(const TSharedRef<FJsonObject>& Body);
+	static FString MakeBearer(const FString& Token);
 
 	//~ 내부 헬퍼 — 매칭 WebSocket
 	FString BuildMatchWsUrl() const;
