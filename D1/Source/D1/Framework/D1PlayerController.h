@@ -22,6 +22,15 @@ public:
 	AD1PlayerController();
 
 protected:
+	//~ APlayerController
+	/** 입력 매핑 컨텍스트 설정 */
+	virtual void SetupInputComponent() override;
+
+	virtual void BeginPlay() override;
+
+	/** GameState.OnMatchFinished 콜백 — 결과 위젯 생성·표시. */
+	UFUNCTION()
+	void HandleMatchFinished();
 
 	/** 입력 매핑 컨텍스트 */
 	UPROPERTY(EditAnywhere, Category ="Input|Input Mappings")
@@ -38,15 +47,6 @@ protected:
 	/** 매치 결과 위젯 클래스. BP에서 WBP_MatchResult 지정. */
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> ResultClass;
-
-	/** 입력 매핑 컨텍스트 설정 */
-	virtual void SetupInputComponent() override;
-
-	virtual void BeginPlay() override;
-
-	/** GameState.OnMatchFinished 콜백 — 결과 위젯 생성·표시. */
-	UFUNCTION()
-	void HandleMatchFinished();
 
 private:
 	/** GameState가 준비되면 OnMatchFinished에 바인드. 아직이면 짧게 재시도. */
