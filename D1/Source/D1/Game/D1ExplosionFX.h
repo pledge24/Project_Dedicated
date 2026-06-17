@@ -39,5 +39,9 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
 	float PeakScale;
 
+	/** 폭발 시작·소멸 시 스케일(작게 시작→PeakScale→작게). */
+	UPROPERTY(EditDefaultsOnly, Category = "FX")
+	float InitialScale;
+
 	float Elapsed;
 };

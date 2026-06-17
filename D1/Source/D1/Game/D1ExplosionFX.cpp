@@ -13,6 +13,7 @@ AD1ExplosionFX::AD1ExplosionFX()
 	Lifetime = 0.5f;
 	ExpansionTime = 0.2f;
 	PeakScale = 0.9f;
+	InitialScale = 0.05f;
 	Elapsed = 0.f;
 
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
@@ -34,7 +35,7 @@ AD1ExplosionFX::AD1ExplosionFX()
 		MeshComp->SetMaterial(0, ExplosionMat.Object);
 	}
 
-	SetActorScale3D(FVector(0.05f));
+	SetActorScale3D(FVector(InitialScale));
 }
 
 void AD1ExplosionFX::Tick(float DeltaSeconds)
@@ -52,13 +53,13 @@ void AD1ExplosionFX::Tick(float DeltaSeconds)
 	if (Elapsed < ExpansionTime)
 	{
 		const float A = FMath::Clamp(Elapsed / FMath::Max(ExpansionTime, KINDA_SMALL_NUMBER), 0.f, 1.f);
-		Scale = FMath::Lerp(0.05f, PeakScale, A);
+		Scale = FMath::Lerp(InitialScale, PeakScale, A);
 	}
 	else
 	{
 		const float HoldDuration = FMath::Max(Lifetime - ExpansionTime, KINDA_SMALL_NUMBER);
 		const float A = FMath::Clamp((Elapsed - ExpansionTime) / HoldDuration, 0.f, 1.f);
-		Scale = FMath::Lerp(PeakScale, 0.05f, A);
+		Scale = FMath::Lerp(PeakScale, InitialScale, A);
 	}
 	SetActorScale3D(FVector(Scale));
 }

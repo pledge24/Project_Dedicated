@@ -54,6 +54,10 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	float FuseSeconds;
 
+	/** 다른 폭탄에 휘말렸을 때 체인 폭발까지의 지연(초). */
+	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
+	float ChainDetonationDelay = 0.05f;
+
 	UPROPERTY(ReplicatedUsing = OnRep_DetonationServerTime, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	float DetonationServerTime;
 

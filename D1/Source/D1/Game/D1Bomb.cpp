@@ -170,7 +170,7 @@ void AD1Bomb::TriggerChainDetonation()
 
 	bChainScheduled = true;
 	// SetTimer가 같은 핸들의 도화선 타이머를 자동으로 clear 후 교체한다.
-	GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, 0.05f, false);
+	GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, ChainDetonationDelay, false);
 }
 
 void AD1Bomb::ChainDetonateBombs(const TArray<FIntPoint>& Cells)
@@ -281,7 +281,7 @@ void AD1Bomb::ApplyExplosionDamage(const TArray<FIntPoint>& Cells)
 			}
 			else
 			{
-				BC->StartInvulnerability(2.0f);
+				BC->StartInvulnerability(BC->GetHitInvulnSeconds());
 				BC->ApplyHitStun();
 			}
 		}

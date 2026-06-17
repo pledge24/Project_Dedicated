@@ -34,6 +34,7 @@ public:
 	void DoMove(float Right, float Forward);
 
 	bool IsInvulnerable() const { return bIsInvulnerable; }
+	float GetHitInvulnSeconds() const { return HitInvulnSeconds; }
 
 	/** 사망 시 메시/콜리전/이동 정리. 서버·클라 모두에서 안전 (PS OnRep 경유로 양쪽에서 호출). */
 	void HandleDeath();
@@ -129,6 +130,10 @@ private:
 	/** 피격 경직(조작 불가) 지속 시간(초). */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	float StunDuration = 1.0f;
+
+	/** 비치명 피격 후 무적 지속 시간(초). 폭탄이 이 값으로 무적 부여. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
+	float HitInvulnSeconds = 2.f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_Invulnerable, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	bool bIsInvulnerable;
