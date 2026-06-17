@@ -6,6 +6,7 @@ import type { Duplex } from 'node:stream';
 import { WebSocket, WebSocketServer } from 'ws';
 import type { RawData } from 'ws';
 
+import { extractBearerToken } from '../common/bearer.js';
 import { config } from '../common/config.js';
 import { AppError, Codes } from '../common/errors.js';
 import type { ErrorKind } from '../common/errors.js';
@@ -19,7 +20,6 @@ import * as roster from './roster.js';
 import * as service from './service.js';
 
 const WS_PATH = '/ws/match';
-const BEARER_PREFIX = 'Bearer ';
 
 /** 인증된 소켓에 붙는 컨텍스트. */
 interface AuthedWs extends WebSocket
@@ -104,13 +104,7 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
 /** 업그레이드 핸드셰이크의 Authorization 헤더에서 토큰 검증. 실패 시 null. */
 function authenticate(req: IncomingMessage): AuthedUser | null
 {
-    const header = req.headers.authorization;
-    if (!header || !header.startsWith(BEARER_PREFIX))
-    {
-        return null;
-    }
-
-    const token = header.slice(BEARER_PREFIX.length).trim();
+    const token = extractBearerToken(req.headers.authorization);
     if (!token)
     {
         return null;

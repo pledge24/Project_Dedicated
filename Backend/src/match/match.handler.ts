@@ -1,13 +1,13 @@
 // 매치 결과 요청/응답 어댑터 (handler 레이어). 본문 형식 검증 + 서버 토큰 추출.
 import type { NextFunction, Request, Response } from 'express';
 
+import { extractBearerToken } from '../common/bearer.js';
 import { config } from '../common/config.js';
 import { ok } from '../common/envelope.js';
 import { AppError, Codes } from '../common/errors.js';
 import type { MatchEndReason, MatchResultEntryInput, MatchResultRequest } from '../common/types.js';
 import * as service from './result.service.js';
 
-const BEARER_PREFIX = 'Bearer ';
 const END_REASONS: readonly MatchEndReason[] = ['winner', 'draw', 'time_expired', 'abort'];
 
 /**
@@ -33,13 +33,7 @@ export async function submitResult(req: Request, res: Response, next: NextFuncti
 /** Authorization 헤더의 Bearer 토큰(=서버 토큰). 없으면 401. */
 function extractServerToken(req: Request): string
 {
-    const header = req.headers.authorization;
-    if (!header || !header.startsWith(BEARER_PREFIX))
-    {
-        throw new AppError(Codes.SERVER_AUTH_REQUIRED, '서버 토큰이 필요합니다.');
-    }
-
-    const token = header.slice(BEARER_PREFIX.length).trim();
+    const token = extractBearerToken(req.headers.authorization);
     if (!token)
     {
         throw new AppError(Codes.SERVER_AUTH_REQUIRED, '서버 토큰이 필요합니다.');

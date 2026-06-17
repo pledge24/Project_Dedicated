@@ -1,10 +1,9 @@
 // Bearer 토큰 검증 미들웨어 (network 레이어). Authorization 헤더 → req.user.
 import type { NextFunction, Request, Response } from 'express';
 
+import { extractBearerToken } from './bearer.js';
 import { AppError, Codes } from './errors.js';
 import * as jwtUtil from './jwt.js';
-
-const BEARER_PREFIX = 'Bearer ';
 
 /**
  * Authorization: Bearer <token> 를 검증하고 req.user를 채운다.
@@ -12,13 +11,7 @@ const BEARER_PREFIX = 'Bearer ';
  */
 export function requireAuth(req: Request, res: Response, next: NextFunction): void
 {
-    const header = req.headers.authorization;
-    if (!header || !header.startsWith(BEARER_PREFIX))
-    {
-        return next(new AppError(Codes.AUTH_REQUIRED, '인증이 필요합니다.'));
-    }
-
-    const token = header.slice(BEARER_PREFIX.length).trim();
+    const token = extractBearerToken(req.headers.authorization);
     if (!token)
     {
         return next(new AppError(Codes.AUTH_REQUIRED, '인증이 필요합니다.'));
