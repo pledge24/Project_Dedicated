@@ -120,6 +120,10 @@ void AD1BomberGameMode::BeginPlay()
 				JE.Slot = FCString::Atoi(*Parts[2]);
 				JoinRoster.Add(Parts[0], JE);
 			}
+			else
+			{
+				UE_LOG(LogD1, Warning, TEXT("[Match] roster 항목 형식 오류(무시): '%s'"), *Entry);
+			}
 		}
 		UE_LOG(LogD1, Log, TEXT("[Match] roster 주입 %d명"), JoinRoster.Num());
 	}
