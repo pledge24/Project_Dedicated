@@ -28,6 +28,34 @@ namespace
 		}
 	}
 
+	// 모든 PlayerStart를 이름순 정렬로 수집 — 슬롯 인덱스 일관성 확보.
+	void GatherSortedPlayerStarts(const UObject* WorldContext, TArray<AActor*>& OutStarts)
+	{
+		UGameplayStatics::GetAllActorsOfClass(WorldContext, APlayerStart::StaticClass(), OutStarts);
+		OutStarts.Sort([](const AActor& A, const AActor& B)
+		{
+			return A.GetName() < B.GetName();
+		});
+	}
+
+	// PlayerStartTag가 "0"~"3"이면 그 슬롯, 아니면 DefaultSlot 유지.
+	int32 ResolveSlotFromTag(const AActor* Start, int32 DefaultSlot)
+	{
+		if (const APlayerStart* PS = Cast<APlayerStart>(Start))
+		{
+			const FString TagStr = PS->PlayerStartTag.ToString();
+			if (TagStr.IsNumeric())
+			{
+				const int32 Parsed = FCString::Atoi(*TagStr);
+				if (Parsed >= 0 && Parsed <= 3)
+				{
+					return Parsed;
+				}
+			}
+		}
+		return DefaultSlot;
+	}
+
 	// 슬롯 번호 → PlayerStart. PlayerStartTag=="N" 우선, 없으면 이름순 정렬의 N번째.
 	AActor* FindStartForSlot(const UObject* WorldContext, int32 Slot)
 	{
@@ -37,11 +65,7 @@ namespace
 		}
 
 		TArray<AActor*> AllStarts;
-		UGameplayStatics::GetAllActorsOfClass(WorldContext, APlayerStart::StaticClass(), AllStarts);
-		AllStarts.Sort([](const AActor& A, const AActor& B)
-		{
-			return A.GetName() < B.GetName();
-		});
+		GatherSortedPlayerStarts(WorldContext, AllStarts);
 
 		const FString SlotTag = FString::FromInt(Slot);
 		for (AActor* Start : AllStarts)
@@ -136,13 +160,7 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 	UsedStarts.RemoveAll([](const TWeakObjectPtr<AActor>& Ptr) { return !Ptr.IsValid(); });
 
 	TArray<AActor*> AllStarts;
-	UGameplayStatics::GetAllActorsOfClass(this, APlayerStart::StaticClass(), AllStarts);
-
-	// 액터 이름 알파벳 정렬 — 슬롯 인덱스 일관성 확보.
-	AllStarts.Sort([](const AActor& A, const AActor& B)
-	{
-		return A.GetName() < B.GetName();
-	});
+	GatherSortedPlayerStarts(this, AllStarts);
 
 	AD1BomberPlayerState* BomberPS = Player ? Player->GetPlayerState<AD1BomberPlayerState>() : nullptr;
 
@@ -183,19 +201,7 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 		}
 
 		// 슬롯 인덱스 결정: PlayerStartTag가 "0"~"3"이면 그 값, 아니면 정렬 인덱스.
-		int32 SlotIndex = i;
-		if (APlayerStart* PS = Cast<APlayerStart>(Start))
-		{
-			const FString TagStr = PS->PlayerStartTag.ToString();
-			if (TagStr.IsNumeric())
-			{
-				const int32 Parsed = FCString::Atoi(*TagStr);
-				if (Parsed >= 0 && Parsed <= 3)
-				{
-					SlotIndex = Parsed;
-				}
-			}
-		}
+		const int32 SlotIndex = ResolveSlotFromTag(Start, i);
 
 		// PlayerState에 슬롯 부여.
 		if (BomberPS)
