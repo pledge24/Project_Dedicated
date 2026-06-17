@@ -4,6 +4,7 @@
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Game/D1BomberGridLibrary.h"
 
 AD1WallBlock::AD1WallBlock()
 {
@@ -13,7 +14,7 @@ AD1WallBlock::AD1WallBlock()
 	bReplicates = true;
 
 	CollisionComp = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionComp"));
-	CollisionComp->SetBoxExtent(FVector(50.f, 50.f, 50.f));
+	CollisionComp->SetBoxExtent(FVector(UD1BomberGridLibrary::CellHalf));
 	CollisionComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	CollisionComp->SetCollisionObjectType(ECC_WorldStatic);
 	CollisionComp->SetCollisionResponseToAllChannels(ECR_Block);

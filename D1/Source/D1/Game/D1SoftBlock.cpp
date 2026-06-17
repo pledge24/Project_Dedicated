@@ -17,7 +17,7 @@ AD1SoftBlock::AD1SoftBlock()
 	bReplicates = true;
 
 	CollisionComp = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionComp"));
-	CollisionComp->SetBoxExtent(FVector(50.f, 50.f, 50.f));
+	CollisionComp->SetBoxExtent(FVector(UD1BomberGridLibrary::CellHalf));
 	CollisionComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	CollisionComp->SetCollisionObjectType(ECC_WorldStatic);
 	CollisionComp->SetCollisionResponseToAllChannels(ECR_Block);

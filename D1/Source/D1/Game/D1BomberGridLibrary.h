@@ -37,4 +37,5 @@ public:
 		TArray<FIntPoint>& OutSoftBlockHits);
 
 	static constexpr float CellSize = 100.f;	// 1m
+	static constexpr float CellHalf = CellSize * 0.5f;	// 셀 중심 높이·블록 반폭·폭탄칸 풋프린트 공용(=50)
 };

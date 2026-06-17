@@ -312,7 +312,7 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 
 	// ============ 검증 종료 =============
 
-	const FVector SpawnLoc = UD1BomberGridLibrary::CellToWorldCenter(Cell, 50.f);
+	const FVector SpawnLoc = UD1BomberGridLibrary::CellToWorldCenter(Cell, UD1BomberGridLibrary::CellHalf);
 	FActorSpawnParameters Params;
 	Params.Owner = this;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -446,7 +446,7 @@ void AD1BomberCharacter::UpdateIgnoredBombs()
 	// 차단을 다시 켠다. 캡슐 반지름 + 박스 반폭 + 여유 거리로 계산해서,
 	// IgnoreActorWhenMoving을 false로 되돌릴 때 캡슐이 박스에 끼어 튕겨나가는 거 방지.
 	const float CapRadius = Cap->GetScaledCapsuleRadius();
-	const float BombHalfExtent = 50.f; // bomb cell footprint, see AD1Bomb
+	const float BombHalfExtent = UD1BomberGridLibrary::CellHalf; // 폭탄이 점유한 셀의 반폭
 	const float ExitMargin = 5.f;
 	const float ExitDistanceSquared = FMath::Square(CapRadius + BombHalfExtent + ExitMargin);
 
