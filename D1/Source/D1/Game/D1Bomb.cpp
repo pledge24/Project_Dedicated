@@ -30,6 +30,7 @@ AD1Bomb::AD1Bomb()
 	DetonationServerTime = 0.f;
 
 	CollisionComp = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionComp"));
+	// 셀(100)보다 작은 충돌 — 두 캐릭터가 폭탄과 같은 칸에 설 수 있게.
 	CollisionComp->InitBoxExtent(FVector(40.f, 40.f, 40.f));
 	CollisionComp->SetCollisionProfileName(TEXT("BomberBomb"));
 	RootComponent = CollisionComp;
@@ -79,7 +80,7 @@ void AD1Bomb::BeginPlay()
 
 	TArray<AActor*> Overlapping;
 	UKismetSystemLibrary::BoxOverlapActors(this, GetActorLocation(),
-		FVector(50.f, 50.f, 100.f),
+		FVector(UD1BomberGridLibrary::CellHalf, UD1BomberGridLibrary::CellHalf, UD1BomberGridLibrary::CellSize),
 		ObjectTypes,
 		AD1BomberCharacter::StaticClass(),
 		TArray<AActor*>(),
@@ -145,9 +146,37 @@ void AD1Bomb::DoExplode()
 	UD1BomberGridLibrary::EnumerateCrossCells(GS, Origin, Range, Cells, SoftBlockHits);
 	Cells.Insert(Origin, 0);
 
-	const TSet<FIntPoint> CellSet(Cells);
+	ChainDetonateBombs(Cells);
+	DestroySoftBlocks(SoftBlockHits);
+	ApplyExplosionDamage(Cells);
 
+	MulticastOnExploded(Cells);
+
+	// 소유자 폭탄 슬롯 회수 — Owner(설치 캐릭터)에서 직접.
+	if (AD1BomberCharacter* OwnerBC = GetOwner<AD1BomberCharacter>())
+	{
+		OwnerBC->NotifyBombDestroyed(this);
+	}
+
+	Destroy();
+}
+
+void AD1Bomb::TriggerChainDetonation()
+{
+	if (!HasAuthority() || bIsExploding || bChainScheduled)
+	{
+		return;
+	}
+
+	bChainScheduled = true;
+	// SetTimer가 같은 핸들의 도화선 타이머를 자동으로 clear 후 교체한다.
+	GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, 0.05f, false);
+}
+
+void AD1Bomb::ChainDetonateBombs(const TArray<FIntPoint>& Cells)
+{
 	// 폭발 십자에 걸린 다른 폭탄 체인 점화. (블록 셀은 Cells에 없으므로 블록 뒤 폭탄은 보호됨)
+	const TSet<FIntPoint> CellSet(Cells);
 	for (TActorIterator<AD1Bomb> It(GetWorld()); It; ++It)
 	{
 		AD1Bomb* Other = *It;
@@ -166,40 +195,51 @@ void AD1Bomb::DoExplode()
 			Other->TriggerChainDetonation();
 		}
 	}
+}
 
+void AD1Bomb::DestroySoftBlocks(const TArray<FIntPoint>& SoftBlockHits)
+{
 	// 폭발 줄기가 닿은 파괴 가능 블록을 "파괴 중"으로 전환. 셀 제거는 블록이 시간 경과 후
 	// 스스로 처리(파괴 중에도 폭발 차단 유지) — 여기선 StartDying만.
-	if (SoftBlockHits.Num() > 0)
+	if (SoftBlockHits.Num() == 0)
 	{
-		const TSet<FIntPoint> HitSet(SoftBlockHits);
-		for (TActorIterator<AD1SoftBlock> It(GetWorld()); It; ++It)
-		{
-			AD1SoftBlock* Block = *It;
-			if (!IsValid(Block) || Block->IsDying())
-			{
-				continue;
-			}
-
-			const FIntPoint BlockCell = UD1BomberGridLibrary::WorldToCell(Block->GetActorLocation());
-			if (HitSet.Contains(BlockCell))
-			{
-				Block->StartDying();
-			}
-		}
+		return;
 	}
 
+	const TSet<FIntPoint> HitSet(SoftBlockHits);
+	for (TActorIterator<AD1SoftBlock> It(GetWorld()); It; ++It)
+	{
+		AD1SoftBlock* Block = *It;
+		if (!IsValid(Block) || Block->IsDying())
+		{
+			continue;
+		}
+
+		const FIntPoint BlockCell = UD1BomberGridLibrary::WorldToCell(Block->GetActorLocation());
+		if (HitSet.Contains(BlockCell))
+		{
+			Block->StartDying();
+		}
+	}
+}
+
+void AD1Bomb::ApplyExplosionDamage(const TArray<FIntPoint>& Cells)
+{
 	AD1BomberGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AD1BomberGameMode>() : nullptr;
 
 	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
 	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
 
+	// 폭발 피격 박스: 셀보다 약간 작은 가로(45) + 캐릭터 높이(80).
+	const FVector HitExtent(45.f, 45.f, 80.f);
+
 	TSet<AD1BomberCharacter*> AlreadyHit;
 	for (const FIntPoint& Cell : Cells)
 	{
-		const FVector Center = UD1BomberGridLibrary::CellToWorldCenter(Cell, 50.f);
+		const FVector Center = UD1BomberGridLibrary::CellToWorldCenter(Cell, UD1BomberGridLibrary::CellHalf);
 		TArray<AActor*> Found;
 		UKismetSystemLibrary::BoxOverlapActors(this, Center,
-			FVector(45.f, 45.f, 80.f),
+			HitExtent,
 			ObjectTypes,
 			AD1BomberCharacter::StaticClass(),
 			TArray<AActor*>(),
@@ -246,26 +286,4 @@ void AD1Bomb::DoExplode()
 			}
 		}
 	}
-
-	MulticastOnExploded(Cells);
-
-	// 소유자 폭탄 슬롯 회수 — Owner(설치 캐릭터)에서 직접.
-	if (AD1BomberCharacter* OwnerBC = GetOwner<AD1BomberCharacter>())
-	{
-		OwnerBC->NotifyBombDestroyed(this);
-	}
-
-	Destroy();
-}
-
-void AD1Bomb::TriggerChainDetonation()
-{
-	if (!HasAuthority() || bIsExploding || bChainScheduled)
-	{
-		return;
-	}
-
-	bChainScheduled = true;
-	// SetTimer가 같은 핸들의 도화선 타이머를 자동으로 clear 후 교체한다.
-	GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, 0.05f, false);
 }

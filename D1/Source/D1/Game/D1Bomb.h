@@ -44,6 +44,10 @@ protected:
 	TObjectPtr<UStaticMeshComponent> MeshComp;
 
 private:
+	void ChainDetonateBombs(const TArray<FIntPoint>& Cells);
+	void DestroySoftBlocks(const TArray<FIntPoint>& SoftBlockHits);
+	void ApplyExplosionDamage(const TArray<FIntPoint>& Cells);
+
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	int32 Range;
 
