@@ -154,6 +154,7 @@ void UBackendSubsystem::ReportMatchResult(const FString& MatchId, const FString&
 	{
 		const TSharedRef<FJsonObject> Entry = MakeShared<FJsonObject>();
 		Entry->SetNumberField(TEXT("userId"),    static_cast<double>(P.UserId));
+		Entry->SetNumberField(TEXT("slotIndex"), P.SlotIndex);
 		Entry->SetNumberField(TEXT("placement"), P.Placement);
 		Entry->SetNumberField(TEXT("livesLeft"), P.LivesLeft);
 		Results.Add(MakeShared<FJsonValueObject>(Entry));
@@ -486,7 +487,6 @@ void UBackendSubsystem::HandleSocketMessage(const FString& Message)
 						(*PObj)->TryGetNumberField(TEXT("userId"),    P.UserId);
 						(*PObj)->TryGetStringField(TEXT("nickname"),  P.Nickname);
 						(*PObj)->TryGetNumberField(TEXT("score"),     P.Score);
-						(*PObj)->TryGetNumberField(TEXT("slotIndex"), P.SlotIndex);
 						Match.Players.Add(P);
 					}
 				}

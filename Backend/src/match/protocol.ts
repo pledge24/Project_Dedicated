@@ -7,13 +7,12 @@ export type ClientMessage =
     | { type: 'queue:join' }
     | { type: 'queue:cancel' };
 
-/** match:found data의 플레이어 1명. slotIndex는 0~(N-1). */
+/** match:found data의 플레이어 1명. 좌석(슬롯)은 DS가 입장 시 랜덤 배정하므로 여기엔 없다. */
 export interface MatchPlayer
 {
     userId: number;
     nickname: string;
     score: number;
-    slotIndex: number;
 }
 
 /** match:found data. joinToken은 수신자 본인 것(per-recipient). */

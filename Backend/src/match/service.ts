@@ -59,11 +59,10 @@ export function buildMatchFound(
     server: { host: string; port: number }
 ): { data: MatchFoundData; targets: WebSocket[] }
 {
-    const players: MatchPlayer[] = group.entries.map((e, i) => ({
+    const players: MatchPlayer[] = group.entries.map((e) => ({
         userId: e.userId,
         nickname: e.nickname,
         score: e.score,
-        slotIndex: i,
     }));
 
     const data: MatchFoundData = {

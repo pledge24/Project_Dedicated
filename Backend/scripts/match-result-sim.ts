@@ -58,7 +58,7 @@ async function main(): Promise<void>
         serverToken,
         mapName: MAP,
         startedAt: Date.now(),
-        players: users.map((u, i) => ({ userId: u.userId, slotIndex: i, nickname: u.nickname, joinToken: `simjoin${i}` })),
+        players: users.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `simjoin${i}` })),
     });
 
     const resultBody = {
@@ -66,7 +66,7 @@ async function main(): Promise<void>
         mapName: MAP,
         durationSec: 123,
         endReason: 'winner',
-        results: users.map((u, i) => ({ userId: u.userId, placement: i + 1, livesLeft: i === 0 ? 2 : 0 })),
+        results: users.map((u, i) => ({ userId: u.userId, slotIndex: i, placement: i + 1, livesLeft: i === 0 ? 2 : 0 })),
     };
 
     const checks: Array<[string, () => Promise<void>]> = [
@@ -94,6 +94,22 @@ async function main(): Promise<void>
         ['외부인 포함 → 400', async () =>
         {
             const bad = { ...resultBody, results: resultBody.results.map((e, i) => i === 3 ? { ...e, userId: 999_999_999 } : e) };
+            const r = await post('/api/match/result', bad, serverToken);
+            assert.equal(r.status, 400, JSON.stringify(r.body));
+            assert.equal(r.body.error?.code, 'INVALID_RESULT');
+        }],
+
+        ['slotIndex 범위 밖 → 400', async () =>
+        {
+            const bad = { ...resultBody, results: resultBody.results.map((e, i) => i === 0 ? { ...e, slotIndex: 4 } : e) };
+            const r = await post('/api/match/result', bad, serverToken);
+            assert.equal(r.status, 400, JSON.stringify(r.body));
+            assert.equal(r.body.error?.code, 'INVALID_RESULT');
+        }],
+
+        ['slotIndex 중복 → 400', async () =>
+        {
+            const bad = { ...resultBody, results: resultBody.results.map((e) => ({ ...e, slotIndex: 0 })) };
             const r = await post('/api/match/result', bad, serverToken);
             assert.equal(r.status, 400, JSON.stringify(r.body));
             assert.equal(r.body.error?.code, 'INVALID_RESULT');

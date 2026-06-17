@@ -7,7 +7,6 @@ import { config } from '../common/config.js';
 export interface RosterPlayer
 {
     userId: number;
-    slotIndex: number;
     nickname: string;
     /** 매치별 1회용 입장 토큰. DS가 ?join= 으로 받은 토큰을 이 신원에 매핑. */
     joinToken: string;

@@ -83,12 +83,17 @@ function parseEntry(raw: unknown, n: number): MatchResultEntryInput
 {
     const e = (raw ?? {}) as Record<string, unknown>;
     const userId = e.userId;
+    const slotIndex = e.slotIndex;
     const placement = e.placement;
     const livesLeft = e.livesLeft;
 
     if (!isInt(userId, 1))
     {
         throw new AppError(Codes.INVALID_RESULT, 'userId는 양의 정수여야 합니다.');
+    }
+    if (!isInt(slotIndex, 0, n - 1))
+    {
+        throw new AppError(Codes.INVALID_RESULT, `slotIndex는 0~${n - 1} 정수여야 합니다.`);
     }
     if (!isInt(placement, 1, n))
     {
@@ -99,5 +104,5 @@ function parseEntry(raw: unknown, n: number): MatchResultEntryInput
         throw new AppError(Codes.INVALID_RESULT, 'livesLeft는 0 이상의 정수여야 합니다.');
     }
 
-    return { userId, placement, livesLeft };
+    return { userId, slotIndex, placement, livesLeft };
 }

@@ -21,14 +21,14 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
 
     assertResultsMatchRoster(rec.players, req.results);
 
-    // roster에서 slotIndex·nickname을 채워 신뢰 가능한 참가자 입력을 만든다.
+    // 신원·닉네임은 roster(권위)에서, 좌석(slotIndex)은 DS가 보고한 값을 그대로 저장한다.
     const participants = req.results.map((r) =>
     {
         const rp = rec.players.find((p) => p.userId === r.userId)!; // 위 검증으로 존재 보장
 
         return {
             userId: r.userId,
-            slotIndex: rp.slotIndex,
+            slotIndex: r.slotIndex,
             nicknameSnapshot: rp.nickname,
             placement: r.placement,
             livesLeft: r.livesLeft,
@@ -78,6 +78,7 @@ function assertResultsMatchRoster(players: roster.RosterPlayer[], results: Match
     }
 
     const seen = new Set<number>();
+    const seenSlots = new Set<number>();
     for (const r of results)
     {
         if (!expected.has(r.userId))
@@ -89,6 +90,13 @@ function assertResultsMatchRoster(players: roster.RosterPlayer[], results: Match
             throw new AppError(Codes.INVALID_RESULT, '참가자 userId가 중복되었습니다.');
         }
         seen.add(r.userId);
+
+        // 좌석(slotIndex)은 DS가 배정한 권위값 — 매치 내 유일해야 한다(DB UNIQUE와 일치).
+        if (seenSlots.has(r.slotIndex))
+        {
+            throw new AppError(Codes.INVALID_RESULT, 'slotIndex가 중복되었습니다.');
+        }
+        seenSlots.add(r.slotIndex);
     }
 }
 

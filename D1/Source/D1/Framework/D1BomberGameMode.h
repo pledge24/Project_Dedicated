@@ -13,11 +13,10 @@ class AD1WallBlock;
 class UD1MapData;
 enum class EBomberEndReason : uint8;
 
-/** -Roster= 로 주입된 입장 토큰 → 권위 신원 매핑. */
+/** -Roster= 로 주입된 입장 토큰 → 권위 신원(userId) 매핑. 좌석은 DS가 입장 시 랜덤 배정. */
 struct FD1JoinEntry
 {
 	int64 UserId = 0;
-	int32 Slot = -1;
 };
 
 UCLASS(abstract)
@@ -31,7 +30,7 @@ public:
 	virtual void BeginPlay() override;
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
-	/** travel ?join= 토큰을 권위 roster로 해석해 userId·슬롯 확정(서버권위). */
+	/** travel ?join= 토큰을 권위 roster로 해석해 userId 확정(서버권위). 좌석은 ChoosePlayerStart가 랜덤 배정. */
 	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
 
 	/** 점유 PlayerStart 해제 — fallback 경로 슬롯 누수 방지. */
@@ -114,6 +113,6 @@ private:
 	FString CurrentMatchId;
 	FString CurrentMatchToken;
 
-	/** -Roster= 로 주입(token→{userId,slot}). InitNewPlayer가 ?join=로 신원 매핑. */
+	/** -Roster= 로 주입(token→userId). InitNewPlayer가 ?join=로 신원 매핑. */
 	TMap<FString, FD1JoinEntry> JoinRoster;
 };

@@ -90,10 +90,11 @@ export interface MatchParticipantRowDTO
 
 /* DS → POST /api/match/result 계약 */
 
-/** 결과 보고의 플레이어 1명. slotIndex·nickname은 백엔드가 roster에서 채운다. */
+/** 결과 보고의 플레이어 1명. slotIndex(좌석)는 DS가 배정해 보고, nickname은 백엔드가 roster에서 채운다. */
 export interface MatchResultEntryInput
 {
     userId: number;
+    slotIndex: number;   // DS가 배정한 좌석 0~3
     placement: number;   // 1=1등, 동점 허용
     livesLeft: number;
 }

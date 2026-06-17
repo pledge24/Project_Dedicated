@@ -246,12 +246,11 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     // DS 결과 보고 인증용 매치별 서버 토큰. DS spawn에 주입되며, 클라엔 보내지 않는다.
     const serverToken = randomBytes(24).toString('base64url');
 
-    // per-player 입장 토큰(권위 신원용) + 슬롯(입장 인덱스). 클라는 본인 토큰만 받고, DS는 roster로 신원 확정.
-    const joinPlayers = group.entries.map((e, i) => ({
+    // per-player 입장 토큰(권위 신원용). 클라는 본인 토큰만 받고, DS는 roster로 신원 확정. 좌석은 DS가 랜덤 배정.
+    const joinPlayers = group.entries.map((e) => ({
         ref: e.ref,
         userId: e.userId,
         nickname: e.nickname,
-        slotIndex: i,
         joinToken: randomBytes(16).toString('base64url'),
     }));
 
@@ -260,7 +259,7 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     {
         server = config.match.ds.enabled
             ? await ds.allocate(matchId, serverToken, group.entries.length,
-                joinPlayers.map((p) => ({ joinToken: p.joinToken, userId: p.userId, slotIndex: p.slotIndex })))
+                joinPlayers.map((p) => ({ joinToken: p.joinToken, userId: p.userId })))
             : config.match.stubServer;
     }
     catch (err)
@@ -284,7 +283,6 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
         startedAt: Date.now(),
         players: joinPlayers.map((p) => ({
             userId: p.userId,
-            slotIndex: p.slotIndex,
             nickname: p.nickname,
             joinToken: p.joinToken,
         })),

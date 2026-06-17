@@ -55,32 +55,6 @@ namespace
 		}
 		return DefaultSlot;
 	}
-
-	// 슬롯 번호 → PlayerStart. PlayerStartTag=="N" 우선, 없으면 이름순 정렬의 N번째.
-	AActor* FindStartForSlot(const UObject* WorldContext, int32 Slot)
-	{
-		if (Slot < 0)
-		{
-			return nullptr;
-		}
-
-		TArray<AActor*> AllStarts;
-		GatherSortedPlayerStarts(WorldContext, AllStarts);
-
-		const FString SlotTag = FString::FromInt(Slot);
-		for (AActor* Start : AllStarts)
-		{
-			if (const APlayerStart* PS = Cast<APlayerStart>(Start))
-			{
-				if (PS->PlayerStartTag.ToString() == SlotTag)
-				{
-					return Start;
-				}
-			}
-		}
-
-		return AllStarts.IsValidIndex(Slot) ? AllStarts[Slot] : nullptr;
-	}
 }
 
 AD1BomberGameMode::AD1BomberGameMode()
@@ -103,7 +77,7 @@ void AD1BomberGameMode::BeginPlay()
 			*CurrentMatchId, CurrentMatchToken.IsEmpty() ? TEXT("(none)") : TEXT("(set)"), ExpectedPlayerCount);
 	}
 
-	// 백엔드 권위 roster 주입(token:userId:slot;…). InitNewPlayer가 ?join= 토큰으로 신원을 확정한다.
+	// 백엔드 권위 roster 주입(token:userId;…). InitNewPlayer가 ?join= 토큰으로 신원을 확정한다.
 	FString RosterStr;
 	if (FParse::Value(FCommandLine::Get(), TEXT("Roster="), RosterStr) && !RosterStr.IsEmpty())
 	{
@@ -113,11 +87,10 @@ void AD1BomberGameMode::BeginPlay()
 		{
 			TArray<FString> Parts;
 			Entry.ParseIntoArray(Parts, TEXT(":"), /*CullEmpty=*/true);
-			if (Parts.Num() == 3)
+			if (Parts.Num() == 2)
 			{
 				FD1JoinEntry JE;
 				JE.UserId = FCString::Atoi64(*Parts[1]);
-				JE.Slot = FCString::Atoi(*Parts[2]);
 				JoinRoster.Add(Parts[0], JE);
 			}
 			else
@@ -166,30 +139,12 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 	TArray<AActor*> AllStarts;
 	GatherSortedPlayerStarts(this, AllStarts);
 
-	AD1BomberPlayerState* BomberPS = Player ? Player->GetPlayerState<AD1BomberPlayerState>() : nullptr;
-
-	// 백엔드 권위 슬롯(InitNewPlayer가 ?join= roster로 세팅)이 있으면 그 슬롯 자리로 고정 배치.
-	// userId별 슬롯이 고정되므로 이중접속/유령 연결이 있어도 색·위치가 안 꼬인다.
-	if (BomberPS && BomberPS->PlayerSlotIndex >= 0)
+	// 위치 선정은 순수 랜덤(사용자 지시): 안 쓴 Start 집합에서 균등 랜덤 1개를 뽑는다.
+	// 비복원(미사용만 후보)이라 한 매치의 슬롯 0~3은 항상 유일 → DB UNIQUE(match,slot)와 안전.
+	TArray<AActor*> FreeStarts;
+	FreeStarts.Reserve(AllStarts.Num());
+	for (AActor* Start : AllStarts)
 	{
-		// 슬롯→Start는 공용 헬퍼로. (단 DS에선 이 함수가 InitNewPlayer보다 먼저 돌아
-		//  보통 PlayerSlotIndex<0 → 아래 fallback로 빠지고, 위치는 PostLogin에서 보정한다.)
-		if (AActor* Chosen = FindStartForSlot(this, BomberPS->PlayerSlotIndex))
-		{
-			UsedStarts.Add(Chosen);
-			UE_LOG(LogD1, Log, TEXT("Slot %d -> Start %s (authoritative) for %s"),
-				BomberPS->PlayerSlotIndex, *Chosen->GetName(), *BomberPS->GetPlayerName());
-			return Chosen;
-		}
-
-		UE_LOG(LogD1, Warning, TEXT("Slot %d has no matching PlayerStart; falling back"), BomberPS->PlayerSlotIndex);
-	}
-
-	// fallback: 슬롯 미지정(PIE/standalone, 백엔드 없음) — 안 쓴 Start를 순번대로 배정.
-	for (int32 i = 0; i < AllStarts.Num(); ++i)
-	{
-		AActor* Start = AllStarts[i];
-
 		bool bAlreadyUsed = false;
 		for (const TWeakObjectPtr<AActor>& Used : UsedStarts)
 		{
@@ -199,25 +154,30 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 				break;
 			}
 		}
-		if (bAlreadyUsed)
+		if (!bAlreadyUsed)
 		{
-			continue;
+			FreeStarts.Add(Start);
 		}
-
-		const int32 SlotIndex = ResolveSlotFromTag(Start, i);
-
-		if (BomberPS)
-		{
-			BomberPS->SetPlayerSlotIndex(SlotIndex);
-			UE_LOG(LogD1, Log, TEXT("Assigned PlayerSlotIndex=%d to %s (Start=%s)"),
-				SlotIndex, *BomberPS->GetPlayerName(), *Start->GetName());
-		}
-
-		UsedStarts.Add(Start);
-		return Start;
 	}
 
-	return Super::ChoosePlayerStart_Implementation(Player);
+	if (FreeStarts.Num() == 0)
+	{
+		return Super::ChoosePlayerStart_Implementation(Player);
+	}
+
+	AActor* Chosen = FreeStarts[FMath::RandHelper(FreeStarts.Num())];
+
+	// 슬롯 라벨 = 뽑힌 Start의 PlayerStartTag(없으면 정렬 인덱스). 스폰 코너·카드 자리가 함께 결정된다.
+	if (AD1BomberPlayerState* BomberPS = Player ? Player->GetPlayerState<AD1BomberPlayerState>() : nullptr)
+	{
+		const int32 SlotIndex = ResolveSlotFromTag(Chosen, AllStarts.IndexOfByKey(Chosen));
+		BomberPS->SetPlayerSlotIndex(SlotIndex);
+		UE_LOG(LogD1, Log, TEXT("Slot %d -> Start %s (random) for %s"),
+			SlotIndex, *Chosen->GetName(), *BomberPS->GetPlayerName());
+	}
+
+	UsedStarts.Add(Chosen);
+	return Chosen;
 }
 
 FString AD1BomberGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)
@@ -227,17 +187,17 @@ FString AD1BomberGameMode::InitNewPlayer(APlayerController* NewPlayerController,
 	AD1BomberPlayerState* PS = NewPlayerController ? NewPlayerController->GetPlayerState<AD1BomberPlayerState>() : nullptr;
 	if (PS)
 	{
-		// travel URL의 ?join= 토큰을 백엔드 권위 roster로 해석 → 신원(userId)·슬롯을 서버가 확정.
-		// 클라가 주장하는 userId/slot은 신뢰하지 않는다(서버권위). PIE/standalone은 토큰 없어 no-op.
+		// travel URL의 ?join= 토큰을 백엔드 권위 roster로 해석 → 신원(userId)을 서버가 확정.
+		// 클라가 주장하는 userId는 신뢰하지 않는다(서버권위). PIE/standalone은 토큰 없어 no-op.
+		// 좌석(스폰 코너·카드 자리)은 ChoosePlayerStart가 랜덤 배정 — 신원과 분리.
 		const FString JoinToken = UGameplayStatics::ParseOption(Options, TEXT("join"));
 		if (!JoinToken.IsEmpty())
 		{
 			if (const FD1JoinEntry* Entry = JoinRoster.Find(JoinToken))
 			{
 				PS->BackendUserId = Entry->UserId;
-				PS->SetPlayerSlotIndex(Entry->Slot);
-				UE_LOG(LogD1, Log, TEXT("[Match] InitNewPlayer %s userId=%lld slot=%d (roster)"),
-					*PS->GetPlayerName(), Entry->UserId, Entry->Slot);
+				UE_LOG(LogD1, Log, TEXT("[Match] InitNewPlayer %s userId=%lld (roster)"),
+					*PS->GetPlayerName(), Entry->UserId);
 			}
 			else
 			{
@@ -266,21 +226,7 @@ void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 
-	// 슬롯 기반 스폰 위치 보정. DS에선 ChoosePlayerStart가 InitNewPlayer보다 먼저 돌아
-	// 권위 슬롯을 모른 채 fallback 위치로 스폰된다. 슬롯이 확정된 지금(InitNewPlayer 이후) 슬롯 자리로 옮긴다.
-	if (NewPlayer)
-	{
-		if (const AD1BomberPlayerState* PS = NewPlayer->GetPlayerState<AD1BomberPlayerState>())
-		{
-			if (APawn* Pawn = NewPlayer->GetPawn())
-			{
-				if (const AActor* Start = FindStartForSlot(this, PS->PlayerSlotIndex))
-				{
-					Pawn->SetActorLocationAndRotation(Start->GetActorLocation(), Start->GetActorRotation());
-				}
-			}
-		}
-	}
+	// 스폰 위치는 ChoosePlayerStart가 슬롯을 확정해 첫 스폰부터 정확 — 별도 보정 불필요.
 
 	// 이미 시작했거나 게이트 비활성(PIE·솔로)이면 시작 게이트 카운트 생략.
 	if (bMatchStarted || ExpectedPlayerCount <= 1)
@@ -395,6 +341,7 @@ void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomb
 
 			FMatchResultPlayer RP;
 			RP.UserId    = B->BackendUserId;
+			RP.SlotIndex = B->PlayerSlotIndex;
 			RP.Placement = B->Placement;
 			RP.LivesLeft = B->Lives;
 			ResultPlayers.Add(RP);

@@ -121,7 +121,7 @@ bool UD1MapBuilder::Build(UWorld* World, AD1BomberGameState* GS, const FD1MapBui
 		}
 	}
 
-	// 스폰 지점(서버 전용) — PlayerStartTag=슬롯 → FindStartForSlot 태그 경로가 그대로 동작.
+	// 스폰 지점(서버 전용) — PlayerStartTag=슬롯 → ChoosePlayerStart의 ResolveSlotFromTag가 이 태그로 슬롯을 라벨링.
 	for (const FD1MapStart& Start : Layout.Starts)
 	{
 		const FVector Loc = UD1BomberGridLibrary::CellToWorldCenter(Start.Cell, 0.f);

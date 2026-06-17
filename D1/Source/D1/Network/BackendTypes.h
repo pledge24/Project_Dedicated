@@ -69,7 +69,7 @@ struct FBackendResponse
 	FString ErrorMessage;
 };
 
-/** match:found 한 명분. 서버가 슬롯 0~3을 배정. */
+/** match:found 한 명분. 좌석(슬롯)은 DS가 입장 시 랜덤 배정하므로 여기엔 없다. */
 USTRUCT(BlueprintType)
 struct FMatchPlayerDTO
 {
@@ -83,9 +83,6 @@ struct FMatchPlayerDTO
 
 	UPROPERTY(BlueprintReadOnly, Category = "Backend")
 	int32 Score = 0;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Backend")
-	int32 SlotIndex = 0;
 };
 
 /** 매칭 성사 정보. ServerHost/Port = 백엔드가 할당한 DS 주소(클라가 ?join= 으로 ClientTravel). */
@@ -115,6 +112,7 @@ struct FMatchFoundDTO
 struct FMatchResultPlayer
 {
 	int64 UserId = 0;
+	int32 SlotIndex = 0;
 	int32 Placement = 0;
 	int32 LivesLeft = 0;
 };
