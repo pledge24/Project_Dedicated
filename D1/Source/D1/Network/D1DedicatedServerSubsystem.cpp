@@ -18,7 +18,7 @@ void UD1DedicatedServerSubsystem::BeginShutdownWatch(float InGraceSec)
 	GraceSec = InGraceSec;
 	Elapsed = 0.f;
 	GetWorld()->GetTimerManager().SetTimer(
-		WatchHandle, this, &UD1DedicatedServerSubsystem::TickWatch, 1.f, /*bLoop=*/true);
+		WatchTimerHandle, this, &UD1DedicatedServerSubsystem::TickWatch, 1.f, /*bLoop=*/true);
 	UE_LOG(LogD1, Log, TEXT("[Match] 종료 감시 시작 — 전원 퇴장 또는 %.0fs 후 DS 종료"), GraceSec);
 }
 
@@ -51,7 +51,7 @@ void UD1DedicatedServerSubsystem::TickWatch()
 
 void UD1DedicatedServerSubsystem::RequestExit()
 {
-	GetWorld()->GetTimerManager().ClearTimer(WatchHandle);
+	GetWorld()->GetTimerManager().ClearTimer(WatchTimerHandle);
 	UE_LOG(LogD1, Log, TEXT("[Match] DS 프로세스 종료 요청(RequestExit)"));
 	FPlatformMisc::RequestExit(false);
 }

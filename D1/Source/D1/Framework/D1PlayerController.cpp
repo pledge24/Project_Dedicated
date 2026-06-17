@@ -103,11 +103,11 @@ void AD1PlayerController::TryBindMatchFinished()
 	{
 		// GameState 복제 전 — 짧게 재시도.
 		GetWorldTimerManager().SetTimer(
-			BindRetryHandle, this, &AD1PlayerController::TryBindMatchFinished, 0.2f, /*bLoop=*/false);
+			BindRetryTimerHandle, this, &AD1PlayerController::TryBindMatchFinished, 0.2f, /*bLoop=*/false);
 		return;
 	}
 
-	GetWorldTimerManager().ClearTimer(BindRetryHandle);
+	GetWorldTimerManager().ClearTimer(BindRetryTimerHandle);
 	GS->OnMatchFinished.AddDynamic(this, &AD1PlayerController::HandleMatchFinished);
 
 	// 이미 끝난 매치에 늦게 구독한 경우(재접속 등) 즉시 표시.

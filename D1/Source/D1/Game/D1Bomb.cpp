@@ -26,7 +26,7 @@ AD1Bomb::AD1Bomb()
 	PrimaryActorTick.bCanEverTick = false;
 
 	Range = 2;
-	FuseSeconds = 3.f;
+	FuseSec = 3.f;
 	DetonationServerTime = 0.f;
 
 	CollisionComp = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionComp"));
@@ -69,8 +69,8 @@ void AD1Bomb::BeginPlay()
 
 	if (HasAuthority())
 	{
-		DetonationServerTime = GetWorld()->GetTimeSeconds() + FuseSeconds;
-		GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, FuseSeconds, false);
+		DetonationServerTime = GetWorld()->GetTimeSeconds() + FuseSec;
+		GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, FuseSec, false);
 	}
 
 	// 서버/클라 양쪽에서 실행. 양쪽 캡슐 스윕(클라 이동 예측 포함)이
@@ -281,7 +281,7 @@ void AD1Bomb::ApplyExplosionDamage(const TArray<FIntPoint>& Cells)
 			}
 			else
 			{
-				BC->StartInvulnerability(BC->GetHitInvulnSeconds());
+				BC->StartInvulnerability(BC->GetHitInvulnSec());
 				BC->ApplyHitStun();
 			}
 		}

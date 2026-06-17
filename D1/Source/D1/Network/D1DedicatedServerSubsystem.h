@@ -23,7 +23,7 @@ private:
 	void TickWatch();
 	void RequestExit();
 
-	FTimerHandle WatchHandle;
+	FTimerHandle WatchTimerHandle;
 
 	float Elapsed = 0.f;
 

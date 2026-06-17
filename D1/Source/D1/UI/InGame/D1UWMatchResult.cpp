@@ -45,7 +45,7 @@ void UD1UWMatchResult::NativeConstruct()
 	// 결과 위젯은 매치 종료 시에만 생성 → 여기서 복귀 카운트다운 시작.
 	if (LeaveButton)
 	{
-		LeaveButton->OnClicked.AddDynamic(this, &UD1UWMatchResult::HandleLeaveClicked);
+		LeaveButton->OnClicked.AddDynamic(this, &UD1UWMatchResult::OnLeaveClicked);
 	}
 
 	RemainingSec = FMath::Max(1, FMath::CeilToInt(ReturnCountdownSec));
@@ -61,7 +61,7 @@ void UD1UWMatchResult::NativeConstruct()
 	}
 }
 
-void UD1UWMatchResult::HandleLeaveClicked()
+void UD1UWMatchResult::OnLeaveClicked()
 {
 	ReturnToLobby();
 }

@@ -52,7 +52,7 @@ private:
 	int32 Range;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
-	float FuseSeconds;
+	float FuseSec;
 
 	/** 다른 폭탄에 휘말렸을 때 체인 폭발까지의 지연(초). */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")

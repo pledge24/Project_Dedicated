@@ -32,7 +32,7 @@ protected:
 
 	/** LeaveButton 클릭 — 즉시 로비로. */
 	UFUNCTION()
-	void HandleLeaveClicked();
+	void OnLeaveClicked();
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UVerticalBox> ResultListPanel;

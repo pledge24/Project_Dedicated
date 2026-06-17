@@ -55,5 +55,5 @@ private:
 	UPROPERTY()
 	TObjectPtr<UUserWidget> ResultWidget;
 
-	FTimerHandle BindRetryHandle;
+	FTimerHandle BindRetryTimerHandle;
 };
