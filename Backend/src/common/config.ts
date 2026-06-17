@@ -42,7 +42,7 @@ export const config = Object.freeze({
         // 실제 Dedicated Server 할당(매치당 spawn). enabled=true일 때만 D1Server.exe를 띄운다.
         ds: Object.freeze({
             enabled:       process.env.MATCH_DS_ENABLED === 'true',
-            exePath:       process.env.MATCH_DS_EXE || 'D:/Unreal/Projects/Project_Dedicated/D1/Packaged/Server/WindowsServer/D1Server.exe',
+            exePath:       process.env.MATCH_DS_EXE || '',  // 머신별 절대경로 — DS 사용 시 .env에서 지정
             map:           process.env.MATCH_DS_MAP || '/Game/D1/Maps/MP_Ingame', // 미쿡 시 임시로 /Game/Maps/MP_Test
             host:          process.env.MATCH_DS_HOST || '127.0.0.1',
             portMin:       asNumber('MATCH_DS_PORT_MIN', 7777),
@@ -57,6 +57,12 @@ export const config = Object.freeze({
         maxLimit:     asNumber('RANKING_MAX_LIMIT', 100),
     }),
 });
+
+// DS 사용 시 실행 파일 경로 필수 (머신별이라 소스에 기본값을 두지 않음)
+if (config.match.ds.enabled && !config.match.ds.exePath)
+{
+    fail('MATCH_DS_ENABLED=true면 MATCH_DS_EXE(D1Server.exe 절대경로)가 필요함 — .env에 설정');
+}
 
 function fail(reason: string): never
 {
