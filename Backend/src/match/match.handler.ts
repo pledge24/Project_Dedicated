@@ -1,5 +1,5 @@
 // 매치 결과 요청/응답 어댑터 (handler 레이어). 본문 형식 검증 + 서버 토큰 추출.
-import type { NextFunction, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 
 import { extractBearerToken } from '../common/bearer.js';
 import { config } from '../common/config.js';
@@ -15,20 +15,13 @@ const END_REASONS: readonly MatchEndReason[] = ['winner', 'draw', 'time_expired'
  * POST /api/match/result  (DS만 — Authorization: Bearer <serverToken>)
  * body: { matchId, mapName, durationSec, endReason, results[] }
  */
-export async function submitResult(req: Request, res: Response, next: NextFunction): Promise<void>
+export async function submitResult(req: Request, res: Response): Promise<void>
 {
-    try
-    {
-        const serverToken = extractServerToken(req);
-        const body = parseResultBody(req.body);
+    const serverToken = extractServerToken(req);
+    const body = parseResultBody(req.body);
 
-        const data = await service.submitResult(serverToken, body);
-        res.json(ok(data));
-    }
-    catch (err)
-    {
-        next(err);
-    }
+    const data = await service.submitResult(serverToken, body);
+    res.json(ok(data));
 }
 
 /** Authorization 헤더의 Bearer 토큰(=서버 토큰). 없으면 401. */

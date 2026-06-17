@@ -1,5 +1,5 @@
 // 랭킹 요청/응답 어댑터 (handler 레이어). 쿼리 limit/offset 검증.
-import type { NextFunction, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 
 import { config } from '../common/config.js';
 import { ok } from '../common/envelope.js';
@@ -16,18 +16,11 @@ interface Pagination
  * GET /api/ranking  (requireAuth 보호)
  * query: ?limit=&offset=  → score DESC 페이지.
  */
-export async function getRanking(req: Request, res: Response, next: NextFunction): Promise<void>
+export async function getRanking(req: Request, res: Response): Promise<void>
 {
-    try
-    {
-        const { limit, offset } = parsePagination(req.query);
-        const data = await service.getRanking(limit, offset);
-        res.json(ok(data));
-    }
-    catch (err)
-    {
-        next(err);
-    }
+    const { limit, offset } = parsePagination(req.query);
+    const data = await service.getRanking(limit, offset);
+    res.json(ok(data));
 }
 
 function parsePagination(query: Request['query']): Pagination
