@@ -88,7 +88,7 @@ struct FMatchPlayerDTO
 	int32 SlotIndex = 0;
 };
 
-/** 매칭 성사 정보. ServerHost/Port는 현재 stub (실제 DS 할당은 다음 슬라이스). */
+/** 매칭 성사 정보. ServerHost/Port = 백엔드가 할당한 DS 주소(클라가 ?join= 으로 ClientTravel). */
 USTRUCT(BlueprintType)
 struct FMatchFoundDTO
 {
