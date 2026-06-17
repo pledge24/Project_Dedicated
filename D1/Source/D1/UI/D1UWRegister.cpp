@@ -6,7 +6,6 @@
 #include "Components/EditableTextBox.h"
 #include "Core/D1LogChannels.h"
 #include "Framework/Menu/D1MenuPlayerController.h"
-#include "Network/BackendErrorMessages.h"
 #include "Network/BackendSubsystem.h"
 
 void UD1UWRegister::NativeConstruct()
@@ -25,11 +24,9 @@ void UD1UWRegister::NativeConstruct()
 
 void UD1UWRegister::OnRegisterClicked()
 {
-	UBackendSubsystem* Backend = GetGameInstance() ? GetGameInstance()->GetSubsystem<UBackendSubsystem>() : nullptr;
+	UBackendSubsystem* Backend = ResolveBackend();
 	if (!Backend)
 	{
-		UE_LOG(LogD1, Error, TEXT("[Register] UBackendSubsystem를 찾을 수 없음"));
-		EndRequest(false, FBackendErrorMessages::Lookup(EBackendErrorCode::InternalError));
 		return;
 	}
 
@@ -37,11 +34,7 @@ void UD1UWRegister::OnRegisterClicked()
 	const FString Password = PasswordTextBox ? PasswordTextBox->GetText().ToString() : FString();
 	const FString Nickname = NicknameTextBox ? NicknameTextBox->GetText().ToString() : FString();
 
-	BeginRequest();
-	if (RegisterButton)
-	{
-		RegisterButton->SetIsEnabled(false);
-	}
+	BeginAuthSubmit();
 
 	FOnAuthCompleted Cb;
 	Cb.BindDynamic(this, &UD1UWRegister::OnRegisterCompletedInternal);
@@ -65,21 +58,10 @@ void UD1UWRegister::OnBackToLoginClicked()
 
 void UD1UWRegister::OnRegisterCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User)
 {
-	if (RegisterButton)
+	if (!FinishAuthSubmit(Response))
 	{
-		RegisterButton->SetIsEnabled(true);
-	}
-
-	if (!Response.bOk)
-	{
-		const FString Msg = Response.ErrorMessage.IsEmpty()
-			? FBackendErrorMessages::Lookup(Response.ErrorCode)
-			: Response.ErrorMessage;
-		EndRequest(false, Msg);
 		return;
 	}
-
-	EndRequest(true, FString());
 
 	// 가입 성공 → 로그인 화면 복귀
 	if (LoginWidgetClass)

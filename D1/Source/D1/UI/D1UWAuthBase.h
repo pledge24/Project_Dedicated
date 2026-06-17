@@ -6,7 +6,11 @@
 #include "UI/D1UserWidget.h"
 #include "D1UWAuthBase.generated.h"
 
+class UBackendSubsystem;
+class UButton;
+class UEditableTextBox;
 class UTextBlock;
+struct FBackendResponse;
 
 /**
  *  로그인/회원가입 공용 베이스.
@@ -35,6 +39,20 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Auth|Events")
 	void OnRequestFinished(bool bSuccess, const FString& ErrorMessage);
+
+	//~ 공용 인증 플로우 (자식 클릭/완료 핸들러가 사용)
+	UBackendSubsystem* ResolveBackend();
+	void BeginAuthSubmit();
+	bool FinishAuthSubmit(const FBackendResponse& Response);
+
+	/** 자식이 잠금/해제 대상 submit 버튼을 반환. */
+	virtual UButton* GetSubmitButton() const { return nullptr; }
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UEditableTextBox> LoginIdTextBox;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
+	TObjectPtr<UEditableTextBox> PasswordTextBox;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> ErrorLabel;

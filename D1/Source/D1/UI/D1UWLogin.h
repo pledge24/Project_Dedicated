@@ -32,11 +32,7 @@ protected:
 	UFUNCTION()
 	void OnLoginCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User);
 
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-	TObjectPtr<UEditableTextBox> LoginIdTextBox;
-
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
-	TObjectPtr<UEditableTextBox> PasswordTextBox;
+	virtual UButton* GetSubmitButton() const override { return LoginButton; }
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UButton> LoginButton;
