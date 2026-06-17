@@ -4,7 +4,8 @@
 
 namespace
 {
-	constexpr int32 MaxPlayerSlots = 4;	// 4인 게임 — 스폰 슬롯 0~3만 유효.
+	// 4인 게임 — 스폰 슬롯 0~3만 유효.
+	constexpr int32 MaxPlayerSlots = 4;
 }
 
 bool UD1MapData::BuildLayout(FD1MapLayout& OutLayout, FString& OutError) const

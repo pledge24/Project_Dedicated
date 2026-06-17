@@ -235,10 +235,7 @@ void AD1BomberCharacter::NotifyBombDestroyed(AD1Bomb* Bomb)
 
 void AD1BomberCharacter::AddIgnoredBomb(AD1Bomb* Bomb)
 {
-	/** 서버 전용: 지금 겹치고 있는 폭탄을 등록.
-	 *  같은 셀에 있는 동안 캡슐이 폭탄을 통과시키고,
-	 *  셀을 벗어나면 Tick 정리에서 차단 복원해 재진입 막음. */
-
+	// 서버 전용: 겹친 폭탄 등록 — 같은 셀 동안 통과, 벗어나면 Tick 정리에서 차단 복원.
 	if (!Bomb)
 	{
 		return;
@@ -294,9 +291,8 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 		return;
 	}
 
-	// 한 셀에 폭탄 하나 룰 — 자기 것뿐 아니라 월드 전역의 모든 폭탄을 검사.
-	// 캐릭터-캐릭터 충돌이 꺼져 있어 두 명이 같은 셀에 설 수 있고 둘 다
-	// 폭탄 IgnoredBombs에 들어갈 수 있어서, 자기 슬롯만 보면 두 폭탄이 겹친다.
+	// 한 셀에 폭탄 하나 룰 — 월드 전역 폭탄 검사. (캐릭터 충돌이 꺼져 같은 셀에
+	// 두 명이 설 수 있어, 자기 슬롯만 보면 두 폭탄이 겹친다.)
 	for (TActorIterator<AD1Bomb> It(GetWorld()); It; ++It)
 	{
 		const AD1Bomb* Existing = *It;
@@ -309,8 +305,6 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 			return;
 		}
 	}
-
-	// ============ 검증 종료 =============
 
 	const FVector SpawnLoc = UD1BomberGridLibrary::CellToWorldCenter(Cell, UD1BomberGridLibrary::CellHalf);
 	FActorSpawnParameters Params;
@@ -325,7 +319,7 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 
 	if (PS)
 	{
-		Bomb->SetRange(PS->FirePower); // 설치자 화력 stamp
+		Bomb->SetRange(PS->FirePower);
 	}
 	ActiveBombs.Add(Bomb);
 	// 폭탄이 BeginPlay에서 겹친 캐릭터(소유자 포함)를 모두 IgnoredBombs에 등록함.

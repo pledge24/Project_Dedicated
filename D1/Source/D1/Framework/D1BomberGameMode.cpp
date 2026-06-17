@@ -28,7 +28,7 @@ namespace
 		}
 	}
 
-	// 모든 PlayerStart를 이름순 정렬로 수집 — 슬롯 인덱스 일관성 확보.
+	// 이름순 정렬 — 슬롯 인덱스 일관성 확보.
 	void GatherSortedPlayerStarts(const UObject* WorldContext, TArray<AActor*>& OutStarts)
 	{
 		UGameplayStatics::GetAllActorsOfClass(WorldContext, APlayerStart::StaticClass(), OutStarts);
@@ -204,10 +204,8 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 			continue;
 		}
 
-		// 슬롯 인덱스 결정: PlayerStartTag가 "0"~"3"이면 그 값, 아니면 정렬 인덱스.
 		const int32 SlotIndex = ResolveSlotFromTag(Start, i);
 
-		// PlayerState에 슬롯 부여.
 		if (BomberPS)
 		{
 			BomberPS->SetPlayerSlotIndex(SlotIndex);
@@ -470,7 +468,6 @@ void AD1BomberGameMode::StartMatch()
 		BomberGS->MatchStartServerTime = BomberGS->GetServerWorldTimeSeconds();
 		BomberGS->MatchPhase = EBomberMatchPhase::Playing;
 
-		// 매치 제한시간 만료 콜백.
 		GetWorldTimerManager().SetTimer(
 			MatchTimerHandle, this, &AD1BomberGameMode::OnMatchTimeExpired,
 			BomberGS->MatchDurationSec, /*bLoop=*/false);

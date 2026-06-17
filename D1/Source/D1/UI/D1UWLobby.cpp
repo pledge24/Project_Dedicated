@@ -41,7 +41,6 @@ void UD1UWLobby::NativeConstruct()
 	}
 	if (MatchStatusPanel)
 	{
-		// 매칭 진입 전 — 매칭 상태 패널 숨김
 		MatchStatusPanel->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
