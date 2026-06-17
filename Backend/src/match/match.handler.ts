@@ -6,6 +6,7 @@ import { config } from '../common/config.js';
 import { ok } from '../common/envelope.js';
 import { AppError, Codes } from '../common/errors.js';
 import type { MatchEndReason, MatchResultEntryInput, MatchResultRequest } from '../common/types.js';
+import { isInt } from '../common/validate.js';
 import * as service from './result.service.js';
 
 const END_REASONS: readonly MatchEndReason[] = ['winner', 'draw', 'time_expired', 'abort'];
@@ -92,18 +93,18 @@ function parseEntry(raw: unknown, n: number): MatchResultEntryInput
     const placement = e.placement;
     const livesLeft = e.livesLeft;
 
-    if (!Number.isInteger(userId) || (userId as number) <= 0)
+    if (!isInt(userId, 1))
     {
         throw new AppError(Codes.INVALID_RESULT, 'userId는 양의 정수여야 합니다.');
     }
-    if (!Number.isInteger(placement) || (placement as number) < 1 || (placement as number) > n)
+    if (!isInt(placement, 1, n))
     {
         throw new AppError(Codes.INVALID_RESULT, `placement는 1~${n} 정수여야 합니다.`);
     }
-    if (!Number.isInteger(livesLeft) || (livesLeft as number) < 0)
+    if (!isInt(livesLeft, 0))
     {
         throw new AppError(Codes.INVALID_RESULT, 'livesLeft는 0 이상의 정수여야 합니다.');
     }
 
-    return { userId: userId as number, placement: placement as number, livesLeft: livesLeft as number };
+    return { userId, placement, livesLeft };
 }

@@ -46,6 +46,12 @@ export function validateNickname(nickname: unknown): asserts nickname is string
     }
 }
 
+/** 정수 + 범위 검사 타입 가드. max 생략 시 상한 없음. */
+export function isInt(v: unknown, min: number, max?: number): v is number
+{
+    return typeof v === 'number' && Number.isInteger(v) && v >= min && (max === undefined || v <= max);
+}
+
 /** 비문자열 입력을 빈 문자열로 — 정규식 검증 진입용 헬퍼. */
 function asString(v: unknown): string
 {

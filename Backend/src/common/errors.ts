@@ -34,6 +34,7 @@ export class AppError extends Error
     constructor(kind: ErrorKind, userMessage: string)
     {
         super(userMessage);
+        this.name = 'AppError';
         this.kind = kind;
     }
 }

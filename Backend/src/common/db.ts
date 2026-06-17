@@ -91,3 +91,9 @@ export async function closePool(): Promise<void>
     pool = null;
     await p.end();
 }
+
+/** mysql2 중복 키 에러(ER_DUP_ENTRY) 판별 — UNIQUE 제약 멱등 가드용. */
+export function isDuplicateKeyError(err: unknown): boolean
+{
+    return typeof err === 'object' && err !== null && (err as { code?: string }).code === 'ER_DUP_ENTRY';
+}

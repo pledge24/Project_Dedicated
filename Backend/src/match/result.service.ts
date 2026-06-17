@@ -1,5 +1,6 @@
 // 매치 결과 처리 (service 레이어) — roster 검증 + 서버 토큰 + 무결성 → 트랜잭션 저장.
 // 서버 권위 모델: 결과는 DS만 보고 가능하며 매치당 발급된 serverToken으로만 통과한다.
+import { isDuplicateKeyError } from '../common/db.js';
 import { AppError, Codes } from '../common/errors.js';
 import type { MatchResultRequest, MatchResultResponse } from '../common/types.js';
 import * as repo from './result.repository.js';
@@ -59,7 +60,7 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
     }
     catch (err)
     {
-        if (isDuplicateEntry(err))
+        if (isDuplicateKeyError(err))
         {
             throw new AppError(Codes.RESULT_ALREADY_SUBMITTED, '이미 처리된 매치 결과입니다.');
         }
@@ -97,10 +98,4 @@ function soleWinner(results: MatchResultRequest['results']): number | null
     const firsts = results.filter((r) => r.placement === 1);
 
     return firsts.length === 1 ? firsts[0].userId : null;
-}
-
-/** mysql2의 중복 키 에러(client_match_id UNIQUE) 판별. */
-function isDuplicateEntry(err: unknown): boolean
-{
-    return typeof err === 'object' && err !== null && (err as { code?: string }).code === 'ER_DUP_ENTRY';
 }
