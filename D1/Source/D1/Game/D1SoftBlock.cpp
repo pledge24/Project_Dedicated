@@ -5,7 +5,6 @@
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
-#include "UObject/ConstructorHelpers.h"
 
 #include "Framework/D1BomberGameState.h"
 #include "Game/D1BomberGridLibrary.h"
@@ -26,22 +25,7 @@ AD1SoftBlock::AD1SoftBlock()
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
 	MeshComp->SetupAttachment(RootComponent);
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	// /Engine/BasicShapes/Cube는 100cm, 피벗 중앙. 셀(100x100x100)에 딱 맞춤.
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshAsset(
-		TEXT("/Engine/BasicShapes/Cube.Cube"));
-	if (CubeMeshAsset.Succeeded())
-	{
-		MeshComp->SetStaticMesh(CubeMeshAsset.Object);
-	}
-
-	// 파괴 중 반투명 머티리얼 기본값. 에셋 없으면 null → 반투명 표현만 생략.
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DestroyingMat(
-		TEXT("/Game/D1/Materials/M_SoftBlock_Destroying.M_SoftBlock_Destroying"));
-	if (DestroyingMat.Succeeded())
-	{
-		DestroyingMaterial = DestroyingMat.Object;
-	}
+	// 메시·파괴중 머티리얼은 BP(BP_SoftBlock)에서 지정.
 }
 
 void AD1SoftBlock::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

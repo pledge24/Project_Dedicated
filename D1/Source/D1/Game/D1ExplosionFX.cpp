@@ -2,8 +2,6 @@
 
 #include "Game/D1ExplosionFX.h"
 #include "Components/StaticMeshComponent.h"
-#include "Materials/MaterialInterface.h"
-#include "UObject/ConstructorHelpers.h"
 
 AD1ExplosionFX::AD1ExplosionFX()
 {
@@ -20,20 +18,7 @@ AD1ExplosionFX::AD1ExplosionFX()
 	RootComponent = MeshComp;
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	MeshComp->SetCastShadow(false);
-
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(
-		TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	if (SphereMesh.Succeeded())
-	{
-		MeshComp->SetStaticMesh(SphereMesh.Object);
-	}
-
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> ExplosionMat(
-		TEXT("/Game/D1/Materials/M_ExplosionFX.M_ExplosionFX"));
-	if (ExplosionMat.Succeeded())
-	{
-		MeshComp->SetMaterial(0, ExplosionMat.Object);
-	}
+	// 메시·머티리얼은 BP(BP_ExplosionFX)에서 지정.
 
 	SetActorScale3D(FVector(InitialScale));
 }

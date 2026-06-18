@@ -6,7 +6,6 @@
 #include "DrawDebugHelpers.h"
 #include "EngineUtils.h"
 #include "Net/UnrealNetwork.h"
-#include "UObject/ConstructorHelpers.h"
 #include "Kismet/KismetSystemLibrary.h"
 
 #include "Core/D1LogChannels.h"
@@ -38,14 +37,8 @@ AD1Bomb::AD1Bomb()
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
 	MeshComp->SetupAttachment(RootComponent);
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(
-		TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	if (SphereMesh.Succeeded())
-	{
-		MeshComp->SetStaticMesh(SphereMesh.Object);
-		MeshComp->SetRelativeScale3D(FVector(0.7f));
-	}
+	// 메시는 BP(BP_Bomb)에서 지정. 스케일만 구조 기본값으로 유지.
+	MeshComp->SetRelativeScale3D(FVector(0.7f));
 }
 
 void AD1Bomb::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -116,7 +109,8 @@ void AD1Bomb::MulticastOnExploded_Implementation(const TArray<FIntPoint>& Affect
 	for (const FIntPoint& Cell : AffectedCells)
 	{
 		const FVector Center = UD1BomberGridLibrary::CellToWorldCenter(Cell, 50.f);
-		World->SpawnActor<AD1ExplosionFX>(AD1ExplosionFX::StaticClass(), Center, FRotator::ZeroRotator, Params);
+		UClass* FXClass = ExplosionFXClass ? ExplosionFXClass.Get() : AD1ExplosionFX::StaticClass();
+		World->SpawnActor<AD1ExplosionFX>(FXClass, Center, FRotator::ZeroRotator, Params);
 	}
 }
 

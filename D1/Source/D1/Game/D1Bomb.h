@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "D1Bomb.generated.h"
 
+class AD1ExplosionFX;
 class UBoxComponent;
 class UStaticMeshComponent;
 
@@ -48,6 +49,10 @@ private:
 	void ChainDetonateBombs(const TArray<FIntPoint>& Cells);
 	void DestroySoftBlocks(const TArray<FIntPoint>& SoftBlockHits);
 	void ApplyExplosionDamage(const TArray<FIntPoint>& Cells);
+
+	/** 폭발 셀마다 스폰하는 FX 액터. 미지정 시 C++ 클래스로 폴백. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
+	TSubclassOf<AD1ExplosionFX> ExplosionFXClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	int32 Range;
