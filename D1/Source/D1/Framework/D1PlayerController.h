@@ -22,9 +22,8 @@ public:
 	AD1PlayerController();
 
 protected:
-	//~ APlayerController
+	//~ Override 함수
 	virtual void SetupInputComponent() override;
-
 	virtual void BeginPlay() override;
 
 	/** GameState.OnMatchFinished 콜백 — 결과 위젯 생성·표시. */

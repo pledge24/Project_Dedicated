@@ -143,9 +143,8 @@ void AD1Bomb::DoExplode()
 
 	TArray<FIntPoint> Cells;
 	TArray<FIntPoint> SoftBlockHits;
-	UD1BomberGridLibrary::EnumerateCrossCells(GS, Origin, Range, Cells, SoftBlockHits);
-	Cells.Insert(Origin, 0);
-
+	UD1BomberGridLibrary::TraceExplosionCells(GS, Origin, Range, Cells, SoftBlockHits);
+	
 	ChainDetonateBombs(Cells);
 	DestroySoftBlocks(SoftBlockHits);
 	ApplyExplosionDamage(Cells);

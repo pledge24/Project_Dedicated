@@ -23,7 +23,7 @@ class AD1MenuPlayerController : public APlayerController
 public:
 	AD1MenuPlayerController();
 
-	//~ APlayerController
+	//~ Override 함수
 	virtual void BeginPlay() override;
 
 	/** 다른 위젯으로 교체 (로그인 ↔ 회원가입 등). 기존 위젯은 RemoveFromParent. */

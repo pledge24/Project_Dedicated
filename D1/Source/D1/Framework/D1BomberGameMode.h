@@ -29,7 +29,7 @@ public:
 
 	virtual void BeginPlay() override;
 
-	/** Login 통과후 해당 클라가 초대받은 손님인지 토큰으로 판단 로직만 추가 */
+	/** Login 통과후 해당 클라가 초대받은 손님인지 토큰으로 판단. */
 	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
 
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
@@ -101,11 +101,9 @@ private:
 	TArray<TObjectPtr<AD1BomberPlayerState>> AlivePlayerStates;
 
 	bool bMatchEnded = false;
-
 	bool bMatchStarted = false;
 
 	FTimerHandle MatchTimerHandle;
-
 	FTimerHandle WaitForPlayersTimerHandle;
 
 	/** -ExpectedPlayers= 로 주입. 이 수만큼 접속 시 매치 시작(0/1=즉시). */

@@ -26,6 +26,5 @@ private:
 	FTimerHandle WatchTimerHandle;
 
 	float Elapsed = 0.f;
-
 	float GraceSec = 0.f;
 };

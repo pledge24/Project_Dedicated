@@ -37,11 +37,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Bomber")
 	bool IsWallCell(const FIntPoint& Cell) const;
 
-	/** soft block이 살아있는 셀인지. 폭발 전파가 이 셀에서 멈춘다. */
 	UFUNCTION(BlueprintPure, Category = "Bomber")
 	bool IsSoftBlockCell(const FIntPoint& Cell) const;
 
-	/** 맵마다 그리드 크기가 달라 GameState가 경계 판정 권위. */
 	UFUNCTION(BlueprintPure, Category = "Bomber")
 	bool IsInsideGrid(const FIntPoint& Cell) const;
 
@@ -70,7 +68,6 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
 	FOnMatchFinished OnMatchFinished;
 
-	//~ 복제 상태
 	UPROPERTY(ReplicatedUsing = OnRep_MatchPhase, BlueprintReadOnly, Category = "Bomber")
 	EBomberMatchPhase MatchPhase;
 
