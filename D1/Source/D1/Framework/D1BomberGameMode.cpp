@@ -132,6 +132,35 @@ void AD1BomberGameMode::BeginPlay()
 	}
 }
 
+FString AD1BomberGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)
+{
+	const FString Result = Super::InitNewPlayer(NewPlayerController, UniqueId, Options, Portal);
+
+	AD1BomberPlayerState* PS = NewPlayerController ? NewPlayerController->GetPlayerState<AD1BomberPlayerState>() : nullptr;
+	if (PS)
+	{
+		// 클라가 접속시 가져온 토큰(travel URL의 ?join=)이 백엔드가 준 roster에 있는지 확인.
+		// 토큰이 roster에 존재 O -> PS에 UserId 넣어준다.
+		// 토큰이 roster에 존재 X -> 해당 클라는 신용하지 않는다.(또는 PIE/StandAlone으로 판단)
+		const FString JoinToken = UGameplayStatics::ParseOption(Options, TEXT("join"));
+		if (!JoinToken.IsEmpty())
+		{
+			if (const FD1JoinEntry* Entry = JoinRoster.Find(JoinToken))
+			{
+				PS->BackendUserId = Entry->UserId;
+				UE_LOG(LogD1, Log, TEXT("[Match] InitNewPlayer %s userId=%lld (roster)"),
+					*PS->GetPlayerName(), Entry->UserId);
+			}
+			else
+			{
+				UE_LOG(LogD1, Warning, TEXT("[Match] InitNewPlayer %s — join 토큰이 roster에 없음"), *PS->GetPlayerName());
+			}
+		}
+	}
+
+	return Result;
+}
+
 AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
 	UsedStarts.RemoveAll([](const TWeakObjectPtr<AActor>& Ptr)
@@ -183,40 +212,9 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 	return Chosen;
 }
 
-FString AD1BomberGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)
-{
-	const FString Result = Super::InitNewPlayer(NewPlayerController, UniqueId, Options, Portal);
-
-	AD1BomberPlayerState* PS = NewPlayerController ? NewPlayerController->GetPlayerState<AD1BomberPlayerState>() : nullptr;
-	if (PS)
-	{
-		// travel URL의 ?join= 토큰을 백엔드 권위 roster로 해석 → 신원(userId)을 서버가 확정.
-		// 클라가 주장하는 userId는 신뢰하지 않는다(서버권위). PIE/standalone은 토큰 없어 no-op.
-		// 좌석(스폰 코너·카드 자리)은 ChoosePlayerStart가 랜덤 배정 — 신원과 분리.
-		const FString JoinToken = UGameplayStatics::ParseOption(Options, TEXT("join"));
-		if (!JoinToken.IsEmpty())
-		{
-			if (const FD1JoinEntry* Entry = JoinRoster.Find(JoinToken))
-			{
-				PS->BackendUserId = Entry->UserId;
-				UE_LOG(LogD1, Log, TEXT("[Match] InitNewPlayer %s userId=%lld (roster)"),
-					*PS->GetPlayerName(), Entry->UserId);
-			}
-			else
-			{
-				UE_LOG(LogD1, Warning, TEXT("[Match] InitNewPlayer %s — join 토큰이 roster에 없음"), *PS->GetPlayerName());
-			}
-		}
-	}
-
-	return Result;
-}
-
 void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
-
-	// 스폰 위치는 ChoosePlayerStart가 슬롯을 확정해 첫 스폰부터 정확 — 별도 보정 불필요.
 
 	// 이미 시작했거나 게이트 비활성(PIE·솔로)이면 시작 게이트 카운트 생략.
 	if (bMatchStarted || ExpectedPlayerCount <= 1)

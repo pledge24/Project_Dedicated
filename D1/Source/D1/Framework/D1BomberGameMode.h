@@ -28,10 +28,11 @@ public:
 	AD1BomberGameMode();
 
 	virtual void BeginPlay() override;
-	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
-	/** travel ?join= 토큰을 권위 roster로 해석해 userId 확정(서버권위). 좌석은 ChoosePlayerStart가 랜덤 배정. */
+	/** Login 통과후 해당 클라가 초대받은 손님인지 토큰으로 판단 로직만 추가 */
 	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
+
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
 	/** 예상 인원 다 모이면 매치 시작(시작 게이트). */
 	virtual void PostLogin(APlayerController* NewPlayer) override;
