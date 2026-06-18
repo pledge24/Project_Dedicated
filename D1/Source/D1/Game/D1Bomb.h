@@ -9,6 +9,7 @@
 class UBoxComponent;
 class UStaticMeshComponent;
 
+/** 그리드 폭탄. 어휘 3단계: Fuse(도화선 카운트다운) → Detonation(격발 시점·연쇄 트리거) → Explosion(십자 폭발 효과·피해·FX). */
 UCLASS()
 class AD1Bomb : public AActor
 {
