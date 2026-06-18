@@ -77,7 +77,7 @@ void AD1BomberGameMode::BeginPlay()
 			*CurrentMatchId, CurrentMatchToken.IsEmpty() ? TEXT("(none)") : TEXT("(set)"), ExpectedPlayerCount);
 	}
 
-	// 백엔드 권위 roster 주입(token:userId;…). InitNewPlayer가 ?join= 토큰으로 신원을 확정한다.
+	// 백엔드 권위 roster 주입({token}:{userId};…). InitNewPlayer가 ?join= 토큰으로 신원을 확정한다.
 	FString RosterStr;
 	if (FParse::Value(FCommandLine::Get(), TEXT("Roster="), RosterStr) && !RosterStr.IsEmpty())
 	{
@@ -134,7 +134,10 @@ void AD1BomberGameMode::BeginPlay()
 
 AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
-	UsedStarts.RemoveAll([](const TWeakObjectPtr<AActor>& Ptr) { return !Ptr.IsValid(); });
+	UsedStarts.RemoveAll([](const TWeakObjectPtr<AActor>& Ptr)
+	{
+		return !Ptr.IsValid();
+	});
 
 	TArray<AActor*> AllStarts;
 	GatherSortedPlayerStarts(this, AllStarts);
@@ -209,19 +212,6 @@ FString AD1BomberGameMode::InitNewPlayer(APlayerController* NewPlayerController,
 	return Result;
 }
 
-void AD1BomberGameMode::Logout(AController* Exiting)
-{
-	// 떠난 플레이어가 점유했던 PlayerStart를 해제 → fallback(순번) 경로 슬롯 누수 방지.
-	// 권위 슬롯 경로에선 슬롯이 고정이라 no-op이어도 무방.
-	if (Exiting && Exiting->StartSpot.IsValid())
-	{
-		UsedStarts.Remove(Exiting->StartSpot);
-	}
-	UsedStarts.RemoveAll([](const TWeakObjectPtr<AActor>& Ptr) { return !Ptr.IsValid(); });
-
-	Super::Logout(Exiting);
-}
-
 void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
@@ -254,6 +244,19 @@ void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 	}
 }
 
+void AD1BomberGameMode::Logout(AController* Exiting)
+{
+	// 떠난 플레이어가 점유했던 PlayerStart를 해제 → fallback(순번) 경로 슬롯 누수 방지.
+	// 권위 슬롯 경로에선 슬롯이 고정이라 no-op이어도 무방.
+	if (Exiting && Exiting->StartSpot.IsValid())
+	{
+		UsedStarts.Remove(Exiting->StartSpot);
+	}
+	UsedStarts.RemoveAll([](const TWeakObjectPtr<AActor>& Ptr) { return !Ptr.IsValid(); });
+
+	Super::Logout(Exiting);
+}
+
 void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 {
 	if (bMatchEnded || !DeadPS)
@@ -277,6 +280,72 @@ void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 		const bool bHasSurvivor = AlivePlayerStates.Num() == 1;
 		AD1BomberPlayerState* Winner = bHasSurvivor ? AlivePlayerStates[0].Get() : DeadPS;
 		EndMatchWithWinner(Winner, bHasSurvivor ? EBomberEndReason::Winner : EBomberEndReason::Draw);
+	}
+}
+
+void AD1BomberGameMode::StartMatch()
+{
+	if (bMatchStarted)
+	{
+		return;
+	}
+	bMatchStarted = true;
+	GetWorldTimerManager().ClearTimer(WaitForPlayersTimerHandle);
+
+	if (AD1BomberGameState* BomberGS = GetGameState<AD1BomberGameState>())
+	{
+		BomberGS->MatchStartServerTime = BomberGS->GetServerWorldTimeSeconds();
+		BomberGS->MatchPhase = EBomberMatchPhase::Playing;
+
+		GetWorldTimerManager().SetTimer(
+			MatchTimerHandle, this, &AD1BomberGameMode::OnMatchTimeExpired,
+			BomberGS->MatchDurationSec, /*bLoop=*/false);
+	}
+
+	UE_LOG(LogD1, Log, TEXT("[Match] 매치 시작 (Playing)"));
+}
+
+void AD1BomberGameMode::OnWaitForPlayersTimeout()
+{
+	if (bMatchStarted)
+	{
+		return;
+	}
+	UE_LOG(LogD1, Warning, TEXT("[Match] 시작 게이트 타임아웃 — 현재 인원으로 시작"));
+	StartMatch();
+}
+
+void AD1BomberGameMode::OnMatchTimeExpired()
+{
+	if (bMatchEnded)
+	{
+		return;
+	}
+	UE_LOG(LogD1, Log, TEXT("Match time expired -> ending match"));
+	// 생존자는 EndMatchWithWinner에서 공동 1위로 보정된다.
+	EndMatchWithWinner(nullptr, EBomberEndReason::TimeExpired);
+}
+
+void AD1BomberGameMode::EnsureAliveListInitialized()
+{
+	if (AlivePlayerStates.Num() > 0)
+	{
+		return;
+	}
+	if (AGameStateBase* GSB = GameState)
+	{
+		for (APlayerState* PS : GSB->PlayerArray)
+		{
+			if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
+			{
+				// ApplyHit가 NotifyPlayerDied보다 먼저 bIsAlive를 꺼서, 첫 사망자가
+				// 누락되면 등수가 1 모자람. 미랭크(Placement<=0) 기준으로 전원 포함.
+				if (B->Placement <= 0)
+				{
+					AlivePlayerStates.Add(B);
+				}
+			}
+		}
 	}
 }
 
@@ -376,70 +445,4 @@ void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomb
 	{
 		DS->BeginShutdownWatch(ShutdownGraceSec);
 	}
-}
-
-void AD1BomberGameMode::EnsureAliveListInitialized()
-{
-	if (AlivePlayerStates.Num() > 0)
-	{
-		return;
-	}
-	if (AGameStateBase* GSB = GameState)
-	{
-		for (APlayerState* PS : GSB->PlayerArray)
-		{
-			if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
-			{
-				// ApplyHit가 NotifyPlayerDied보다 먼저 bIsAlive를 꺼서, 첫 사망자가
-				// 누락되면 등수가 1 모자람. 미랭크(Placement<=0) 기준으로 전원 포함.
-				if (B->Placement <= 0)
-				{
-					AlivePlayerStates.Add(B);
-				}
-			}
-		}
-	}
-}
-
-void AD1BomberGameMode::StartMatch()
-{
-	if (bMatchStarted)
-	{
-		return;
-	}
-	bMatchStarted = true;
-	GetWorldTimerManager().ClearTimer(WaitForPlayersTimerHandle);
-
-	if (AD1BomberGameState* BomberGS = GetGameState<AD1BomberGameState>())
-	{
-		BomberGS->MatchStartServerTime = BomberGS->GetServerWorldTimeSeconds();
-		BomberGS->MatchPhase = EBomberMatchPhase::Playing;
-
-		GetWorldTimerManager().SetTimer(
-			MatchTimerHandle, this, &AD1BomberGameMode::OnMatchTimeExpired,
-			BomberGS->MatchDurationSec, /*bLoop=*/false);
-	}
-
-	UE_LOG(LogD1, Log, TEXT("[Match] 매치 시작 (Playing)"));
-}
-
-void AD1BomberGameMode::OnWaitForPlayersTimeout()
-{
-	if (bMatchStarted)
-	{
-		return;
-	}
-	UE_LOG(LogD1, Warning, TEXT("[Match] 시작 게이트 타임아웃 — 현재 인원으로 시작"));
-	StartMatch();
-}
-
-void AD1BomberGameMode::OnMatchTimeExpired()
-{
-	if (bMatchEnded)
-	{
-		return;
-	}
-	UE_LOG(LogD1, Log, TEXT("Match time expired -> ending match"));
-	// 생존자는 EndMatchWithWinner에서 공동 1위로 보정된다.
-	EndMatchWithWinner(nullptr, EBomberEndReason::TimeExpired);
 }

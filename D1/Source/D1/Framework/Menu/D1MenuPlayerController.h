@@ -31,8 +31,8 @@ public:
 	void SwitchToWidget(TSubclassOf<UUserWidget> NewWidgetClass);
 
 private:
-	void ShowInitialWidgetFromGameMode();
 	void ShowBackground();
+	void ShowInitialWidgetFromGameMode();
 	void ApplyUiOnlyInputMode();
 	static UWidget* FindFirstFocusableWidget(UUserWidget* Root);
 

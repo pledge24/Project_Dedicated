@@ -404,22 +404,39 @@ int32 AD1BomberCharacter::GetActiveBombCount()
 	return ActiveBombs.Num();
 }
 
-void AD1BomberCharacter::EndInvulnerability()
+void AD1BomberCharacter::RefreshPlayerStateBinding()
 {
-	if (!HasAuthority())
+	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
+	if (!PS || BoundPlayerState.Get() == PS)
 	{
 		return;
 	}
-	bIsInvulnerable = false;
-	OnRep_Invulnerable();
-}
 
-void AD1BomberCharacter::TickBlink()
-{
-	bBlinkVisible = !bBlinkVisible;
-	if (USkeletalMeshComponent* SK = GetMesh())
+	if (AD1BomberPlayerState* Prev = BoundPlayerState.Get())
 	{
-		SK->SetVisibility(bBlinkVisible);
+		Prev->OnAliveStateChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
+		Prev->OnPlayerNameChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
+		Prev->OnSpeedLevelChanged.RemoveDynamic(this, &AD1BomberCharacter::OnSpeedLevelChanged);
+	}
+	PS->OnAliveStateChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
+	PS->OnPlayerNameChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
+	PS->OnSpeedLevelChanged.AddDynamic(this, &AD1BomberCharacter::OnSpeedLevelChanged);
+	BoundPlayerState = PS;
+
+	// 늦게 합류한 클라가 이미 올라간 SpeedLevel을 받았을 때 즉시 반영.
+	OnSpeedLevelChanged();
+
+	// BP가 PS 확보 시점을 받게 함 (이름표 UI 등). BeginPlay 전에는 컴포넌트가 아직 init 안 됐을 수 있어
+	// 신호를 미루고, BeginPlay에서 다시 한 번 발화한다.
+	if (HasActorBegunPlay())
+	{
+		OnPlayerStateReady();
+	}
+
+	// 늦게 합류한 클라가 이미 사망 상태를 받았을 때 즉시 반영.
+	if (!PS->bIsAlive)
+	{
+		OnPlayerAliveStateChanged();
 	}
 }
 
@@ -471,40 +488,28 @@ void AD1BomberCharacter::UpdateIgnoredBombs()
 	}
 }
 
-void AD1BomberCharacter::RefreshPlayerStateBinding()
+void AD1BomberCharacter::TickBlink()
 {
-	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
-	if (!PS || BoundPlayerState.Get() == PS)
+	bBlinkVisible = !bBlinkVisible;
+	if (USkeletalMeshComponent* SK = GetMesh())
+	{
+		SK->SetVisibility(bBlinkVisible);
+	}
+}
+
+void AD1BomberCharacter::EndInvulnerability()
+{
+	if (!HasAuthority())
 	{
 		return;
 	}
+	bIsInvulnerable = false;
+	OnRep_Invulnerable();
+}
 
-	if (AD1BomberPlayerState* Prev = BoundPlayerState.Get())
-	{
-		Prev->OnAliveStateChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
-		Prev->OnPlayerNameChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
-		Prev->OnSpeedLevelChanged.RemoveDynamic(this, &AD1BomberCharacter::OnSpeedLevelChanged);
-	}
-	PS->OnAliveStateChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
-	PS->OnPlayerNameChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
-	PS->OnSpeedLevelChanged.AddDynamic(this, &AD1BomberCharacter::OnSpeedLevelChanged);
-	BoundPlayerState = PS;
-
-	// 늦게 합류한 클라가 이미 올라간 SpeedLevel을 받았을 때 즉시 반영.
-	OnSpeedLevelChanged();
-
-	// BP가 PS 확보 시점을 받게 함 (이름표 UI 등). BeginPlay 전에는 컴포넌트가 아직 init 안 됐을 수 있어
-	// 신호를 미루고, BeginPlay에서 다시 한 번 발화한다.
-	if (HasActorBegunPlay())
-	{
-		OnPlayerStateReady();
-	}
-
-	// 늦게 합류한 클라가 이미 사망 상태를 받았을 때 즉시 반영.
-	if (!PS->bIsAlive)
-	{
-		OnPlayerAliveStateChanged();
-	}
+void AD1BomberCharacter::EndStun()
+{
+	bStunned = false;
 }
 
 void AD1BomberCharacter::FinishDeath()
@@ -514,9 +519,4 @@ void AD1BomberCharacter::FinishDeath()
 	{
 		SK->SetVisibility(false);
 	}
-}
-
-void AD1BomberCharacter::EndStun()
-{
-	bStunned = false;
 }

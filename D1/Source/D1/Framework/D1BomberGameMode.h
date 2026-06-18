@@ -33,19 +33,16 @@ public:
 	/** travel ?join= 토큰을 권위 roster로 해석해 userId 확정(서버권위). 좌석은 ChoosePlayerStart가 랜덤 배정. */
 	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
 
-	/** 점유 PlayerStart 해제 — fallback 경로 슬롯 누수 방지. */
-	virtual void Logout(AController* Exiting) override;
-
 	/** 예상 인원 다 모이면 매치 시작(시작 게이트). */
 	virtual void PostLogin(APlayerController* NewPlayer) override;
+
+	/** 점유 PlayerStart 해제 — fallback 경로 슬롯 누수 방지. */
+	virtual void Logout(AController* Exiting) override;
 
 	/** 서버 전용: 사망 등록·등수 부여, 1명 남으면 매치 종료. */
 	void NotifyPlayerDied(AD1BomberPlayerState* DeadPS);
 
 private:
-	void EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason);
-	void EnsureAliveListInitialized();
-
 	/** Waiting→Playing + 매치 타이머 시작. 한 번만 실행(가드). */
 	void StartMatch();
 
@@ -54,6 +51,10 @@ private:
 
 	/** 매치 시간 만료 → 종료. placement 룰은 v2. */
 	void OnMatchTimeExpired();
+
+	void EnsureAliveListInitialized();
+
+	void EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason);
 
 	/** 빌드할 맵 데이터. -MapData= 로 오버라이드 가능. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))

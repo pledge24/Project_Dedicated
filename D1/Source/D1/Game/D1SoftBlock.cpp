@@ -50,6 +50,18 @@ void AD1SoftBlock::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AD1SoftBlock, bDying);
 }
 
+void AD1SoftBlock::SetHeldItem(EPowerupType InType, TSubclassOf<AD1PowerupPickup> InPickupClass, float InDropZ)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	HeldItem = InType;
+	PickupClass = InPickupClass;
+	DropZ = InDropZ;
+	bHasItem = true;
+}
+
 void AD1SoftBlock::StartDying()
 {
 	if (!HasAuthority() || bDying)
@@ -65,18 +77,6 @@ void AD1SoftBlock::StartDying()
 	// 콜리전·셀은 그대로 둔 채 일정 시간 후 실제 파괴.
 	GetWorldTimerManager().SetTimer(
 		DyingTimerHandle, this, &AD1SoftBlock::CompleteDestruction, DyingDurationSec, /*bLoop=*/false);
-}
-
-void AD1SoftBlock::SetHeldItem(EPowerupType InType, TSubclassOf<AD1PowerupPickup> InPickupClass, float InDropZ)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-	HeldItem = InType;
-	PickupClass = InPickupClass;
-	DropZ = InDropZ;
-	bHasItem = true;
 }
 
 void AD1SoftBlock::OnRep_bDying()

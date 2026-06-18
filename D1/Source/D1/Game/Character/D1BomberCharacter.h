@@ -83,18 +83,18 @@ protected:
 	TSet<TWeakObjectPtr<AD1Bomb>> IgnoredBombs;
 
 private:
-	void EndInvulnerability();
-	void TickBlink();
-	void UpdateIgnoredBombs();
-
 	/** PossessedBy/OnRep_PlayerState 양쪽서 호출. PS 확보 시 OnAliveStateChanged 바인딩. */
 	void RefreshPlayerStateBinding();
 
-	/** 사망 연출 종료 후 메시 숨김. 타이머 콜백. */
-	void FinishDeath();
+	void UpdateIgnoredBombs();
+	void TickBlink();
+	void EndInvulnerability();
 
 	/** 경직 해제. 타이머 콜백(서버). */
 	void EndStun();
+
+	/** 사망 연출 종료 후 메시 숨김. 타이머 콜백. */
+	void FinishDeath();
 
 	UPROPERTY(EditAnywhere, Category = "Input")
 	TObjectPtr<UInputAction> MoveAction;

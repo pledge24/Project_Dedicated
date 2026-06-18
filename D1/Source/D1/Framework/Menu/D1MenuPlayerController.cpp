@@ -52,6 +52,21 @@ void AD1MenuPlayerController::SwitchToWidget(TSubclassOf<UUserWidget> NewWidgetC
 	ApplyUiOnlyInputMode();
 }
 
+void AD1MenuPlayerController::ShowBackground()
+{
+	if (!BackgroundWidgetClass || BackgroundWidget)
+	{
+		return;
+	}
+
+	BackgroundWidget = CreateWidget<UUserWidget>(this, BackgroundWidgetClass);
+	if (BackgroundWidget)
+	{
+		// ZOrder = -1: 어떤 콘텐츠 위젯보다도 항상 뒤에 그려짐
+		BackgroundWidget->AddToViewport(-1);
+	}
+}
+
 void AD1MenuPlayerController::ShowInitialWidgetFromGameMode()
 {
 	AD1MenuGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AD1MenuGameMode>() : nullptr;
@@ -69,21 +84,6 @@ void AD1MenuPlayerController::ShowInitialWidgetFromGameMode()
 	}
 
 	SwitchToWidget(InitialClass);
-}
-
-void AD1MenuPlayerController::ShowBackground()
-{
-	if (!BackgroundWidgetClass || BackgroundWidget)
-	{
-		return;
-	}
-
-	BackgroundWidget = CreateWidget<UUserWidget>(this, BackgroundWidgetClass);
-	if (BackgroundWidget)
-	{
-		// ZOrder = -1: 어떤 콘텐츠 위젯보다도 항상 뒤에 그려짐
-		BackgroundWidget->AddToViewport(-1);
-	}
 }
 
 void AD1MenuPlayerController::ApplyUiOnlyInputMode()
