@@ -199,7 +199,7 @@ void AD1Bomb::ChainDetonateBombs(const TArray<FIntPoint>& Cells)
 void AD1Bomb::DestroySoftBlocks(const TArray<FIntPoint>& SoftBlockHits)
 {
 	// 폭발 줄기가 닿은 파괴 가능 블록을 "파괴 중"으로 전환. 셀 제거는 블록이 시간 경과 후
-	// 스스로 처리(파괴 중에도 폭발 차단 유지) — 여기선 StartDying만.
+	// 스스로 처리(파괴 중에도 폭발 차단 유지) — 여기선 StartDestroying만.
 	if (SoftBlockHits.Num() == 0)
 	{
 		return;
@@ -209,7 +209,7 @@ void AD1Bomb::DestroySoftBlocks(const TArray<FIntPoint>& SoftBlockHits)
 	for (TActorIterator<AD1SoftBlock> It(GetWorld()); It; ++It)
 	{
 		AD1SoftBlock* Block = *It;
-		if (!IsValid(Block) || Block->IsDying())
+		if (!IsValid(Block) || Block->IsDestroying())
 		{
 			continue;
 		}
@@ -217,7 +217,7 @@ void AD1Bomb::DestroySoftBlocks(const TArray<FIntPoint>& SoftBlockHits)
 		const FIntPoint BlockCell = UD1BomberGridLibrary::WorldToCell(Block->GetActorLocation());
 		if (HitSet.Contains(BlockCell))
 		{
-			Block->StartDying();
+			Block->StartDestroying();
 		}
 	}
 }

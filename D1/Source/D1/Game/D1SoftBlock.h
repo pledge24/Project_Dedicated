@@ -26,13 +26,13 @@ public:
 	void SetHeldItem(EPowerupType InType, TSubclassOf<AD1PowerupPickup> InPickupClass, float InDropZ);
 
 	/** 서버 전용: "파괴 중" 진입. 반투명 유지 후 Destroy. 콜리전·폭발 차단은 유지. */
-	void StartDying();
+	void StartDestroying();
 
-	bool IsDying() const { return bDying; }
+	bool IsDestroying() const { return bDestroying; }
 
 protected:
 	UFUNCTION()
-	void OnRep_bDying();
+	void OnRep_bDestroying();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UBoxComponent> CollisionComp;
@@ -46,16 +46,16 @@ private:
 
 	/** 파괴 중 상태에서 교체할 반투명 머티리얼. 없으면 반투명 표현만 생략. */
 	UPROPERTY(EditAnywhere, Category = "Bomber")
-	TObjectPtr<UMaterialInterface> DyingMaterial;
+	TObjectPtr<UMaterialInterface> DestroyingMaterial;
 
 	/** "파괴 중" 유지 시간(초). 이 시간 뒤 실제 Destroy. */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
-	float DyingDurationSec = 0.6f;
+	float DestroyingDurationSec = 0.6f;
 
-	UPROPERTY(ReplicatedUsing = OnRep_bDying)
-	bool bDying = false;
+	UPROPERTY(ReplicatedUsing = OnRep_bDestroying)
+	bool bDestroying = false;
 
-	FTimerHandle DyingTimerHandle;
+	FTimerHandle DestroyingTimerHandle;
 
 	/** 빌드 시 사전 배정된 보유 아이템(서버 전용, 비복제 — 파괴 전엔 숨김). */
 	EPowerupType HeldItem{};

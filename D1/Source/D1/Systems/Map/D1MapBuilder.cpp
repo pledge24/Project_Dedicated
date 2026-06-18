@@ -103,7 +103,7 @@ bool UD1MapBuilder::Build(UWorld* World, AD1BomberGameState* GS, const FD1MapBui
 		}
 	}
 
-	// 소프트블록(복제) — dying 상태는 자체 복제.
+	// 소프트블록(복제) — 파괴 중 상태는 자체 복제.
 	int32 AssignedItems = 0;
 	if (MapToUse->SoftBlockClass)
 	{
