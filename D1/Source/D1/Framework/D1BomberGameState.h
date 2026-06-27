@@ -69,11 +69,11 @@ public:
 	FOnMatchFinished OnMatchFinished;
 
 	UPROPERTY(ReplicatedUsing = OnRep_MatchPhase, BlueprintReadOnly, Category = "Bomber")
-	EBomberMatchPhase MatchPhase;
+	EBomberMatchPhase MatchPhase = EBomberMatchPhase::Waiting;
 
 	/** 빌드 시 서버가 세팅. 경계 판정 권위. */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
-	FIntPoint GridSize;
+	FIntPoint GridSize = FIntPoint::ZeroValue;
 
 	/** ~64셀 규모라 TArray로 충분. */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
@@ -85,11 +85,11 @@ public:
 
 	/** GameMode가 Playing 진입 시 기록. */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Match")
-	float MatchStartServerTime;
+	float MatchStartServerTime = 0.0f;
 
 	/** 기본 5분. */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Match")
-	float MatchDurationSec;
+	float MatchDurationSec = 300.0f;
 
 	/** 종료 시 서버가 1회 채움. 단일 배열로 원자 복제. */
 	UPROPERTY(ReplicatedUsing = OnRep_FinalResults, BlueprintReadOnly, Category = "Bomber|Match")

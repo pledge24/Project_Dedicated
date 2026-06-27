@@ -11,18 +11,6 @@ namespace
 	constexpr int32 MaxSpeedLevel = 5;
 }
 
-AD1BomberPlayerState::AD1BomberPlayerState()
-{
-	Lives = 3;
-	bIsAlive = true;
-	Placement = 0;
-	PlayerSlotIndex = -1;
-	FirePower = 2;
-	BombCapacity = 1;
-	SpeedLevel = 0;
-	BackendUserId = 0;
-}
-
 void AD1BomberPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);

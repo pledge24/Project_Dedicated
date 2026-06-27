@@ -10,7 +10,10 @@ class AD1ExplosionFX;
 class UBoxComponent;
 class UStaticMeshComponent;
 
-/** 그리드 폭탄. 어휘 3단계: Fuse(도화선 카운트다운) → Detonation(격발 시점·연쇄 트리거) → Explosion(십자 폭발 효과·피해·FX). */
+/** 폭탄 클래스. 사용한 단어 헷갈리지 말 것.
+ * Fuse(도화선 카운트다운) 
+ * Detonation(격발 시점·연쇄 트리거) 
+ * Explosion(십자 폭발 효과·피해·FX). */
 UCLASS()
 class AD1Bomb : public AActor
 {
@@ -55,17 +58,17 @@ private:
 	TSubclassOf<AD1ExplosionFX> ExplosionFXClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
-	int32 Range;
+	int32 Range = 2;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
-	float FuseSec;
+	float FuseSec = 3.f;
 
 	/** 다른 폭탄에 휘말렸을 때 체인 폭발까지의 지연(초). */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	float ChainDetonationDelay = 0.05f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_DetonationServerTime, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
-	float DetonationServerTime;
+	float DetonationServerTime = 0.f;
 
 	FTimerHandle FuseTimerHandle;
 

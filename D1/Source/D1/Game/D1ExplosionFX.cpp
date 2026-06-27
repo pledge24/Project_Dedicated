@@ -8,12 +8,6 @@ AD1ExplosionFX::AD1ExplosionFX()
 	PrimaryActorTick.bCanEverTick = true;
 	bReplicates = false;
 
-	Lifetime = 0.5f;
-	ExpansionTime = 0.2f;
-	PeakScale = 0.9f;
-	InitialScale = 0.05f;
-	Elapsed = 0.f;
-
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
 	RootComponent = MeshComp;
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);

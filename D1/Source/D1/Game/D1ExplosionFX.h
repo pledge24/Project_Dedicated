@@ -31,17 +31,17 @@ protected:
 
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
-	float Lifetime;
+	float Lifetime = 0.5f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
-	float ExpansionTime;
+	float ExpansionTime = 0.2f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
-	float PeakScale;
+	float PeakScale = 0.9f;
 
 	/** 폭발 시작·소멸 시 스케일(작게 시작→PeakScale→작게). */
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
-	float InitialScale;
+	float InitialScale = 0.05f;
 
-	float Elapsed;
+	float Elapsed = 0.f;
 };

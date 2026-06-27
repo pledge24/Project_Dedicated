@@ -11,11 +11,6 @@ namespace
 
 AD1BomberGameState::AD1BomberGameState()
 {
-	MatchPhase = EBomberMatchPhase::Waiting;
-	MatchStartServerTime = 0.0f;
-	MatchDurationSec = 300.0f; // 5분
-	GridSize = FIntPoint::ZeroValue;
-
 	// 서버시간 복제 주기 기본 5초 → 0.5초. HUD 타이머 클라간 드리프트 완화.
 	ServerWorldTimeSecondsUpdateFrequency = 0.5f;
 }

@@ -24,12 +24,8 @@ AD1Bomb::AD1Bomb()
 	SetNetUpdateFrequency(10.f);
 	PrimaryActorTick.bCanEverTick = false;
 
-	Range = 2;
-	FuseSec = 3.f;
-	DetonationServerTime = 0.f;
-
+	// 옆 칸에 있는 캐릭터가 폭탄 모서리에 끼는걸 방지하기 위해 충돌체 크기 100 -> 80으로 조정.
 	CollisionComp = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionComp"));
-	// 셀(100)보다 작은 충돌 — 두 캐릭터가 폭탄과 같은 칸에 설 수 있게.
 	CollisionComp->InitBoxExtent(FVector(40.f, 40.f, 40.f));
 	CollisionComp->SetCollisionProfileName(TEXT("BomberBomb"));
 	RootComponent = CollisionComp;
@@ -37,8 +33,6 @@ AD1Bomb::AD1Bomb()
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
 	MeshComp->SetupAttachment(RootComponent);
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	// 메시는 BP(BP_Bomb)에서 지정. 스케일만 구조 기본값으로 유지.
-	MeshComp->SetRelativeScale3D(FVector(0.7f));
 }
 
 void AD1Bomb::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -66,31 +60,32 @@ void AD1Bomb::BeginPlay()
 		GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, FuseSec, false);
 	}
 
-	// 서버/클라 양쪽에서 실행. 양쪽 캡슐 스윕(클라 이동 예측 포함)이
-	// 폭탄 셀에 들어와 있는 캐릭터는 셀을 벗어나기 전까지 통과로 처리되도록.
-	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
-	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
-
-	TArray<AActor*> Overlapping;
-	UKismetSystemLibrary::BoxOverlapActors(this, GetActorLocation(),
-		FVector(UD1BomberGridLibrary::CellHalf, UD1BomberGridLibrary::CellHalf, UD1BomberGridLibrary::CellSize),
-		ObjectTypes,
-		AD1BomberCharacter::StaticClass(),
-		TArray<AActor*>(),
-		Overlapping);
-
-	for (AActor* A : Overlapping)
+	// 폭탄이 스폰된 타이밍에 해당 셀 내부에 위치한 캐릭터들은 Sweep 충돌을 무시하도록 등록. (서버/클라 양쪽에서 실행)
 	{
-		if (AD1BomberCharacter* BC = Cast<AD1BomberCharacter>(A))
+		TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
+		ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
+
+		TArray<AActor*> Overlapping;
+		UKismetSystemLibrary::BoxOverlapActors(this, GetActorLocation(),
+			FVector(UD1BomberGridLibrary::CellHalf, UD1BomberGridLibrary::CellHalf, UD1BomberGridLibrary::CellSize),
+			ObjectTypes,
+			AD1BomberCharacter::StaticClass(),
+			TArray<AActor*>(),
+			Overlapping);
+
+		for (AActor* A : Overlapping)
 		{
-			BC->AddIgnoredBomb(this);
+			if (AD1BomberCharacter* BC = Cast<AD1BomberCharacter>(A))
+			{
+				BC->AddIgnoredBomb(this);
+			}
 		}
 	}
 }
 
 void AD1Bomb::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	// 소멸 경로 일원화: 미발화 도화선 타이머 정리(엔진 자동 취소의 명시적 보강).
+	// 소멸 경로 일원화: 미발화 도화선 타이머 정리.
 	GetWorldTimerManager().ClearAllTimersForObject(this);
 	Super::EndPlay(EndPlayReason);
 }
@@ -139,11 +134,13 @@ void AD1Bomb::DoExplode()
 	TArray<FIntPoint> SoftBlockHits;
 	UD1BomberGridLibrary::TraceExplosionCells(GS, Origin, Range, Cells, SoftBlockHits);
 	
-	ChainDetonateBombs(Cells);
-	DestroySoftBlocks(SoftBlockHits);
-	ApplyExplosionDamage(Cells);
-
-	MulticastOnExploded(Cells);
+	// 체인 격발 -> 소프트 블럭 파괴(이 Bomb의 폭발에 대해서만) -> 캐릭터에게 폭발 피해 적용 -> 폭발 이펙트 적용
+	{
+		ChainDetonateBombs(Cells);
+		DestroySoftBlocks(SoftBlockHits);
+		ApplyExplosionDamage(Cells);
+		MulticastOnExploded(Cells);
+	}
 
 	// 소유자 폭탄 슬롯 회수 — Owner(설치 캐릭터)에서 직접.
 	if (AD1BomberCharacter* OwnerBC = GetOwner<AD1BomberCharacter>())
@@ -168,7 +165,7 @@ void AD1Bomb::TriggerChainDetonation()
 
 void AD1Bomb::ChainDetonateBombs(const TArray<FIntPoint>& Cells)
 {
-	// 폭발 십자에 걸린 다른 폭탄 체인 점화. (블록 셀은 Cells에 없으므로 블록 뒤 폭탄은 보호됨)
+	// 폭발 십자에 걸린 다른 폭탄 체인 점화.
 	const TSet<FIntPoint> CellSet(Cells);
 	for (TActorIterator<AD1Bomb> It(GetWorld()); It; ++It)
 	{

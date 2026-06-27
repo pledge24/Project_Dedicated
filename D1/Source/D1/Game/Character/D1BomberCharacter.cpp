@@ -27,9 +27,6 @@ AD1BomberCharacter::AD1BomberCharacter(const FObjectInitializer& ObjectInitializ
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	bIsInvulnerable = false;
-	bBlinkVisible = true;
-
 	// 탑다운: 컨트롤러 회전 안 씀, 이동이 캐릭터 방향을 결정.
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;

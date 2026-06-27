@@ -18,8 +18,6 @@ class AD1BomberPlayerState : public APlayerState
 	GENERATED_BODY()
 
 public:
-	AD1BomberPlayerState();
-
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	//~ 외부 API (서버 전용)
@@ -49,32 +47,32 @@ public:
 
 	//~ 복제 상태
 	UPROPERTY(ReplicatedUsing = OnRep_Lives, BlueprintReadOnly, Category = "Bomber")
-	int32 Lives;
+	int32 Lives = 3;
 
 	UPROPERTY(ReplicatedUsing = OnRep_bIsAlive, BlueprintReadOnly, Category = "Bomber")
-	bool bIsAlive;
+	bool bIsAlive = true;
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
-	int32 Placement;
+	int32 Placement = 0;
 
 	UPROPERTY(ReplicatedUsing = OnRep_PlayerSlotIndex, BlueprintReadOnly, Category = "Bomber")
-	int32 PlayerSlotIndex;
+	int32 PlayerSlotIndex = -1;
 
 	/** 폭발 범위(칸). 설치 시 폭탄에 stamp. Fire로 증가. */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Powerup")
-	int32 FirePower;
+	int32 FirePower = 2;
 
 	/** 동시 설치 가능 폭탄 수. Bomb로 증가. */
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Powerup")
-	int32 BombCapacity;
+	int32 BombCapacity = 1;
 
 	/** 이동속도 단계. Speed로 증가 → 캐릭터 MaxWalkSpeed에 반영. */
 	UPROPERTY(ReplicatedUsing = OnRep_SpeedLevel, BlueprintReadOnly, Category = "Bomber|Powerup")
-	int32 SpeedLevel;
+	int32 SpeedLevel = 0;
 
 	/** DS가 ?join= 토큰을 권위 roster로 해석해 설정. 결과 POST에 사용, 복제 안 함. */
 	UPROPERTY(BlueprintReadOnly, Category = "Bomber")
-	int64 BackendUserId;
+	int64 BackendUserId = 0;
 
 protected:
 	virtual void OnRep_PlayerName() override;

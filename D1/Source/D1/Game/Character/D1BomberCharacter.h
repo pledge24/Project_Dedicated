@@ -134,7 +134,7 @@ private:
 	float HitInvulnSec = 2.f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_Invulnerable, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
-	bool bIsInvulnerable;
+	bool bIsInvulnerable = false;
 
 	UPROPERTY(Replicated)
 	bool bStunned = false;
@@ -143,7 +143,7 @@ private:
 	FTimerHandle BlinkTimerHandle;
 	FTimerHandle DeathHideTimerHandle;
 	FTimerHandle StunTimerHandle;
-	bool bBlinkVisible;
+	bool bBlinkVisible = true;
 	bool bDeathHandled = false;
 
 	/** 재바인딩 시 중복 방지·이전 핸들러 제거용. */
