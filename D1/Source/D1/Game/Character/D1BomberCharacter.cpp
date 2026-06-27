@@ -32,6 +32,7 @@ AD1BomberCharacter::AD1BomberCharacter(const FObjectInitializer& ObjectInitializ
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
+	// 기본 이동 수치 설정.
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
 		Move->bOrientRotationToMovement = true;
@@ -176,7 +177,7 @@ void AD1BomberCharacter::HandleDeath()
 		Move->DisableMovement();
 	}
 
-	// 머리 위 이름표(Screen Space 위젯)는 SetVisibility로 꺼야 한다.
+	// 캐릭터 머리 위 NameTag 가림.
 	TArray<UWidgetComponent*> WidgetComps;
 	GetComponents<UWidgetComponent>(WidgetComps);
 	for (UWidgetComponent* WC : WidgetComps)

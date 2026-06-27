@@ -9,11 +9,10 @@
 #include "Kismet/KismetSystemLibrary.h"
 
 #include "Game/Character/D1BomberCharacter.h"
-#include "Framework/D1BomberGameMode.h"
 #include "Framework/D1BomberGameState.h"
 #include "Game/D1BomberGridLibrary.h"
-#include "Framework/D1BomberPlayerState.h"
 #include "Game/D1ExplosionFX.h"
+#include "Game/D1ExplosionHazard.h"
 #include "Game/D1SoftBlock.h"
 
 AD1Bomb::AD1Bomb()
@@ -133,11 +132,11 @@ void AD1Bomb::DoExplode()
 	TArray<FIntPoint> SoftBlockHits;
 	UD1BomberGridLibrary::TraceExplosionCells(GS, Origin, Range, Cells, SoftBlockHits);
 	
-	// 체인 격발 -> 소프트 블럭 파괴(이 Bomb의 폭발에 대해서만) -> 캐릭터에게 폭발 피해 적용 -> 폭발 이펙트 적용
+	// 체인 격발 -> 소프트 블럭 파괴(이 Bomb의 폭발에 대해서만) -> 지속 피해 위험 영역 스폰 -> 폭발 이펙트 적용
 	{
 		ChainDetonateBombs(Cells);
 		DestroySoftBlocks(SoftBlockHits);
-		ApplyExplosionDamage(Cells);
+		SpawnExplosionHazard(Cells);
 		MulticastOnExploded(Cells);
 	}
 
@@ -212,43 +211,26 @@ void AD1Bomb::DestroySoftBlocks(const TArray<FIntPoint>& SoftBlockHits)
 	}
 }
 
-void AD1Bomb::ApplyExplosionDamage(const TArray<FIntPoint>& Cells)
+void AD1Bomb::SpawnExplosionHazard(const TArray<FIntPoint>& Cells)
 {
-	AD1BomberGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AD1BomberGameMode>() : nullptr;
-
-	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
-	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
-
-	// 폭발 피격 박스: 셀보다 약간 작은 가로(45) + 캐릭터 높이(80).
-	const FVector HitExtent(45.f, 45.f, 80.f);
-
-	TSet<AD1BomberCharacter*> AlreadyHit;
-	for (const FIntPoint& Cell : Cells)
+	if (!HasAuthority() || Cells.Num() == 0)
 	{
-		const FVector Center = UD1BomberGridLibrary::CellToWorldCenter(Cell, UD1BomberGridLibrary::CellHalf);
-		TArray<AActor*> Found;
-		UKismetSystemLibrary::BoxOverlapActors(this, Center,
-			HitExtent,
-			ObjectTypes,
-			AD1BomberCharacter::StaticClass(),
-			TArray<AActor*>(),
-			Found);
+		return;
+	}
 
-		for (AActor* Hit : Found)
-		{
-			AD1BomberCharacter* BC = Cast<AD1BomberCharacter>(Hit);
-			if (!BC || AlreadyHit.Contains(BC))
-			{
-				continue;
-			}
-			AlreadyHit.Add(BC);
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
 
-			// 무적·생명·사망·경직은 전부 피해자가 결정. 공격자는 반환값으로 매치 통보만.
-			// (사망 정리는 PS의 OnAliveStateChanged 바인딩이 처리.)
-			if (BC->ReceiveExplosionHit() && GM)
-			{
-				GM->NotifyPlayerDied(BC->GetPlayerState<AD1BomberPlayerState>());
-			}
-		}
+	// 서버 전용 위험 액터가 불꽃 수명 동안 피해를 담당(즉시 1차 + 지속 스윕).
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	UClass* HazardClass = ExplosionHazardClass ? ExplosionHazardClass.Get() : AD1ExplosionHazard::StaticClass();
+	if (AD1ExplosionHazard* Hazard = World->SpawnActor<AD1ExplosionHazard>(HazardClass, GetActorLocation(), FRotator::ZeroRotator, Params))
+	{
+		Hazard->Initialize(Cells, ExplosionLingerDurationSec);
 	}
 }

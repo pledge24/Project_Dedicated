@@ -30,6 +30,7 @@ protected:
 	TObjectPtr<UStaticMeshComponent> MeshComp;
 
 private:
+	/** 비주얼 수명(초). 게임플레이 피해 지속 AD1Bomb::ExplosionLingerDurationSec과 동일하게 유지. */
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
 	float Lifetime = 0.5f;
 

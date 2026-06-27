@@ -7,6 +7,7 @@
 #include "D1Bomb.generated.h"
 
 class AD1ExplosionFX;
+class AD1ExplosionHazard;
 class UBoxComponent;
 class UStaticMeshComponent;
 
@@ -51,11 +52,15 @@ protected:
 private:
 	void ChainDetonateBombs(const TArray<FIntPoint>& Cells);
 	void DestroySoftBlocks(const TArray<FIntPoint>& SoftBlockHits);
-	void ApplyExplosionDamage(const TArray<FIntPoint>& Cells);
+	void SpawnExplosionHazard(const TArray<FIntPoint>& Cells);
 
 	/** 폭발 셀마다 스폰하는 FX 액터. 미지정 시 C++ 클래스로 폴백. */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	TSubclassOf<AD1ExplosionFX> ExplosionFXClass;
+
+	/** 폭발 지속 피해용 서버 전용 위험 액터. 미지정 시 C++ 클래스로 폴백. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
+	TSubclassOf<AD1ExplosionHazard> ExplosionHazardClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	int32 Range = 2;
@@ -66,6 +71,10 @@ private:
 	/** 다른 폭탄에 휘말렸을 때 체인 폭발까지의 지연(초). */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	float ChainDetonationDelay = 0.05f;
+
+	/** 폭발 불꽃이 피해를 주는 지속 시간(초). 비주얼 AD1ExplosionFX::Lifetime 이하로 유지. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
+	float ExplosionLingerDurationSec = 0.5f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_DetonationServerTime, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	float DetonationServerTime = 0.f;
