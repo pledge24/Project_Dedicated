@@ -59,6 +59,24 @@ void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)
 	OnRep_PlayerSlotIndex(); // Listen Server 대응
 }
 
+void AD1BomberPlayerState::SetPlacement(int32 NewPlacement)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	Placement = NewPlacement;
+}
+
+void AD1BomberPlayerState::SetBackendUserId(int64 NewUserId)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	BackendUserId = NewUserId;
+}
+
 void AD1BomberPlayerState::AddFirePower(int32 Delta)
 {
 	if (!HasAuthority())

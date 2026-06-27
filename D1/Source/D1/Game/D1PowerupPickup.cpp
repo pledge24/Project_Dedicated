@@ -99,7 +99,7 @@ void AD1PowerupPickup::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComp,
 	}
 
 	AD1BomberPlayerState* PS = BC->GetPlayerState<AD1BomberPlayerState>();
-	if (!PS || !PS->bIsAlive)
+	if (!PS || !PS->IsAlive())
 	{
 		return;
 	}

@@ -33,17 +33,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoMove(float Right, float Forward);
 
-	bool IsInvulnerable() const { return bIsInvulnerable; }
-	float GetHitInvulnSec() const { return HitInvulnSec; }
+	/** 서버 전용: 폭발 피격 진입점. 무적 무시·생명 차감·비치명 시 무적/경직 부여를
+	 *  모두 피해자가 소유. 이 피격으로 사망 시 true 반환(공격자가 매치 통보에 사용). */
+	bool ReceiveExplosionHit();
 
 	/** 사망 시 메시/콜리전/이동 정리. 서버·클라 양쪽서 호출돼도 안전. */
 	void HandleDeath();
-
-	//~ 서버 전용
-	void StartInvulnerability(float Duration);
-
-	/** 서버 전용: 피격 경직 시작. StunDuration 동안 입력 차단. */
-	void ApplyHitStun();
 
 	void NotifyBombDestroyed(AD1Bomb* Bomb);
 	void AddIgnoredBomb(AD1Bomb* Bomb);
@@ -88,7 +83,13 @@ private:
 
 	void UpdateIgnoredBombs();
 	void TickBlink();
+
+	/** 서버 전용: 비치명 피격 후 무적 시작. Duration 뒤 EndInvulnerability. */
+	void StartInvulnerability(float Duration);
 	void EndInvulnerability();
+
+	/** 서버 전용: 피격 경직 시작. StunDuration 동안 입력 차단. */
+	void ApplyHitStun();
 
 	/** 경직 해제. 타이머 콜백(서버). */
 	void EndStun();

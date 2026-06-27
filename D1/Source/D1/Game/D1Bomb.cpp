@@ -8,7 +8,6 @@
 #include "Net/UnrealNetwork.h"
 #include "Kismet/KismetSystemLibrary.h"
 
-#include "Core/D1LogChannels.h"
 #include "Game/Character/D1BomberCharacter.h"
 #include "Framework/D1BomberGameMode.h"
 #include "Framework/D1BomberGameState.h"
@@ -244,35 +243,11 @@ void AD1Bomb::ApplyExplosionDamage(const TArray<FIntPoint>& Cells)
 			}
 			AlreadyHit.Add(BC);
 
-			if (BC->IsInvulnerable())
+			// 무적·생명·사망·경직은 전부 피해자가 결정. 공격자는 반환값으로 매치 통보만.
+			// (사망 정리는 PS의 OnAliveStateChanged 바인딩이 처리.)
+			if (BC->ReceiveExplosionHit() && GM)
 			{
-				UE_LOG(LogD1, Log, TEXT("Bomb hit (invul ignored): %s"), *BC->GetName());
-				continue;
-			}
-
-			AD1BomberPlayerState* PS = BC->GetPlayerState<AD1BomberPlayerState>();
-			if (!PS || !PS->bIsAlive)
-			{
-				continue;
-			}
-
-			const bool bKilled = PS->ApplyHit();
-			UE_LOG(LogD1, Log, TEXT("Bomb hit: %s Lives=%d killed=%d"),
-				*BC->GetName(), PS->Lives, bKilled ? 1 : 0);
-
-			if (bKilled)
-			{
-				// 캐릭터 사망 정리는 PS의 OnAliveStateChanged 바인딩이 처리.
-				// (서버 측은 ApplyHit가 OnRep_bIsAlive를 수동 호출해 델리게이트가 즉시 발화.)
-				if (GM)
-				{
-					GM->NotifyPlayerDied(PS);
-				}
-			}
-			else
-			{
-				BC->StartInvulnerability(BC->GetHitInvulnSec());
-				BC->ApplyHitStun();
+				GM->NotifyPlayerDied(BC->GetPlayerState<AD1BomberPlayerState>());
 			}
 		}
 	}

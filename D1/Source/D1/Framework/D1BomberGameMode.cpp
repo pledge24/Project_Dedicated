@@ -147,7 +147,7 @@ FString AD1BomberGameMode::InitNewPlayer(APlayerController* NewPlayerController,
 		{
 			if (const FD1JoinEntry* Entry = JoinRoster.Find(JoinToken))
 			{
-				PS->BackendUserId = Entry->UserId;
+				PS->SetBackendUserId(Entry->UserId);
 				UE_LOG(LogD1, Log, TEXT("[Match] InitNewPlayer %s userId=%lld (roster)"),
 					*PS->GetPlayerName(), Entry->UserId);
 			}
@@ -264,13 +264,13 @@ void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 
 	EnsureAliveListInitialized();
 
-	if (DeadPS->Placement <= 0)
+	if (DeadPS->GetPlacement() <= 0)
 	{
 		// 등수 = 죽는 시점의 생존자 수(자기 포함).
-		DeadPS->Placement = AlivePlayerStates.Num();
+		DeadPS->SetPlacement(AlivePlayerStates.Num());
 		AlivePlayerStates.Remove(DeadPS);
 		UE_LOG(LogD1, Log, TEXT("Player died: %s Placement=%d Remaining=%d"),
-			*DeadPS->GetPlayerName(), DeadPS->Placement, AlivePlayerStates.Num());
+			*DeadPS->GetPlayerName(), DeadPS->GetPlacement(), AlivePlayerStates.Num());
 	}
 
 	if (AlivePlayerStates.Num() <= 1)
@@ -338,7 +338,7 @@ void AD1BomberGameMode::EnsureAliveListInitialized()
 			{
 				// ApplyHit가 NotifyPlayerDied보다 먼저 bIsAlive를 꺼서, 첫 사망자가
 				// 누락되면 등수가 1 모자람. 미랭크(Placement<=0) 기준으로 전원 포함.
-				if (B->Placement <= 0)
+				if (B->GetPlacement() <= 0)
 				{
 					AlivePlayerStates.Add(B);
 				}
@@ -355,9 +355,9 @@ void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomb
 	}
 	bMatchEnded = true;
 
-	if (WinnerPS && WinnerPS->Placement <= 0)
+	if (WinnerPS && WinnerPS->GetPlacement() <= 0)
 	{
-		WinnerPS->Placement = 1;
+		WinnerPS->SetPlacement(1);
 	}
 
 	AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
@@ -369,7 +369,7 @@ void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomb
 	UE_LOG(LogD1, Log, TEXT("Match ended (%s). Winner=%s (Placement=%d)"),
 		EndReasonToString(Reason),
 		WinnerPS ? *WinnerPS->GetPlayerName() : TEXT("(none)"),
-		WinnerPS ? WinnerPS->Placement : 0);
+		WinnerPS ? WinnerPS->GetPlacement() : 0);
 
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 	{
@@ -394,23 +394,23 @@ void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomb
 		if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
 		{
 			// 미배정 생존자(시간 만료/무승부)는 공동 1위로 보정 — 백엔드는 placement 1~N만 허용.
-			if (B->Placement <= 0)
+			if (B->GetPlacement() <= 0)
 			{
-				B->Placement = 1;
+				B->SetPlacement(1);
 			}
 
 			FD1MatchResultEntry Entry;
-			Entry.Placement = B->Placement;
+			Entry.Placement = B->GetPlacement();
 			Entry.Nickname  = B->GetPlayerName();
-			Entry.SlotIndex = B->PlayerSlotIndex;
-			Entry.LivesLeft = B->Lives;
+			Entry.SlotIndex = B->GetPlayerSlotIndex();
+			Entry.LivesLeft = B->GetLives();
 			Entries.Add(Entry);
 
 			FMatchResultPlayer RP;
-			RP.UserId    = B->BackendUserId;
-			RP.SlotIndex = B->PlayerSlotIndex;
-			RP.Placement = B->Placement;
-			RP.LivesLeft = B->Lives;
+			RP.UserId    = B->GetBackendUserId();
+			RP.SlotIndex = B->GetPlayerSlotIndex();
+			RP.Placement = B->GetPlacement();
+			RP.LivesLeft = B->GetLives();
 			ResultPlayers.Add(RP);
 		}
 	}

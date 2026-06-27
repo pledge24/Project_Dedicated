@@ -132,6 +132,32 @@ void AD1BomberCharacter::DoMove(float Right, float Forward)
 	}
 }
 
+bool AD1BomberCharacter::ReceiveExplosionHit()
+{
+	if (!HasAuthority() || bIsInvulnerable)
+	{
+		return false;
+	}
+
+	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
+	if (!PS || !PS->IsAlive())
+	{
+		return false;
+	}
+
+	const bool bKilled = PS->ApplyHit();
+	UE_LOG(LogD1, Log, TEXT("Explosion hit: %s Lives=%d killed=%d"),
+		*GetName(), PS->GetLives(), bKilled ? 1 : 0);
+
+	if (!bKilled)
+	{
+		StartInvulnerability(HitInvulnSec);
+		ApplyHitStun();
+	}
+	// 사망 시 캐릭터 정리는 PS->OnAliveStateChanged → HandleDeath가 처리.
+	return bKilled;
+}
+
 void AD1BomberCharacter::HandleDeath()
 {
 	if (bDeathHandled)
@@ -189,29 +215,6 @@ void AD1BomberCharacter::HandleDeath()
 		&AD1BomberCharacter::FinishDeath, HideAfter, false);
 }
 
-void AD1BomberCharacter::StartInvulnerability(float Duration)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-	bIsInvulnerable = true;
-	GetWorldTimerManager().SetTimer(InvulnTimerHandle, this,
-		&AD1BomberCharacter::EndInvulnerability, Duration, false);
-	OnRep_Invulnerable();
-}
-
-void AD1BomberCharacter::ApplyHitStun()
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-	bStunned = true;
-	GetWorldTimerManager().SetTimer(StunTimerHandle, this,
-		&AD1BomberCharacter::EndStun, StunDuration, false);
-}
-
 void AD1BomberCharacter::NotifyBombDestroyed(AD1Bomb* Bomb)
 {
 	// 폭탄이 터지면서 호출 — 소유자 슬롯 회수.
@@ -256,7 +259,7 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 	}
 
 	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
-	const int32 BombCap = PS ? PS->BombCapacity : 1;
+	const int32 BombCap = PS ? PS->GetBombCapacity() : 1;
 	if (GetActiveBombCount() >= BombCap)
 	{
 		return;
@@ -273,7 +276,7 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 		return;
 	}
 
-	if (PS && !PS->bIsAlive)
+	if (PS && !PS->IsAlive())
 	{
 		return;
 	}
@@ -316,7 +319,7 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 
 	if (PS)
 	{
-		Bomb->SetRange(PS->FirePower);
+		Bomb->SetRange(PS->GetFirePower());
 	}
 	ActiveBombs.Add(Bomb);
 	// 폭탄이 BeginPlay에서 겹친 캐릭터(소유자 포함)를 모두 IgnoredBombs에 등록함.
@@ -354,7 +357,7 @@ void AD1BomberCharacter::OnRep_Invulnerable()
 void AD1BomberCharacter::OnPlayerAliveStateChanged()
 {
 	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
-	if (PS && !PS->bIsAlive)
+	if (PS && !PS->IsAlive())
 	{
 		HandleDeath();
 	}
@@ -379,7 +382,7 @@ void AD1BomberCharacter::OnSpeedLevelChanged()
 	}
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
-		Move->MaxWalkSpeed = BaseWalkSpeed + PS->SpeedLevel * SpeedStep;
+		Move->MaxWalkSpeed = BaseWalkSpeed + PS->GetSpeedLevel() * SpeedStep;
 	}
 }
 
@@ -431,7 +434,7 @@ void AD1BomberCharacter::RefreshPlayerStateBinding()
 	}
 
 	// 늦게 합류한 클라가 이미 사망 상태를 받았을 때 즉시 반영.
-	if (!PS->bIsAlive)
+	if (!PS->IsAlive())
 	{
 		OnPlayerAliveStateChanged();
 	}
@@ -494,6 +497,18 @@ void AD1BomberCharacter::TickBlink()
 	}
 }
 
+void AD1BomberCharacter::StartInvulnerability(float Duration)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	bIsInvulnerable = true;
+	GetWorldTimerManager().SetTimer(InvulnTimerHandle, this,
+		&AD1BomberCharacter::EndInvulnerability, Duration, false);
+	OnRep_Invulnerable();
+}
+
 void AD1BomberCharacter::EndInvulnerability()
 {
 	if (!HasAuthority())
@@ -502,6 +517,17 @@ void AD1BomberCharacter::EndInvulnerability()
 	}
 	bIsInvulnerable = false;
 	OnRep_Invulnerable();
+}
+
+void AD1BomberCharacter::ApplyHitStun()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	bStunned = true;
+	GetWorldTimerManager().SetTimer(StunTimerHandle, this,
+		&AD1BomberCharacter::EndStun, StunDuration, false);
 }
 
 void AD1BomberCharacter::EndStun()

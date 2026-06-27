@@ -84,7 +84,7 @@ TArray<AD1BomberPlayerState*> AD1BomberGameState::GetPlayerStatesBySlot() const
 		{
 			continue;
 		}
-		const int32 Idx = BomberPS->PlayerSlotIndex;
+		const int32 Idx = BomberPS->GetPlayerSlotIndex();
 		if (BySlot.IsValidIndex(Idx))
 		{
 			BySlot[Idx] = BomberPS;
