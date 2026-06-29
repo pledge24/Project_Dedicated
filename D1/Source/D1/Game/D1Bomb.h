@@ -11,10 +11,14 @@ class AD1ExplosionHazard;
 class UBoxComponent;
 class UStaticMeshComponent;
 
-/** 폭탄 클래스. 사용한 단어 헷갈리지 말 것.
- * Fuse(도화선 카운트다운) 
- * Detonation(격발 시점·연쇄 트리거) 
- * Explosion(십자 폭발 효과·피해·FX). */
+/** 폭탄 생애 단계(서버 전용 상태). */
+enum class ED1BombState : uint8
+{
+	Fusing,      // 도화선 카운트다운 중
+	Detonating,  // 체인 격발 예약됨(짧은 지연 대기)
+	Exploding,   // 폭발 처리 시작됨(곧 Destroy)
+};
+
 UCLASS()
 class AD1Bomb : public AActor
 {
@@ -81,6 +85,5 @@ private:
 
 	FTimerHandle FuseTimerHandle;
 
-	bool bIsExploding = false;
-	bool bChainScheduled = false;
+	ED1BombState State = ED1BombState::Fusing;
 };
