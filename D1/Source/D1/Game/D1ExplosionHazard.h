@@ -17,7 +17,6 @@ class AD1ExplosionHazard : public AActor
 public:
 	AD1ExplosionHazard();
 
-	/** 서버 전용: 셀 목록·지속시간으로 위험 영역 가동(즉시 1차 스윕 + 반복 타이머). */
 	void Initialize(const TArray<FIntPoint>& InCells, float InDurationSec);
 
 protected:

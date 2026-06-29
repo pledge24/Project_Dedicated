@@ -12,6 +12,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "Net/UnrealNetwork.h"
 
 #include "Core/D1LogChannels.h"
@@ -27,7 +28,7 @@ AD1BomberCharacter::AD1BomberCharacter(const FObjectInitializer& ObjectInitializ
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// 탑다운: 컨트롤러 회전 안 씀, 이동이 캐릭터 방향을 결정.
+	// 컨트롤러 회전 안 씀, 이동이 캐릭터 방향을 결정.
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
@@ -133,17 +134,17 @@ void AD1BomberCharacter::DoMove(float Right, float Forward)
 	}
 }
 
-bool AD1BomberCharacter::ReceiveExplosionHit()
+void AD1BomberCharacter::ReceiveExplosionHit()
 {
 	if (!HasAuthority() || bIsInvulnerable)
 	{
-		return false;
+		return;
 	}
 
 	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
 	if (!PS || !PS->IsAlive())
 	{
-		return false;
+		return;
 	}
 
 	const bool bKilled = PS->ApplyHit();
@@ -155,8 +156,6 @@ bool AD1BomberCharacter::ReceiveExplosionHit()
 		StartInvulnerability(HitInvulnSec);
 		ApplyHitStun();
 	}
-	// 사망 시 캐릭터 정리는 PS->OnAliveStateChanged → HandleDeath가 처리.
-	return bKilled;
 }
 
 void AD1BomberCharacter::HandleDeath()
@@ -177,7 +176,7 @@ void AD1BomberCharacter::HandleDeath()
 		Move->DisableMovement();
 	}
 
-	// 캐릭터 머리 위 NameTag 가림.
+	// 캐릭터 머리 위 NameTag 처리.
 	TArray<UWidgetComponent*> WidgetComps;
 	GetComponents<UWidgetComponent>(WidgetComps);
 	for (UWidgetComponent* WC : WidgetComps)
@@ -185,35 +184,37 @@ void AD1BomberCharacter::HandleDeath()
 		WC->SetVisibility(false);
 	}
 
-	// 무적 타이머 중단 — 죽은 뒤 EndInvulnerability가 메시를 다시 켜는 사고 방지.
+	// 무적 연출은 미리 클리어해둔다.
 	GetWorldTimerManager().ClearTimer(InvulnTimerHandle);
 
-	// 사망 연출: 피격처럼 깜빡이게 하고 사망 몽타주 재생.
-	bBlinkVisible = true;
-	if (USkeletalMeshComponent* SK = GetMesh())
+	// 사망 연출: 깜빡임 연출 + 사망 몽타주 재생.
 	{
-		SK->SetVisibility(true);
-	}
-	GetWorldTimerManager().SetTimer(BlinkTimerHandle, this,
-		&AD1BomberCharacter::TickBlink, 0.1f, true);
-
-	// 몽타주는 각 인스턴스에서 로컬 재생(HandleDeath가 서버·클라 양쪽에서 불림 → RPC 불필요).
-	float HideAfter = DeathHideDelay;
-	if (DeathMontage)
-	{
-		if (UAnimInstance* AnimInst = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+		bBlinkVisible = true;
+		if (USkeletalMeshComponent* SK = GetMesh())
 		{
-			const float MontageLen = AnimInst->Montage_Play(DeathMontage);
-			if (MontageLen > 0.f)
+			SK->SetVisibility(true);
+		}
+		GetWorldTimerManager().SetTimer(BlinkTimerHandle, this,
+			&AD1BomberCharacter::TickBlink, 0.1f, true);
+
+		// 몽타주는 각 인스턴스에서 로컬 재생(HandleDeath가 서버·클라 양쪽에서 불림 → RPC 불필요).
+		float HideAfter = DeathHideDelay;
+		if (DeathMontage)
+		{
+			if (UAnimInstance* AnimInst = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
 			{
-				HideAfter = MontageLen + DeathHideDelay;
+				const float MontageLen = AnimInst->Montage_Play(DeathMontage);
+				if (MontageLen > 0.f)
+				{
+					HideAfter = MontageLen + DeathHideDelay;
+				}
 			}
 		}
-	}
 
-	// 사망 애니 종료 + 딜레이 후 메시 숨김.
-	GetWorldTimerManager().SetTimer(DeathHideTimerHandle, this,
-		&AD1BomberCharacter::FinishDeath, HideAfter, false);
+		// 사망 애니 종료 + 딜레이 후 메시 숨김.
+		GetWorldTimerManager().SetTimer(DeathHideTimerHandle, this,
+			&AD1BomberCharacter::FinishDeath, HideAfter, false);
+	}
 }
 
 void AD1BomberCharacter::NotifyBombDestroyed(AD1Bomb* Bomb)
@@ -236,15 +237,35 @@ void AD1BomberCharacter::NotifyBombDestroyed(AD1Bomb* Bomb)
 
 void AD1BomberCharacter::AddIgnoredBomb(AD1Bomb* Bomb)
 {
-	// 서버 전용: 겹친 폭탄 등록 — 같은 셀 동안 통과, 벗어나면 Tick 정리에서 차단 복원.
 	if (!Bomb)
 	{
 		return;
 	}
+	
 	IgnoredBombs.Add(Bomb);
 	if (UCapsuleComponent* Cap = GetCapsuleComponent())
 	{
 		Cap->IgnoreActorWhenMoving(Bomb, true);
+	}
+}
+
+void AD1BomberCharacter::OverlapBomberCharacters(const UObject* WorldContext, const FVector& Center, const FVector& Extent, TArray<AD1BomberCharacter*>& OutChars)
+{
+	OutChars.Reset();
+
+	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
+	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
+
+	TArray<AActor*> Found;
+	UKismetSystemLibrary::BoxOverlapActors(WorldContext, Center, Extent, ObjectTypes,
+		AD1BomberCharacter::StaticClass(), TArray<AActor*>(), Found);
+
+	for (AActor* A : Found)
+	{
+		if (AD1BomberCharacter* BC = Cast<AD1BomberCharacter>(A))
+		{
+			OutChars.Add(BC);
+		}
 	}
 }
 
@@ -292,11 +313,9 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 		return;
 	}
 
-	// 한 셀에 폭탄 하나 룰 — 월드 전역 폭탄 검사. (캐릭터 충돌이 꺼져 같은 셀에
-	// 두 명이 설 수 있어, 자기 슬롯만 보면 두 폭탄이 겹친다.)
-	for (TActorIterator<AD1Bomb> It(GetWorld()); It; ++It)
+	// 월드 폭탄 전역 검사해서 동일한 셀에 중복 설치 방지.
+	for (const AD1Bomb* Existing : TActorRange<AD1Bomb>(GetWorld()))
 	{
-		const AD1Bomb* Existing = *It;
 		if (!IsValid(Existing))
 		{
 			continue;
@@ -307,6 +326,7 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 		}
 	}
 
+	// 폭탄 설치 진행.
 	const FVector SpawnLoc = UD1BomberGridLibrary::CellToWorldCenter(Cell, UD1BomberGridLibrary::CellHalf);
 	FActorSpawnParameters Params;
 	Params.Owner = this;

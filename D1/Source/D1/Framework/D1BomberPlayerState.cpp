@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Framework/D1BomberPlayerState.h"
+#include "Framework/D1BomberGameMode.h"
 #include "Framework/D1BomberGameState.h"
 #include "Net/UnrealNetwork.h"
 
@@ -39,6 +40,12 @@ bool AD1BomberPlayerState::ApplyHit()
 	{
 		bIsAlive = false;
 		OnRep_bIsAlive(); // Listen Server 대응
+
+		// 사망 전환의 매치 처리(등수·승패)는 상태 주인인 PS가 직접 GM에 보고.
+		if (AD1BomberGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AD1BomberGameMode>() : nullptr)
+		{
+			GM->NotifyPlayerDied(this);
+		}
 		return true;
 	}
 	return false;
