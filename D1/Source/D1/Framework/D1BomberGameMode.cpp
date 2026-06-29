@@ -175,18 +175,10 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 	// 비복원(미사용만 후보)이라 한 매치의 슬롯 0~3은 항상 유일 → DB UNIQUE(match,slot)와 안전.
 	TArray<AActor*> FreeStarts;
 	FreeStarts.Reserve(AllStarts.Num());
+	// 미사용 Start만 후보로. (UsedStarts는 위에서 invalid 제거됨 → Contains 안전)
 	for (AActor* Start : AllStarts)
 	{
-		bool bAlreadyUsed = false;
-		for (const TWeakObjectPtr<AActor>& Used : UsedStarts)
-		{
-			if (Used.Get() == Start)
-			{
-				bAlreadyUsed = true;
-				break;
-			}
-		}
-		if (!bAlreadyUsed)
+		if (!UsedStarts.Contains(Start))
 		{
 			FreeStarts.Add(Start);
 		}
@@ -217,7 +209,7 @@ void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 	Super::PostLogin(NewPlayer);
 
 	// 이미 시작했거나 게이트 비활성(PIE·솔로)이면 시작 게이트 카운트 생략.
-	if (bMatchStarted || ExpectedPlayerCount <= 1)
+	if (HasMatchStarted() || ExpectedPlayerCount <= 1)
 	{
 		return;
 	}
@@ -257,7 +249,7 @@ void AD1BomberGameMode::Logout(AController* Exiting)
 
 void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 {
-	if (bMatchEnded || !DeadPS)
+	if (IsMatchEnded() || !DeadPS)
 	{
 		return;
 	}
@@ -283,11 +275,10 @@ void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 
 void AD1BomberGameMode::StartMatch()
 {
-	if (bMatchStarted)
+	if (HasMatchStarted())
 	{
 		return;
 	}
-	bMatchStarted = true;
 	GetWorldTimerManager().ClearTimer(WaitForPlayersTimerHandle);
 
 	if (AD1BomberGameState* BomberGS = GetGameState<AD1BomberGameState>())
@@ -305,7 +296,7 @@ void AD1BomberGameMode::StartMatch()
 
 void AD1BomberGameMode::OnWaitForPlayersTimeout()
 {
-	if (bMatchStarted)
+	if (HasMatchStarted())
 	{
 		return;
 	}
@@ -315,7 +306,7 @@ void AD1BomberGameMode::OnWaitForPlayersTimeout()
 
 void AD1BomberGameMode::OnMatchTimeExpired()
 {
-	if (bMatchEnded)
+	if (IsMatchEnded())
 	{
 		return;
 	}
@@ -349,11 +340,10 @@ void AD1BomberGameMode::EnsureAliveListInitialized()
 
 void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason)
 {
-	if (bMatchEnded)
+	if (IsMatchEnded())
 	{
 		return;
 	}
-	bMatchEnded = true;
 
 	if (WinnerPS && WinnerPS->GetPlacement() <= 0)
 	{
@@ -443,4 +433,16 @@ void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomb
 	{
 		DS->BeginShutdownWatch(ShutdownGraceSec);
 	}
+}
+
+bool AD1BomberGameMode::HasMatchStarted() const
+{
+	const AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
+	return GS && GS->MatchPhase != EBomberMatchPhase::Waiting;
+}
+
+bool AD1BomberGameMode::IsMatchEnded() const
+{
+	const AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
+	return GS && GS->MatchPhase == EBomberMatchPhase::Finished;
 }

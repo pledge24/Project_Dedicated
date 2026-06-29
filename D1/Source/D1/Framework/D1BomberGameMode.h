@@ -57,6 +57,10 @@ private:
 
 	void EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason);
 
+	/** 매치 생애 질의 — GameState의 MatchPhase 단일 출처. */
+	bool HasMatchStarted() const;
+	bool IsMatchEnded() const;
+
 	/** 빌드할 맵 데이터. -MapData= 로 오버라이드 가능. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UD1MapData> MapData;
@@ -99,9 +103,6 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<AD1BomberPlayerState>> AlivePlayerStates;
-
-	bool bMatchEnded = false;
-	bool bMatchStarted = false;
 
 	FTimerHandle MatchTimerHandle;
 	FTimerHandle WaitForPlayersTimerHandle;
