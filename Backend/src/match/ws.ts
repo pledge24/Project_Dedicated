@@ -14,10 +14,10 @@ import * as jwtUtil from '../common/jwt.js';
 import { logger } from '../common/logger.js';
 import type { AuthedUser } from '../common/types.js';
 import * as ds from './ds.js';
+import * as service from './match.service.js';
 import type { ClientMessage, ServerMessage, ServerMessageType } from './protocol.js';
 import type { MatchGroup } from './queue.js';
 import * as roster from './roster.js';
-import * as service from './service.js';
 
 const WS_PATH = '/ws/match';
 
@@ -34,6 +34,7 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
 {
     const wss = new WebSocketServer({ noServer: true });
 
+    /** upgrade 이벤트(클라가 요청) 핸들 함수 추가 */
     server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) =>
     {
         const { pathname } = new URL(req.url ?? '', 'http://localhost');
@@ -44,8 +45,11 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
             return;
         }
 
+        /** socket error 이벤트에 핸들링 함수를 추가했다 삭제하는 이유는
+         *  인증 도중 error 발생 시, 핸들링 해줄 함수가 없기 때문.
+         *  그래서 임시용으로 추가했다 삭제하는 것.
+        */
         socket.on('error', onSocketError);
-
         const user = authenticate(req);
         if (!user)
         {
@@ -54,14 +58,16 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
 
             return;
         }
-
         socket.removeListener('error', onSocketError);
+
         wss.handleUpgrade(req, socket, head, (ws) =>
         {
+            // 해당 emit은 클라이언트를 향하지 않음. 바로 아래 있는 wss.on('connection')을 향한다.
             wss.emit('connection', ws, req, user);
         });
     });
 
+    /** 연결 이벤트(이 서버가 요청) 핸들 함수 추가 */
     wss.on('connection', (ws: WebSocket, _req: IncomingMessage, user: AuthedUser) => onConnection(wss, ws, user));
 
     // 죽은 연결 감지 — heartbeat 주기마다 pong 못 받은 소켓은 terminate.
@@ -69,18 +75,19 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
     {
         for (const client of wss.clients)
         {
-            const aws = client as AuthedWs;
-            if (!aws.isAlive)
+            const newSocket = client as AuthedWs;
+            if (!newSocket.isAlive)
             {
-                aws.terminate();
+                newSocket.terminate();
                 continue;
             }
-            aws.isAlive = false;
-            aws.ping();
+            newSocket.isAlive = false;
+            newSocket.ping();
         }
     }, config.match.heartbeatMs);
     heartbeat.unref();
 
+    // 매치 인터벌 타이머 설정.
     const cycle = setInterval(runMatchCycle, config.match.cycleMs);
     cycle.unref();
 
@@ -155,6 +162,7 @@ async function onMessage(ws: AuthedWs, raw: RawData): Promise<void>
         return;
     }
 
+    /** 메세지 처리 */
     try
     {
         switch (msg.type)
@@ -192,40 +200,44 @@ async function onMessage(ws: AuthedWs, raw: RawData): Promise<void>
 
 function onConnection(wss: WebSocketServer, ws: WebSocket, user: AuthedUser): void
 {
-    const aws = ws as AuthedWs;
-    aws.userId = user.userId;
-    aws.nickname = user.nickname;
-    aws.isAlive = true;
+    const newSocket = ws as AuthedWs;
+    newSocket.userId = user.userId;
+    newSocket.nickname = user.nickname;
+    newSocket.isAlive = true;
 
     // 같은 userId의 기존 소켓 정리(중복 탭/재연결) — 한 유저 한 자리 보장.
     for (const other of wss.clients)
     {
         const o = other as AuthedWs;
-        if (o !== aws && o.userId === user.userId)
+        if (o !== newSocket && o.userId === user.userId)
         {
             service.leave(user.userId);
             o.terminate();
         }
     }
 
-    aws.on('pong', () =>
+    newSocket.on('pong', () =>
     {
-        aws.isAlive = true;
+        newSocket.isAlive = true;
     });
 
-    aws.on('message', (raw) =>
+    newSocket.on('message', (raw) =>
     {
-        void onMessage(aws, raw);
+        void onMessage(newSocket, raw);
     });
 
-    aws.on('close', () =>
+    newSocket.on('close', () =>
     {
-        const removed = service.leave(aws.userId);
-        logger.info({ userId: aws.userId, removed }, 'WS 종료 — 큐에서 제거');
+        const removed = service.leave(newSocket.userId);
+        logger.info({ userId: newSocket.userId, removed }, 'WS 종료 — 큐에서 제거');
     });
-    aws.on('error', (err) => logger.warn({ err, userId: aws.userId }, 'WS 에러'));
 
-    logger.info({ userId: aws.userId }, 'WS 연결 수립');
+    newSocket.on('error', (err) =>
+    {
+        logger.warn({ err, userId: newSocket.userId }, 'WS 에러')
+    });
+
+    logger.info({ userId: newSocket.userId }, 'WS 연결 수립');
 }
 
 /** 1초 사이클: 매칭 시도 → 성사 그룹마다 DS 할당+푸시(비동기). */
@@ -243,10 +255,8 @@ function runMatchCycle(): void
 async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
 {
     const matchId = randomUUID();
-    // DS 결과 보고 인증용 매치별 서버 토큰. DS spawn에 주입되며, 클라엔 보내지 않는다.
+    // DS 결과 보고 인증용 매치별 서버 토큰. 새로 spawn하는 DS에게 커맨드라인으로 넘겨준다.
     const serverToken = randomBytes(24).toString('base64url');
-
-    // per-player 입장 토큰(권위 신원용). 클라는 본인 토큰만 받고, DS는 roster로 신원 확정. 좌석은 DS가 랜덤 배정.
     const joinPlayers = group.entries.map((e) => ({
         ref: e.ref,
         userId: e.userId,
@@ -255,6 +265,8 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     }));
 
     let server: { host: string; port: number };
+
+    /** 매치를 실행할 DS를 Spawn */
     try
     {
         server = config.match.ds.enabled

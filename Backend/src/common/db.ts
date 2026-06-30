@@ -43,7 +43,7 @@ export async function queryOne<T extends RowDataPacket>(sql: string, params?: Ex
     return rows.length ? rows[0] : null;
 }
 
-/** 트랜잭션 경계 헬퍼 — begin→fn→commit, 실패 시 rollback, 항상 release. */
+/** 트랜잭션 헬퍼 — begin→fn→commit, 실패 시 rollback, 항상 release. */
 export async function withTransaction<T>(fn: (conn: PoolConnection) => Promise<T>): Promise<T>
 {
     const conn = await getPool().getConnection();
@@ -66,7 +66,7 @@ export async function withTransaction<T>(fn: (conn: PoolConnection) => Promise<T
     }
 }
 
-/** 레디니스 프로브용 — 풀에서 커넥션 받아 ping 후 반환. 실패 시 throw. */
+/** readiness prove용 — 풀에서 커넥션 받아 ping 후 반환. 실패 시 throw. */
 export async function pingDb(): Promise<void>
 {
     const conn = await getPool().getConnection();

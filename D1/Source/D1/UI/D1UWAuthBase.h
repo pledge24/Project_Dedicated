@@ -13,7 +13,7 @@ class UTextBlock;
 struct FBackendResponse;
 
 /**
- *  로그인/회원가입 공용 베이스.
+ *  로그인/회원가입 공용 베이스 클래스(상속 전용).
  *  요청 잠금/해제, 에러 텍스트 표시를 한 곳에서.
  *  자식 위젯은 NativeConstruct에서 버튼 OnClicked 바인딩만 하면 된다.
  */
@@ -26,17 +26,19 @@ protected:
 	//~ UUserWidget
 	virtual void NativeConstruct() override;
 
-	/** 통신 시작 — 에러 텍스트 숨김. 자식이 자기 버튼 비활성화. */
+	/** 요청 시작전 처리 — 에러 텍스트 숨김. 자식이 자기 버튼 비활성화. */
 	UFUNCTION(BlueprintCallable, Category = "Auth")
 	void BeginRequest();
 
-	/** 응답 도착 — 실패 시 에러 텍스트 표시. */
+	/** 요청 종료(Res 수신)전 처리 — 실패 시 에러 텍스트 표시. */
 	UFUNCTION(BlueprintCallable, Category = "Auth")
 	void EndRequest(bool bSuccess, const FString& ErrorMessage);
 
+	/** 요청 시작 이벤트 바인딩 함수 */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Auth|Events")
 	void OnRequestStarted();
 
+	/** 요청 종료(Res 수신) 이벤트 바인딩 함수 */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Auth|Events")
 	void OnRequestFinished(bool bSuccess, const FString& ErrorMessage);
 

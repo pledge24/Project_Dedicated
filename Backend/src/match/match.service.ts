@@ -4,10 +4,10 @@ import type { WebSocket } from 'ws';
 
 import { config } from '../common/config.js';
 import { AppError, Codes } from '../common/errors.js';
+import * as repo from './match.repository.js';
 import type { MatchFoundData, MatchPlayer } from './protocol.js';
 import { MatchQueue } from './queue.js';
 import type { MatchGroup } from './queue.js';
-import * as repo from './repository.js';
 
 // ref = 그 유저의 WS 소켓. 매칭 성사 시 여기로 푸시한다.
 const queue = new MatchQueue<WebSocket>({

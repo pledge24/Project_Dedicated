@@ -7,6 +7,7 @@ import { withTransaction } from '../common/db.js';
 import type { MatchEndReason } from '../common/types.js';
 import { computeFfaEloDeltas } from './elo.js';
 
+/** saveResult 함수용 - 종료 매치 각 플레이어 정보 */
 export interface SaveResultParticipant
 {
     userId: number;
@@ -16,6 +17,7 @@ export interface SaveResultParticipant
     livesLeft: number;
 }
 
+/** saveResult 함수용 - 입력 매개변수 구조 */
 export interface SaveResultInput
 {
     matchId: string;          // client_match_id (UNIQUE → 멱등성 가드)
@@ -28,7 +30,8 @@ export interface SaveResultInput
     participants: SaveResultParticipant[];
 }
 
-export interface SavedParticipant
+/** ELO 계산 결과 반환 구조체 */
+export interface ParticipantScoreResult
 {
     userId: number;
     placement: number;
@@ -47,7 +50,7 @@ interface ScoreRow extends RowDataPacket
 const PLACEMENT_EXP = [100, 70, 40, 20];
 
 /** 결과를 원자적으로 기록하고 ELO로 점수를 갱신한다. matchId 중복 시 ER_DUP_ENTRY를 throw. */
-export async function saveResult(input: SaveResultInput): Promise<SavedParticipant[]>
+export async function saveResult(input: SaveResultInput): Promise<ParticipantScoreResult[]>
 {
     return withTransaction(async (conn) =>
     {
@@ -79,7 +82,7 @@ export async function saveResult(input: SaveResultInput): Promise<SavedParticipa
         const placements = input.participants.map((p) => p.placement);
         const deltas = computeFfaEloDeltas(ratings, placements, config.match.eloK);
 
-        const saved: SavedParticipant[] = [];
+        const saved: ParticipantScoreResult[] = [];
         for (let i = 0; i < input.participants.length; i++)
         {
             const p = input.participants[i];

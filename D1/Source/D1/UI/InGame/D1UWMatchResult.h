@@ -15,7 +15,7 @@ class UD1UWMatchResultRow;
 /**
  *  매치 결과 화면. 등수 오름차순으로 행을 채운다.
  *  데이터는 GameState.FinalResults에서 PC가 넘겨준다(서버 권위).
- *  카운트다운 종료 또는 LeaveButton 클릭 시 MP_Lobby로 복귀(TRAVEL_Absolute).
+ *  카운트다운 종료 또는 LeaveButton 클릭 시 MP_Lobby로 복귀.
  */
 UCLASS()
 class UD1UWMatchResult : public UD1UserWidget
@@ -48,7 +48,7 @@ private:
 	/** 1초마다 카운트다운 감소·라벨 갱신, 0이면 복귀. */
 	void OnCountdownTick();
 
-	/** DS 연결을 끊고 MP_Lobby로 트래블. 중복 호출 가드. */
+	/** DS 연결을 끊고 MP_Lobby로 Travel. 중복 호출 가드. */
 	void ReturnToLobby();
 
 	/** 행 위젯 클래스 — 디테일 패널에서 WBP_MatchResultRow 지정. */

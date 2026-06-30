@@ -2,31 +2,33 @@
 // score 오름차순 정렬 유지 + joinedAt(동률 seq)로 선착순 우대.
 import { AppError, Codes } from '../common/errors.js';
 
-/** 큐의 한 자리. ref는 불투명 핸들(WS 레이어의 소켓 등) — 알고리즘은 안 읽는다. */
+/** Queue 단위. ref는 불투명 핸들(WS 레이어의 소켓 등) */
 export interface QueueEntry<Ref = unknown>
 {
     userId: number;
     nickname: string;
     score: number;
-    joinedAt: number; // epoch ms
-    seq: number;       // 입장 순서 (joinedAt 동률 tiebreak)
+    joinedAt: number;       // epoch ms
+    seq: number;            // 입장 순서 (joinedAt 동률 tiebreak)
     ref: Ref;
 }
 
-/** 성사된 한 매치(playersPerMatch 명). */
+/** 매치 단위(playersPerMatch 명). */
 export interface MatchGroup<Ref = unknown>
 {
     entries: QueueEntry<Ref>[];
 }
 
+/** 매치 Queue 파라미터(Config) */
 export interface MatchQueueParams
 {
     playersPerMatch: number;
     baseWindow: number;
-    expandRate: number; // 대기 1초당 윈도우 확장폭
+    expandRate: number;     // 대기 1초당 윈도우 확장폭
     maxWindow: number;
 }
 
+/** 매치 Queue 클래스 */
 export class MatchQueue<Ref = unknown>
 {
     private entries: QueueEntry<Ref>[] = []; // score 오름차순 유지
@@ -78,9 +80,9 @@ export class MatchQueue<Ref = unknown>
 
     /**
      * 1 사이클 매칭. now(ms)는 주입형 — 테스트 결정론을 위해 외부에서 시각을 넘긴다.
-     * 절차: seed=최장대기 → seed 윈도우 안 후보 ≥N이면 그중 최장대기 N명 매치.
-     *       같은 tick에서 더 못 만들 때까지 반복(여러 매치 가능).
-     * seed가 매치를 못 만들면 break — 선착순(최장대기 우선)을 깨지 않는다.
+     * 최장 대기 유저를 우선 매치(엄격한 FIFO방식).
+     * playersPerMatch명을 찾았다면, MatchGroup 생성 및 해당 플레이어들 Queue에서 제거.
+     * playersPerMatch명을 찾지 못할때까지 반복.
      */
     runCycle(now: number): MatchGroup<Ref>[]
     {
