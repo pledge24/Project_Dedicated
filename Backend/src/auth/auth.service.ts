@@ -1,7 +1,7 @@
 import { AppError, Codes } from '../common/errors.js';
 import * as jwtUtil from '../common/jwt.js';
 import * as passwordUtil from '../common/password.js';
-import type { AuthUserDTO, RegisterResultDTO } from '../common/types.js';
+import type { AuthUserDTO, PlayerProfileRow, RegisterResultDTO } from '../common/types.js';
 import * as repo from './auth.repository.js';
 
 // 가입 직후 자동 로그인을 막기 위해 register는 토큰을 발급하지 않는다.
@@ -28,13 +28,7 @@ export async function register(loginId: string, password: string, nickname: stri
         throw new AppError(Codes.INTERNAL_ERROR, '가입 직후 프로필 조회에 실패했습니다.');
     }
 
-    return {
-        userId,
-        nickname,
-        score: profile.score,
-        level: profile.level,
-        exp:   profile.exp,
-    };
+    return buildProfileResult(userId, nickname, profile);
 }
 
 /** 로그인. */
@@ -54,14 +48,7 @@ export async function login(loginId: string, password: string): Promise<AuthUser
     }
     const token = jwtUtil.sign({ userId: row.id, nickname: row.nickname });
 
-    return {
-        userId:   row.id,
-        nickname: row.nickname,
-        score:    profile.score,
-        level:    profile.level,
-        exp:      profile.exp,
-        token,
-    };
+    return { ...buildProfileResult(row.id, row.nickname, profile), token };
 }
 
 /** 현재 사용자 프로필 조회. 토큰 검증(requireAuth) 통과 후 호출된다. */
@@ -74,6 +61,12 @@ export async function getMe(userId: number, nickname: string): Promise<RegisterR
         throw new AppError(Codes.NOT_FOUND, '사용자 정보를 찾을 수 없습니다.');
     }
 
+    return buildProfileResult(userId, nickname, profile);
+}
+
+/** userId·nickname·프로필을 공개 응답 형태로 조립. register·login·getMe 공용. */
+function buildProfileResult(userId: number, nickname: string, profile: PlayerProfileRow): RegisterResultDTO
+{
     return {
         userId,
         nickname,
