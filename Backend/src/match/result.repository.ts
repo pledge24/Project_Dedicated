@@ -74,19 +74,28 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
         const placements = input.participants.map((p) => p.placement);
         const deltas = computeFfaEloDeltas(ratings, placements, config.match.eloK);
 
+        // 참가자별 파생값을 먼저 확정 (순수) — INSERT/UPDATE 값이 모두 여기서 나온다.
+        const computed = input.participants.map((p, i) => ({
+            p,
+            c: computeParticipantResult(p.placement, ratings[i], deltas[i], config.match.scoreFloor),
+        }));
+
+        // match_participants는 multi-row INSERT 1회. VALUES 그룹만 동적 생성 —
+        // 사용자 데이터가 아니라 '(?, ...)' 텍스트라 주입 위험 0 (동적 IN 선례와 동일).
+        const rowsSql = computed.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
+        const insertParams = computed.flatMap(({ p, c }) =>
+            [matchDbId, p.userId, p.nicknameSnapshot, p.slotIndex, p.placement, p.livesLeft, c.expGained, c.scoreDelta]);
+        await conn.execute(
+            'INSERT INTO match_participants ' +
+            '(match_id, user_id, nickname_snapshot, slot_index, placement, lives_left, exp_gained, score_delta) ' +
+            `VALUES ${rowsSql}`,
+            insertParams
+        );
+
+        // player_profiles는 행마다 값이 달라 개별 UPDATE 유지.
         const saved: ParticipantScoreResult[] = [];
-        for (let i = 0; i < input.participants.length; i++)
+        for (const { p, c } of computed)
         {
-            const p = input.participants[i];
-            const c = computeParticipantResult(p.placement, ratings[i], deltas[i], config.match.scoreFloor);
-
-            await conn.execute(
-                'INSERT INTO match_participants ' +
-                '(match_id, user_id, nickname_snapshot, slot_index, placement, lives_left, exp_gained, score_delta) ' +
-                'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [matchDbId, p.userId, p.nicknameSnapshot, p.slotIndex, p.placement, p.livesLeft, c.expGained, c.scoreDelta]
-            );
-
             await conn.execute(
                 'UPDATE player_profiles SET ' +
                 'score = ?, wins = wins + ?, losses = losses + ?, matches_played = matches_played + 1, ' +
