@@ -104,6 +104,47 @@ const scenarios: Array<[string, () => void]> = [
         assert.equal(m.length, 2);
         assert.equal(q.size, 0);
     }],
+
+    ['HOL 해소 — 고립 고MMR 시드 뒤의 4명이 막히지 않고 매치', () =>
+    {
+        const q = makeQueue();
+        add(q, 99, 5000, 0); // 극단 MMR + 최장 대기(=시드 후보)
+        add(q, 1, 1000, 1); add(q, 2, 1000, 2); add(q, 3, 1000, 3); add(q, 4, 1000, 4);
+        const m = q.runCycle(1_000_000); // 큰 now라도 5000↔1000=4000 > maxWindow → 못 끌어옴
+        assert.equal(m.length, 1);
+        assert.deepEqual(idsOf(m[0]), [1, 2, 3, 4]);
+        assert.equal(q.size, 1);
+        assert.equal(q.snapshot()[0].userId, 99); // 아웃라이어만 잔류
+    }],
+
+    ['HOL 해소 — 고립 시드 뒤 두 클러스터가 한 사이클에 2매치', () =>
+    {
+        const q = makeQueue();
+        add(q, 99, 5000, 0); // 최장 대기 아웃라이어
+        for (let i = 1; i <= 4; i++)
+        {
+            add(q, i, 1000, i); // 저 클러스터
+        }
+        for (let i = 5; i <= 8; i++)
+        {
+            add(q, i, 2500, i); // 고 클러스터(5000과도 2500 > 2000)
+        }
+        const m = q.runCycle(1_000_000);
+        assert.equal(m.length, 2);
+        assert.equal(q.size, 1);
+        assert.equal(q.snapshot()[0].userId, 99);
+    }],
+
+    ['앵커 강제 포함 — 성사된 방은 반드시 앵커(브리지)를 담는다', () =>
+    {
+        const q = makeQueue();
+        // P들(joinedAt 0 = 최장대기)은 각자 앵커론 실패. X만 전원을 잇는 브리지 앵커.
+        add(q, 10, 600, 0); add(q, 11, 600, 0); add(q, 12, 1400, 0); add(q, 13, 1400, 0);
+        add(q, 1, 1000, 1000); // X: window=200+4*50=400 → [600,1400] 전원 포함(단, 짧게 대기)
+        const m = q.runCycle(5000);
+        assert.equal(m.length, 1);
+        assert.ok(idsOf(m[0]).includes(1), '앵커 X(id 1)가 방에 포함돼야 함(단순 slice면 밀려남)');
+    }],
 ];
 
 let failed = 0;
