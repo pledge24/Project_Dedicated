@@ -1,6 +1,7 @@
 // 매치 결과 저장 (repository 레이어) — matches + match_participants + player_profiles를 한 트랜잭션으로.
 // ELO는 현재 점수에 의존하므로 트랜잭션 안에서 FOR UPDATE로 점수를 잠그고 재조회한 뒤 계산한다.
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
+import type { PoolConnection } from 'mysql2/promise';
 
 import { config } from '../common/config.js';
 import { withTransaction } from '../common/db.js';
@@ -67,18 +68,9 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
 
         // 현재 점수를 잠그고(FOR UPDATE) 재조회 — roster의 점수는 stale일 수 있다.
         const userIds = input.participants.map((p) => p.userId);
-        const placeholders = userIds.map(() => '?').join(', ');
-        const [scoreRows] = await conn.query<ScoreRow[]>(
-            `SELECT user_id, score FROM player_profiles WHERE user_id IN (${placeholders}) FOR UPDATE`,
-            userIds
-        );
-        const scoreByUser = new Map<number, number>();
-        for (const row of scoreRows)
-        {
-            scoreByUser.set(Number(row.user_id), row.score);
-        }
+        const scoreByUser = await lockAndFetchScores(conn, userIds);
 
-        const ratings = input.participants.map((p) => scoreByUser.get(p.userId) ?? 0);
+        const ratings = input.participants.map((p) => scoreByUser.get(p.userId)!);
         const placements = input.participants.map((p) => p.placement);
         const deltas = computeFfaEloDeltas(ratings, placements, config.match.eloK);
 
@@ -86,29 +78,73 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
         for (let i = 0; i < input.participants.length; i++)
         {
             const p = input.participants[i];
-            const before = ratings[i];
-            const delta = deltas[i];
-            const after = Math.max(config.match.scoreFloor, before + delta);
-            const isWin = p.placement === 1 ? 1 : 0;
-            const expGained = PLACEMENT_EXP[p.placement - 1] ?? PLACEMENT_EXP[PLACEMENT_EXP.length - 1];
+            const c = computeParticipantResult(p.placement, ratings[i], deltas[i], config.match.scoreFloor);
 
             await conn.execute(
                 'INSERT INTO match_participants ' +
                 '(match_id, user_id, nickname_snapshot, slot_index, placement, lives_left, exp_gained, score_delta) ' +
                 'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [matchDbId, p.userId, p.nicknameSnapshot, p.slotIndex, p.placement, p.livesLeft, expGained, delta]
+                [matchDbId, p.userId, p.nicknameSnapshot, p.slotIndex, p.placement, p.livesLeft, c.expGained, c.scoreDelta]
             );
 
             await conn.execute(
                 'UPDATE player_profiles SET ' +
                 'score = ?, wins = wins + ?, losses = losses + ?, matches_played = matches_played + 1, ' +
                 'exp = exp + ?, last_match_at = ? WHERE user_id = ?',
-                [after, isWin, 1 - isWin, expGained, input.endedAt, p.userId]
+                [c.scoreAfter, c.isWin, 1 - c.isWin, c.expGained, input.endedAt, p.userId]
             );
 
-            saved.push({ userId: p.userId, placement: p.placement, scoreBefore: before, scoreDelta: delta, scoreAfter: after });
+            saved.push({
+                userId: p.userId,
+                placement: p.placement,
+                scoreBefore: c.scoreBefore,
+                scoreDelta: c.scoreDelta,
+                scoreAfter: c.scoreAfter,
+            });
         }
 
         return saved;
     });
+}
+
+/** 참가자 점수를 FOR UPDATE로 잠그고 재조회. 잠근 행 수가 요청과 다르면 즉시 throw(침묵 오염 방지). */
+async function lockAndFetchScores(conn: PoolConnection, userIds: number[]): Promise<Map<number, number>>
+{
+    const placeholders = userIds.map(() => '?').join(', ');
+    const [rows] = await conn.query<ScoreRow[]>(
+        `SELECT user_id, score FROM player_profiles WHERE user_id IN (${placeholders}) FOR UPDATE`,
+        userIds
+    );
+    if (rows.length !== userIds.length)
+    {
+        throw new Error(`프로필 잠금 행 수 불일치: 요청 ${userIds.length}, 조회 ${rows.length}`);
+    }
+
+    const scoreByUser = new Map<number, number>();
+    for (const row of rows)
+    {
+        scoreByUser.set(Number(row.user_id), row.score);
+    }
+
+    return scoreByUser;
+}
+
+/** 한 참가자의 점수 파생값(순수). floor 적용 후 실제 변화량을 scoreDelta로 반환 → before+delta=after 보장. */
+function computeParticipantResult(placement: number, before: number, delta: number, scoreFloor: number)
+{
+    const after = Math.max(scoreFloor, before + delta);
+
+    return {
+        scoreBefore: before,
+        scoreDelta: after - before,       // A3: 반영된 실변화량(floor 반영)
+        scoreAfter: after,
+        isWin: placement === 1 ? 1 : 0,
+        expGained: expForPlacement(placement),
+    };
+}
+
+/** 등수별 획득 경험치. 범위를 벗어나면 최저값. */
+function expForPlacement(placement: number): number
+{
+    return PLACEMENT_EXP[placement - 1] ?? PLACEMENT_EXP[PLACEMENT_EXP.length - 1];
 }
