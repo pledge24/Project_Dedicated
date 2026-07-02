@@ -2,6 +2,7 @@
 // 실행: npm run match:sim  (전부 PASS여야 머지 — CLAUDE.md '알고리즘은 테스트 도구로 검증 후 머지')
 import assert from 'node:assert/strict';
 
+import { selectRequeue } from '../src/match/formation.js';
 import { MatchQueue } from '../src/match/queue.js';
 import type { MatchQueueParams } from '../src/match/queue.js';
 
@@ -144,6 +145,40 @@ const scenarios: Array<[string, () => void]> = [
         const m = q.runCycle(5000);
         assert.equal(m.length, 1);
         assert.ok(idsOf(m[0]).includes(1), '앵커 X(id 1)가 방에 포함돼야 함(단순 slice면 밀려남)');
+    }],
+
+    ['selectRequeue — inFormation+open+미큐만 재큐 대상', () =>
+    {
+        // ref는 'open'/'closed' 문자열이면 충분 — 순수 함수는 ref를 predicate로만 본다.
+        const entries = [
+            { userId: 1, ref: 'open' },   // 전부 충족 → 재큐
+            { userId: 2, ref: 'closed' }, // 소켓 닫힘 → 제외
+            { userId: 3, ref: 'open' },   // inFormation 아님(이탈) → 제외
+            { userId: 4, ref: 'open' },   // 이미 큐에 있음 → 제외
+        ];
+        const inForm = new Set([1, 2, 4]);
+        const queued = new Set([4]);
+        const out = selectRequeue(entries, {
+            isInFormation: (id) => inForm.has(id),
+            isOpen: (ref) => ref === 'open',
+            isQueued: (id) => queued.has(id),
+        });
+        assert.deepEqual(out.map((e) => e.userId), [1]);
+    }],
+
+    ['enqueue seq 보존 — 동률 joinedAt에서 재삽입 우선순위 유지', () =>
+    {
+        const q = makeQueue();
+        // 삽입 순서와 무관하게 seq 작은 4명이 뽑히고 seq 큰 1명이 남아야(재큐가 원 seq 보존 시의 거동).
+        q.enqueue({ userId: 1, nickname: 'u1', score: 1000, joinedAt: 0, ref: 1, seq: 40 }); // 최대 → 잔류
+        q.enqueue({ userId: 2, nickname: 'u2', score: 1000, joinedAt: 0, ref: 2, seq: 10 });
+        q.enqueue({ userId: 3, nickname: 'u3', score: 1000, joinedAt: 0, ref: 3, seq: 20 });
+        q.enqueue({ userId: 4, nickname: 'u4', score: 1000, joinedAt: 0, ref: 4, seq: 30 });
+        q.enqueue({ userId: 5, nickname: 'u5', score: 1000, joinedAt: 0, ref: 5, seq: 5 });
+        const m = q.runCycle(100);
+        assert.equal(m.length, 1);
+        assert.deepEqual(idsOf(m[0]), [2, 3, 4, 5]); // seq 5,10,20,30 선택
+        assert.equal(q.snapshot()[0].userId, 1);      // seq 40 잔류
     }],
 ];
 

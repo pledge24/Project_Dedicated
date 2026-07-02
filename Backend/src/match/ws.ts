@@ -251,22 +251,38 @@ function runMatchCycle(): void
     }
 }
 
-/** 한 매치 처리: DS 할당(또는 stub) → match:found 푸시. 할당 실패 시 에러 푸시. */
+/**
+ * 한 매치 처리: 확정 창(끊김/재접속/취소) 방어 → DS 할당 → match:found.
+ * 성사 즉시 큐에서 빠진 그룹을 begin/end/abortFormation으로 추적한다.
+ * 끊김·재접속·취소는 전부 service.leave를 거쳐 inFormation에서 빠지므로 userId 기준으로 포착된다.
+ */
 async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
 {
     const matchId = randomUUID();
-    // DS 결과 보고 인증용 매치별 서버 토큰. 새로 spawn하는 DS에게 커맨드라인으로 넘겨준다.
+    // DS 인증용 토큰. 커맨드라인으로 넘겨주며, DS -> 백엔드로 매치 결과 전송 시 사용.
     const serverToken = randomBytes(24).toString('base64url');
     const joinPlayers = group.entries.map((e) => ({
         ref: e.ref,
         userId: e.userId,
         nickname: e.nickname,
+        // 각 플레이어 DS 입장 토큰. 클라가 DS 입장시 사용.
         joinToken: randomBytes(16).toString('base64url'),
     }));
+    const userIds = group.entries.map((e) => e.userId);
 
+    service.beginFormation(userIds);
+
+    // 1) 스폰 전: 이미 닫힌 소켓(같은 틱 onClose 미처리 레이스)이 있으면 스폰 없이 생존자만 재큐.
+    if (group.entries.some((e) => e.ref.readyState !== WebSocket.OPEN))
+    {
+        const requeued = service.abortFormation(group.entries);
+        logger.warn({ matchId, requeued }, '확정 전 소켓 종료 — 스폰 취소, 생존자 재큐');
+
+        return;
+    }
+
+    // 2) 매치를 실행할 DS를 spawn(또는 stub). 할당 실패는 복구 불가라 error 전송.
     let server: { host: string; port: number };
-
-    /** 매치를 실행할 DS를 Spawn */
     try
     {
         server = config.match.ds.enabled
@@ -277,6 +293,7 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     catch (err)
     {
         logger.error({ err, matchId }, 'DS 할당 실패 — 매치 취소');
+        service.endFormation(userIds);
         for (const e of group.entries)
         {
             sendError(e.ref, 'error', Codes.INTERNAL_ERROR, '게임 서버 할당에 실패했습니다.');
@@ -285,9 +302,22 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
         return;
     }
 
-    const { data } = service.buildMatchFound(group, matchId, server);
+    // 3) 부팅(≈5s) 사이 끊김/재접속/취소 포착(userId 기준). 하나라도 이탈 시 스폰한 DS 회수 + 생존자 재큐.
+    if (group.entries.some((e) => !service.isInFormation(e.userId) || e.ref.readyState !== WebSocket.OPEN))
+    {
+        if (config.match.ds.enabled)
+        {
+            ds.release(server.port);
+        }
+        const requeued = service.abortFormation(group.entries);
+        logger.warn({ matchId, requeued }, '확정 창 이탈 — DS 회수, 생존자 재큐');
 
-    // 결과 POST 검증용 roster 등록(matchId → 신원 + 서버 토큰 + 입장 토큰).
+        return;
+    }
+
+    // 4) 성사 확정: formation 종료 → roster 등록 → 각 클라에 본인 입장 토큰만 실어 push.
+    service.endFormation(userIds);
+    const { data } = service.buildMatchFound(group, matchId, server);
     roster.register({
         matchId,
         serverToken,
@@ -299,7 +329,6 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
             joinToken: p.joinToken,
         })),
     });
-
     // 각 클라에 본인 입장 토큰만 실어 보낸다.
     for (const p of joinPlayers)
     {

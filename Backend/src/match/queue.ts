@@ -58,15 +58,18 @@ export class MatchQueue<Ref = unknown>
         return true;
     }
 
-    /** userId당 1자리. 중복이면 AppError(ALREADY_IN_QUEUE). score 정렬 위치에 삽입. */
-    enqueue(input: { userId: number; nickname: string; score: number; joinedAt: number; ref: Ref }): QueueEntry<Ref>
+    /**
+     * userId당 1자리. 중복이면 AppError(ALREADY_IN_QUEUE). score 정렬 위치에 삽입.
+     * seq는 보통 자동 부여하지만, 재큐(확정 실패 복귀) 시 원 seq를 넘겨 동률 joinedAt 우선순위를 보존한다.
+     */
+    enqueue(input: { userId: number; nickname: string; score: number; joinedAt: number; ref: Ref; seq?: number }): QueueEntry<Ref>
     {
         if (this.has(input.userId))
         {
             throw new AppError(Codes.ALREADY_IN_QUEUE, '이미 매칭 큐에 있습니다.');
         }
 
-        const entry: QueueEntry<Ref> = { ...input, seq: this.seqCounter++ };
+        const entry: QueueEntry<Ref> = { ...input, seq: input.seq ?? this.seqCounter++ };
         const idx = this.lowerBound(entry.score);
         this.entries.splice(idx, 0, entry);
 
@@ -81,13 +84,9 @@ export class MatchQueue<Ref = unknown>
     /**
      * 1 사이클 매칭. now(ms)는 주입형 — 테스트 결정론을 위해 외부에서 시각을 넘긴다.
      *
-     * [정책] 대기 오래된 유저를 "앵커"로 우선 시도하되, 앵커가 방을 못 채우면
-     *        그 앵커만 건너뛰고(다음 앵커로) 계속한다. 앵커는 큐에 남으므로
-     *        다음 사이클에도 우선권을 유지한다.
-     *
-     * [이유] 예전 방식(못 채우면 break)은 외딴 고티어 한 명이 큐 맨 앞에 박혀
-     *        뒤 유저 전부를 막는 head-of-line blocking을 일으킨다. 우선권은
-     *        "시도 순서에서 앞"이어야지 "내가 묶일 때까지 뒤는 대기"가 아니다.
+     * 대기 오래된 유저를 "앵커"로 우선 시도하되, 앵커가 방을 못 채우면
+     * 그 앵커만 건너뛰고(다음 앵커로) 계속한다. 앵커는 큐에 남으므로
+     * 다음 사이클에도 우선권을 유지한다.
      *
      * 매치된 유저는 즉시 지우지 않고 표시(matched)만 하고, 사이클 끝에 일괄 제거한다.
      */
@@ -117,7 +116,7 @@ export class MatchQueue<Ref = unknown>
 
             if (others.length < playersPerMatch - 1)
             {
-                continue; // ★ break 아님 — 앵커만 건너뛰고 다음 앵커 시도(큐엔 그대로 남음)
+                continue;
             }
 
             // 앵커는 반드시 자기 방에 포함. 나머지 자리는 윈도우 내 최장 대기자로 채운다.
