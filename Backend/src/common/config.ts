@@ -23,6 +23,7 @@ export const config = Object.freeze({
         registerMax: asNumber('RATE_LIMIT_REGISTER_MAX', 10),
         resultMax: asNumber('RATE_LIMIT_RESULT_MAX', 30),    // DS 결과 보고(/api/match/result)
         rankingMax: asNumber('RATE_LIMIT_RANKING_MAX', 60),  // 랭킹 조회(/api/ranking)
+        wsMax: asNumber('RATE_LIMIT_WS_MAX', 100),           // 매칭 WS 메시지(연결당) — OWASP 시작점
     }),
     match: Object.freeze({
         playersPerMatch: asNumber('MATCH_PLAYERS_PER_MATCH', 4),

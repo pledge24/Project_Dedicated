@@ -21,9 +21,15 @@ const queue = new MatchQueue<WebSocket>({
 // 매칭 확정(formation) 중인 userId 집합 — 끊김/재접속/취소가 전부 leave를 거치며 여기서 제거된다(단일 진실원).
 const inFormation = new Set<number>();
 
-/** 큐 입장. 현재 점수/닉네임을 DB에서 읽어 자리 생성. DB에 없으면 throw. */
+/** 큐 입장. 중복·확정 중 재입장은 선 차단, 현재 점수/닉네임을 DB에서 읽어 자리 생성. DB에 없으면 throw. */
 export async function join(userId: number, ref: WebSocket): Promise<void>
 {
+    // 큐 중복·확정 중 재입장 선 차단 — DB 조회 전에 거절
+    if (queue.has(userId) || inFormation.has(userId))
+    {
+        throw new AppError(Codes.ALREADY_IN_QUEUE, '이미 매칭 진행 중입니다.');
+    }
+
     const profile = await repo.findScoreAndNickname(userId);
     if (!profile)
     {

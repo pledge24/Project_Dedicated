@@ -27,12 +27,16 @@ interface AuthedWs extends WebSocket
     userId: number;
     nickname: string;
     isAlive: boolean;
+    msgWindowStart: number;  // rate limit 고정 윈도우 시작 시각(epoch ms)
+    msgCount: number;        // 현재 윈도우의 수신 메시지 수
+    limitNotified: boolean;  // 이번 윈도우에 초과 경고를 이미 보냈는가
 }
 
 /** http.Server에 매칭 WS를 붙이고 사이클/heartbeat를 기동. stop()으로 정리. */
 export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
 {
-    const wss = new WebSocketServer({ noServer: true });
+    // maxPayload: ws 기본값 100MiB → 16KB. 큐 메시지는 수십 바이트라 대형 메시지 flood 차단.
+    const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 
     /** upgrade 이벤트(클라가 요청) 핸들 함수 추가 */
     server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) =>
@@ -147,9 +151,39 @@ function sendError(ws: WebSocket, type: ServerMessageType, kind: ErrorKind, mess
     send(ws, { type, ok: false, error: { code: kind.code, message } });
 }
 
+/** 연결별 고정 윈도우 rate limit — 초과 메시지는 무시(윈도우당 경고 1회). */
+function allowMessage(ws: AuthedWs): boolean
+{
+    const now = Date.now();
+    if (now - ws.msgWindowStart >= config.rateLimit.windowMs)
+    {
+        ws.msgWindowStart = now;
+        ws.msgCount = 0;
+        ws.limitNotified = false;
+    }
+    ws.msgCount += 1;
+    if (ws.msgCount <= config.rateLimit.wsMax)
+    {
+        return true;
+    }
+    if (!ws.limitNotified)
+    {
+        ws.limitNotified = true;
+        sendError(ws, 'error', Codes.RATE_LIMITED, '메시지가 너무 잦습니다. 잠시 후 다시 시도해주세요.');
+        logger.warn({ userId: ws.userId, count: ws.msgCount }, 'WS 메시지 rate limit 초과');
+    }
+
+    return false;
+}
+
 /** WS 메시지 처리 — queue:join / queue:cancel. */
 async function onMessage(ws: AuthedWs, raw: RawData): Promise<void>
 {
+    if (!allowMessage(ws))
+    {
+        return;
+    }
+
     let msg: ClientMessage;
     try
     {
@@ -204,6 +238,9 @@ function onConnection(wss: WebSocketServer, ws: WebSocket, user: AuthedUser): vo
     newSocket.userId = user.userId;
     newSocket.nickname = user.nickname;
     newSocket.isAlive = true;
+    newSocket.msgWindowStart = Date.now();
+    newSocket.msgCount = 0;
+    newSocket.limitNotified = false;
 
     // 같은 userId의 기존 소켓 정리(중복 탭/재연결) — 한 유저 한 자리 보장.
     for (const other of wss.clients)
