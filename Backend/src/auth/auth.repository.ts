@@ -1,8 +1,29 @@
 // 인증 도메인의 DB 쿼리만 담당 (repository 레이어)
-import type { ResultSetHeader } from 'mysql2';
+import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 
 import { queryOne, withTransaction } from '../common/db.js';
-import type { PlayerProfileRow, UserRow } from '../common/types.js';
+
+/** DB users 행. */
+export interface UserRow extends RowDataPacket
+{
+    id: number;
+    login_id: string;
+    password_hash: string;
+    nickname: string;
+}
+
+/** DB player_profiles 행. */
+export interface PlayerProfileRow extends RowDataPacket
+{
+    user_id: number;
+    score: number;
+    level: number;
+    exp: number;
+    wins: number;
+    losses: number;
+    matches_played: number;
+    last_match_at: Date | null;
+}
 
 export async function findByLoginId(loginId: string): Promise<UserRow | null>
 {

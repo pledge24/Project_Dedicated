@@ -1,7 +1,7 @@
 import { AppError, Codes } from '../common/errors.js';
 import * as jwtUtil from '../common/jwt.js';
 import * as passwordUtil from '../common/password.js';
-import type { AuthUserDTO, PlayerProfileRow, RegisterResultDTO } from '../common/types.js';
+import type { AuthUserDTO, RegisterResultDTO } from '../common/types.js';
 import * as repo from './auth.repository.js';
 
 // 가입 직후 자동 로그인을 막기 위해 register는 토큰을 발급하지 않는다.
@@ -65,7 +65,7 @@ export async function getMe(userId: number, nickname: string): Promise<RegisterR
 }
 
 /** userId·nickname·프로필을 공개 응답 형태로 조립. register·login·getMe 공용. */
-function buildProfileResult(userId: number, nickname: string, profile: PlayerProfileRow): RegisterResultDTO
+function buildProfileResult(userId: number, nickname: string, profile: repo.PlayerProfileRow): RegisterResultDTO
 {
     return {
         userId,

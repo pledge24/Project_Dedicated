@@ -17,6 +17,7 @@ export const dbConnectionOptions = Object.freeze({
 
 let pool: Pool | null = null;
 
+/** 싱글톤 방식의 Connection Pool 생성 */
 export function getPool(): Pool
 {
     if (pool)
