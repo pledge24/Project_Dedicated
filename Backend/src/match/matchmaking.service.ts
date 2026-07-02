@@ -5,7 +5,7 @@ import { WebSocket } from 'ws';
 import { config } from '../common/config.js';
 import { AppError, Codes } from '../common/errors.js';
 import { selectRequeue } from './formation.js';
-import * as repo from './match.repository.js';
+import * as repo from './matchmaking.repository.js';
 import type { MatchFoundData, MatchPlayer } from './protocol.js';
 import { MatchQueue } from './queue.js';
 import type { MatchGroup, QueueEntry } from './queue.js';

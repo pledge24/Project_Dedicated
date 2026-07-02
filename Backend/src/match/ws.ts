@@ -14,7 +14,7 @@ import * as jwtUtil from '../common/jwt.js';
 import { logger } from '../common/logger.js';
 import type { AuthedUser } from '../common/types.js';
 import * as ds from './ds.js';
-import * as service from './match.service.js';
+import * as service from './matchmaking.service.js';
 import type { ClientMessage, ServerMessage, ServerMessageType } from './protocol.js';
 import type { MatchGroup } from './queue.js';
 import * as roster from './roster.js';
