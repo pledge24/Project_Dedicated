@@ -1,6 +1,7 @@
 import { AppError, Codes } from '../common/errors.js';
 import * as jwtUtil from '../common/jwt.js';
 import * as passwordUtil from '../common/password.js';
+import { emitSuperseded } from '../common/session.js';
 import type { AuthUserDTO, RegisterResultDTO } from '../common/types.js';
 import * as repo from './auth.repository.js';
 
@@ -46,7 +47,11 @@ export async function login(loginId: string, password: string): Promise<AuthUser
     {
         throw new AppError(Codes.INTERNAL_ERROR, '프로필 조회에 실패했습니다.');
     }
-    const token = jwtUtil.sign({ userId: row.id, nickname: row.nickname });
+    // 단일 세션 강제: 로그인마다 token_version을 올려 이전 세션 토큰을 무효화(최신 로그인 우선).
+    const tokenVersion = await repo.bumpTokenVersion(row.id);
+    // 옛 세션이 이미 매칭 WS에 연결돼 있으면 즉시 끊도록 알린다 (버전 대조는 핸드셰이크 때뿐).
+    emitSuperseded(row.id);
+    const token = jwtUtil.sign({ userId: row.id, nickname: row.nickname, tokenVersion: tokenVersion });
 
     return { ...buildProfileResult(row.id, row.nickname, profile), token };
 }

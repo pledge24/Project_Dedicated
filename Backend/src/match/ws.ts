@@ -12,6 +12,7 @@ import { AppError, Codes } from '../common/errors.js';
 import type { ErrorKind } from '../common/errors.js';
 import * as jwtUtil from '../common/jwt.js';
 import { logger } from '../common/logger.js';
+import { getCurrentTokenVersion, onSuperseded } from '../common/session.js';
 import type { AuthedUser } from '../common/types.js';
 import * as ds from './ds.js';
 import * as service from './matchmaking.service.js';
@@ -39,7 +40,7 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
     const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 
     /** upgrade 이벤트(클라가 요청) 핸들 함수 추가 */
-    server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) =>
+    server.on('upgrade', async (req: IncomingMessage, socket: Duplex, head: Buffer) =>
     {
         const { pathname } = new URL(req.url ?? '', 'http://localhost');
         if (pathname !== WS_PATH)
@@ -54,7 +55,7 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
          *  그래서 임시용으로 추가했다 삭제하는 것.
         */
         socket.on('error', onSocketError);
-        const user = authenticate(req);
+        const user = await authenticate(req);
         if (!user)
         {
             socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
@@ -73,6 +74,9 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
 
     /** 연결 이벤트(이 서버가 요청) 핸들 함수 추가 */
     wss.on('connection', (ws: WebSocket, _req: IncomingMessage, user: AuthedUser) => onConnection(wss, ws, user));
+
+    // 재로그인(세션 대체) 알림 구독 — 버전 대조는 핸드셰이크 때뿐이라 이미 연결된 옛 소켓은 여기서 끊는다.
+    const offSuperseded = onSuperseded((userId) => kickThisUserSockets(wss, userId));
 
     // 죽은 연결 감지 — heartbeat 주기마다 pong 못 받은 소켓은 terminate.
     const heartbeat = setInterval(() =>
@@ -100,6 +104,7 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
     return {
         stop()
         {
+            offSuperseded();
             clearInterval(heartbeat);
             clearInterval(cycle);
             ds.shutdownAll();
@@ -112,8 +117,12 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
     };
 }
 
-/** 업그레이드 핸드셰이크의 Authorization 헤더에서 토큰 검증. 실패 시 null. */
-function authenticate(req: IncomingMessage): AuthedUser | null
+/**
+ * 업그레이드 핸드셰이크의 Authorization 헤더에서 토큰 검증. 실패 시 null.
+ * 단일 세션 강제: tokenVersion을 DB 현재값과 대조해 옛(대체된) 토큰의 매칭 접속도 거절.
+ * verify·DB 조회 중 어떤 예외든 null(=401)로 수렴시켜 업그레이드 콜백의 unhandled reject를 막는다.
+ */
+async function authenticate(req: IncomingMessage): Promise<AuthedUser | null>
 {
     const token = extractBearerToken(req.headers.authorization);
     if (!token)
@@ -124,6 +133,12 @@ function authenticate(req: IncomingMessage): AuthedUser | null
     try
     {
         const claims = jwtUtil.verify(token);
+
+        const currentVersion = await getCurrentTokenVersion(claims.userId);
+        if (currentVersion === null || currentVersion !== claims.tokenVersion)
+        {
+            return null;
+        }
 
         return { userId: claims.userId, nickname: claims.nickname };
     }
@@ -136,6 +151,20 @@ function authenticate(req: IncomingMessage): AuthedUser | null
 function onSocketError(err: Error): void
 {
     logger.warn({ err }, 'WS 업그레이드 소켓 에러');
+}
+
+/** 해당 userId의 기존 소켓 정리(중복 탭/재연결) — 한 유저 한 자리 보장. except는 제외(신규 연결 자신). */
+function kickThisUserSockets(wss: WebSocketServer, userId: number, except?: WebSocket): void
+{
+    for (const client of wss.clients)
+    {
+        const socket = client as AuthedWs;
+        if (socket !== except && socket.userId === userId)
+        {
+            service.leave(userId);
+            socket.terminate();
+        }
+    }
 }
 
 function send(ws: WebSocket, msg: ServerMessage): void
@@ -242,16 +271,8 @@ function onConnection(wss: WebSocketServer, ws: WebSocket, user: AuthedUser): vo
     newSocket.msgCount = 0;
     newSocket.limitNotified = false;
 
-    // 같은 userId의 기존 소켓 정리(중복 탭/재연결) — 한 유저 한 자리 보장.
-    for (const other of wss.clients)
-    {
-        const o = other as AuthedWs;
-        if (o !== newSocket && o.userId === user.userId)
-        {
-            service.leave(user.userId);
-            o.terminate();
-        }
-    }
+    // 이전 ws 소켓 Cleanup.
+    kickThisUserSockets(wss, user.userId, newSocket);
 
     newSocket.on('pong', () =>
     {

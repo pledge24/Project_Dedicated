@@ -22,7 +22,8 @@
     "match:elo": "tsx scripts/match-elo.ts",
     "match:result-sim": "tsx scripts/match-result-sim.ts",
     "match:bots": "tsx scripts/match-bots.ts",
-    "ranking:sim": "tsx scripts/ranking-sim.ts"
+    "ranking:sim": "tsx scripts/ranking-sim.ts",
+    "auth:sim": "tsx scripts/auth-session-sim.ts"
   },
   "keywords": [],
   "author": "",

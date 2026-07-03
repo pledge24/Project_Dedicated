@@ -12,6 +12,8 @@ export const Codes = {
     AUTH_REQUIRED:       { http: 401, code: 'AUTH_REQUIRED' },
     TOKEN_EXPIRED:       { http: 401, code: 'TOKEN_EXPIRED' },
     INVALID_TOKEN:       { http: 401, code: 'INVALID_TOKEN' },
+    SESSION_SUPERSEDED:  { http: 401, code: 'SESSION_SUPERSEDED' },   // 더 최신 로그인이 세션을 대체함
+
     NOT_FOUND:           { http: 404, code: 'NOT_FOUND' },
     MATCH_NOT_FOUND:     { http: 404, code: 'MATCH_NOT_FOUND' },
     DUPLICATE_LOGIN_ID:  { http: 409, code: 'DUPLICATE_LOGIN_ID' },

@@ -8,6 +8,7 @@ export interface TokenPayload
 {
     userId: number;
     nickname: string;
+    tokenVersion: number;   // 단일 세션 강제 — 로그인마다 +1, DB 현재값과 대조
 }
 
 export interface DecodedToken extends TokenPayload
