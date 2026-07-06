@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Network/D1GameInstance.h"
+#include "Framework/D1GameInstance.h"
 
 void UD1GameInstance::SetSession(const FString& InJwt, const FAuthUserDTO& InUser)
 {

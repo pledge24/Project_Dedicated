@@ -6,10 +6,10 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Core/D1LogChannels.h"
+#include "Framework/D1GameInstance.h"
 #include "Kismet/GameplayStatics.h"
 #include "Network/BackendErrorMessages.h"
 #include "Network/BackendSubsystem.h"
-#include "Network/D1GameInstance.h"
 
 // 매치 정원(백엔드 playersPerMatch와 동일). match:found가 개수를 싣지 않아 클라 상수로 표기.
 static constexpr int32 MatchPlayerCount = 4;

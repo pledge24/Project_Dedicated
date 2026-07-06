@@ -4,11 +4,11 @@
 
 #include "Core/D1LogChannels.h"
 #include "Dom/JsonObject.h"
+#include "Framework/D1GameInstance.h"
 #include "GameFramework/PlayerController.h"
 #include "HttpModule.h"
 #include "Interfaces/IHttpResponse.h"
 #include "IWebSocket.h"
-#include "Network/D1GameInstance.h"
 #include "Network/D1OnlineSettings.h"
 #include "Policies/CondensedJsonPrintPolicy.h"
 #include "Serialization/JsonReader.h"
