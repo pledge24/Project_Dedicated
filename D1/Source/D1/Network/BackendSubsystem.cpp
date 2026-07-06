@@ -94,8 +94,10 @@ void UBackendSubsystem::StartMatchmaking()
 
 void UBackendSubsystem::CancelMatchmaking()
 {
+	// 4가지 상태 중 유일하게 큐 밖에 있는 Idle 상태만 거른다.
 	if (MatchmakingState == EMatchmakingState::Idle)
 	{
+		CloseMatchSocket();	// 혹시나 ws 소켓이 열려있는 경우
 		return;
 	}
 
@@ -125,11 +127,11 @@ void UBackendSubsystem::RefreshMyProfile()
 
 	TWeakObjectPtr<UBackendSubsystem> WeakThis(this);
 	Request->OnProcessRequestComplete().BindLambda(
-		[WeakThis](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded)
+		[WeakThis](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded)
 		{
 			if (UBackendSubsystem* Self = WeakThis.Get())
 			{
-				Self->HandleProfileResponse(Req, Resp, bSucceeded);
+				Self->HandleProfileResponse(Req, Res, bSucceeded);
 			}
 		});
 	Request->ProcessRequest();
@@ -166,16 +168,16 @@ void UBackendSubsystem::ReportMatchResult(const FString& MatchId, const FString&
 	Request->SetHeader(TEXT("Authorization"), MakeBearer(MatchToken));
 
 	Request->OnProcessRequestComplete().BindLambda(
-		[](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded)
+		[](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded)
 		{
-			const int32 Code = (bSucceeded && Resp.IsValid()) ? Resp->GetResponseCode() : 0;
+			const int32 Code = (bSucceeded && Res.IsValid()) ? Res->GetResponseCode() : 0;
 			if (Code == 200)
 			{
 				UE_LOG(LogD1, Log, TEXT("[Match] 결과 POST 성공 (200)"));
 			}
 			else
 			{
-				const FString Content = (bSucceeded && Resp.IsValid()) ? Resp->GetContentAsString() : TEXT("(no response)");
+				const FString Content = (bSucceeded && Res.IsValid()) ? Res->GetContentAsString() : TEXT("(no response)");
 				UE_LOG(LogD1, Warning, TEXT("[Match] 결과 POST 실패 code=%d %s"), Code, *Content);
 			}
 		});
@@ -191,11 +193,11 @@ void UBackendSubsystem::SendAuthRequest(const FString& Path, const TSharedRef<FJ
 	TWeakObjectPtr<UBackendSubsystem> WeakThis(this);
 	const FOnAuthCompleted Forward = OnCompleted;
 	Request->OnProcessRequestComplete().BindLambda(
-		[WeakThis, Forward](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded)
+		[WeakThis, Forward](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded)
 		{
 			if (UBackendSubsystem* Self = WeakThis.Get())
 			{
-				Self->HandleAuthResponse(Req, Resp, bSucceeded, Forward);
+				Self->HandleAuthResponse(Req, Res, bSucceeded, Forward);
 			}
 		});
 	Request->ProcessRequest();
@@ -224,13 +226,13 @@ TSharedRef<IHttpRequest> UBackendSubsystem::BuildPostJson(const FString& Path, c
 	return Request;
 }
 
-void UBackendSubsystem::HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded, FOnAuthCompleted Forward)
+void UBackendSubsystem::HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded, FOnAuthCompleted Forward)
 {
 	FBackendResponse Out;
 	FAuthUserDTO User;
 
-	// 네트워크 자체 실패
-	if (!bSucceeded || !Resp.IsValid())
+	// fail case: 네트워크 자체 실패
+	if (!bSucceeded || !Res.IsValid())
 	{
 		Out.bOk = false;
 		Out.ErrorCode = EBackendErrorCode::NetworkError;
@@ -240,14 +242,15 @@ void UBackendSubsystem::HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr
 		return;
 	}
 
-	const FString Content = Resp->GetContentAsString();
+	const FString Content = Res->GetContentAsString();
 	TSharedPtr<FJsonObject> Root;
-	if (!ParseJsonObject(Content, Root))
+	// fail case: content 역직렬화 실패
+	if (!DeserializeJson(Content, Root))
 	{
 		Out.bOk = false;
 		Out.ErrorCode = EBackendErrorCode::Unknown;
 		Out.ErrorMessage = TEXT("");
-		UE_LOG(LogD1, Warning, TEXT("[Backend] JSON 파싱 실패: %s"), *Content);
+		UE_LOG(LogD1, Warning, TEXT("[Backend] JSON 역직렬화 실패: %s"), *Content);
 		Forward.ExecuteIfBound(Out, User);
 		return;
 	}
@@ -285,14 +288,15 @@ void UBackendSubsystem::HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr
 			return;
 		}
 
+		// fail case: 성공 envelope + data 필드 가져오기 실패.
 		Out.bOk = false;
 		Out.ErrorCode = EBackendErrorCode::Unknown;
-		Out.ErrorMessage = TEXT("");
+		Out.ErrorMessage = TEXT("성공한 요청에 데이터를 가져올 수 없습니다");
 		Forward.ExecuteIfBound(Out, User);
 		return;
 	}
 
-	// 실패 envelope
+	// fail case: 실패 envelope
 	const TSharedPtr<FJsonObject>* ErrorObj = nullptr;
 	if (GetObjectField(Root, TEXT("error"), ErrorObj))
 	{
@@ -308,17 +312,17 @@ void UBackendSubsystem::HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr
 	Forward.ExecuteIfBound(Out, User);
 }
 
-void UBackendSubsystem::HandleProfileResponse(FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSucceeded)
+void UBackendSubsystem::HandleProfileResponse(FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded)
 {
-	if (!bSucceeded || !Resp.IsValid())
+	if (!bSucceeded || !Res.IsValid())
 	{
 		UE_LOG(LogD1, Warning, TEXT("[Profile] /me 갱신 실패 (네트워크)"));
 		return;
 	}
 
-	const FString Content = Resp->GetContentAsString();
+	const FString Content = Res->GetContentAsString();
 	TSharedPtr<FJsonObject> Root;
-	if (!ParseJsonObject(Content, Root)
+	if (!DeserializeJson(Content, Root)
 		|| !(Root->HasField(TEXT("ok")) && Root->GetBoolField(TEXT("ok"))))
 	{
 		UE_LOG(LogD1, Warning, TEXT("[Profile] /me 응답 파싱 실패: %s"), *Content);
@@ -359,7 +363,7 @@ EBackendErrorCode UBackendSubsystem::ParseErrorCode(const FString& CodeStr)
 	return EBackendErrorCode::Unknown;
 }
 
-bool UBackendSubsystem::ParseJsonObject(const FString& Content, TSharedPtr<FJsonObject>& OutRoot)
+bool UBackendSubsystem::DeserializeJson(const FString& Content, TSharedPtr<FJsonObject>& OutRoot)
 {
 	const TSharedRef<TJsonReader<TCHAR>> Reader = TJsonReaderFactory<TCHAR>::Create(Content);
 	return FJsonSerializer::Deserialize(Reader, OutRoot) && OutRoot.IsValid();
@@ -438,7 +442,7 @@ void UBackendSubsystem::HandleSocketConnected()
 void UBackendSubsystem::HandleSocketMessage(const FString& Message)
 {
 	TSharedPtr<FJsonObject> Root;
-	if (!ParseJsonObject(Message, Root))
+	if (!DeserializeJson(Message, Root))
 	{
 		UE_LOG(LogD1, Warning, TEXT("[Match] WS 메시지 파싱 실패: %s"), *Message);
 		return;
@@ -474,28 +478,11 @@ void UBackendSubsystem::HandleSocketMessage(const FString& Message)
 				(*ServerObj)->TryGetStringField(TEXT("host"), Match.ServerHost);
 				(*ServerObj)->TryGetNumberField(TEXT("port"), Match.ServerPort);
 			}
-
-			const TArray<TSharedPtr<FJsonValue>>* PlayersArr = nullptr;
-			if ((*DataObj)->TryGetArrayField(TEXT("players"), PlayersArr))
-			{
-				for (const TSharedPtr<FJsonValue>& Val : *PlayersArr)
-				{
-					const TSharedPtr<FJsonObject>* PObj = nullptr;
-					if (Val.IsValid() && Val->TryGetObject(PObj) && PObj && PObj->IsValid())
-					{
-						FMatchPlayerDTO P;
-						(*PObj)->TryGetNumberField(TEXT("userId"),    P.UserId);
-						(*PObj)->TryGetStringField(TEXT("nickname"),  P.Nickname);
-						(*PObj)->TryGetNumberField(TEXT("score"),     P.Score);
-						Match.Players.Add(P);
-					}
-				}
-			}
 		}
 
 		MatchmakingState = EMatchmakingState::Matched;
-		UE_LOG(LogD1, Log, TEXT("[Match] 매칭 성사 matchId=%s server=%s:%d players=%d"),
-			*Match.MatchId, *Match.ServerHost, Match.ServerPort, Match.Players.Num());
+		UE_LOG(LogD1, Log, TEXT("[Match] 매칭 성사 matchId=%s server=%s:%d"),
+			*Match.MatchId, *Match.ServerHost, Match.ServerPort);
 		OnMatchFound.Broadcast(Match);
 
 		// travel이 월드를 내리므로 WS 먼저 정리.

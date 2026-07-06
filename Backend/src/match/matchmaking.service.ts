@@ -6,7 +6,7 @@ import { config } from '../common/config.js';
 import { AppError, Codes } from '../common/errors.js';
 import { selectRequeue } from './formation.js';
 import * as repo from './matchmaking.repository.js';
-import type { MatchFoundData, MatchPlayer } from './protocol.js';
+import type { MatchFoundData } from './protocol.js';
 import { MatchQueue } from './queue.js';
 import type { MatchGroup, QueueEntry } from './queue.js';
 
@@ -119,16 +119,9 @@ export function buildMatchFound(
     server: { host: string; port: number }
 ): { data: MatchFoundData; targets: WebSocket[] }
 {
-    const players: MatchPlayer[] = group.entries.map((e) => ({
-        userId: e.userId,
-        nickname: e.nickname,
-        score: e.score,
-    }));
-
     const data: MatchFoundData = {
         matchId,
         server: { host: server.host, port: server.port },
-        players,
         joinToken: '', // per-recipient — ws.handleMatch가 수신자별로 채움
     };
 

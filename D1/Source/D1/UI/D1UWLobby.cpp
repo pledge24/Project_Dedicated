@@ -11,6 +11,9 @@
 #include "Network/BackendSubsystem.h"
 #include "Network/D1GameInstance.h"
 
+// 매치 정원(백엔드 playersPerMatch와 동일). match:found가 개수를 싣지 않아 클라 상수로 표기.
+static constexpr int32 MatchPlayerCount = 4;
+
 void UD1UWLobby::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -125,14 +128,14 @@ void UD1UWLobby::HandleQueueJoined()
 
 void UD1UWLobby::HandleMatchFound(const FMatchFoundDTO& Match)
 {
-	UE_LOG(LogD1, Log, TEXT("[Lobby] 매칭 완료 — server=%s:%d players=%d"),
-		*Match.ServerHost, Match.ServerPort, Match.Players.Num());
+	UE_LOG(LogD1, Log, TEXT("[Lobby] 매칭 완료 — server=%s:%d"),
+		*Match.ServerHost, Match.ServerPort);
 
 	if (MatchStatusLabel)
 	{
 		MatchStatusLabel->SetText(FText::Format(
 			NSLOCTEXT("Lobby", "MatchFoundFmt", "매칭 완료! ({0}명) — 입장 중..."),
-			FText::AsNumber(Match.Players.Num())
+			FText::AsNumber(MatchPlayerCount)
 		));
 	}
 	// 실제 DS 입장(ClientTravel)은 BackendSubsystem가 처리. 위젯은 곧 travel로 소멸.
