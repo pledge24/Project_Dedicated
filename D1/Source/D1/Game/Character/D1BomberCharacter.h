@@ -80,10 +80,16 @@ protected:
 	TSet<TWeakObjectPtr<AD1Bomb>> IgnoredBombs;
 
 private:
+	/** 폭탄 설치 사전조건 전부(스턴·용량·페이즈·생존·격자·벽·중복셀). 서버 RPC 검증부. */
+	bool CanPlaceBombAt(const FIntPoint& Cell, AD1BomberPlayerState* PS);
+
 	/** PossessedBy/OnRep_PlayerState 양쪽서 호출. PS 확보 시 OnAliveStateChanged 바인딩. */
 	void RefreshPlayerStateBinding();
 
 	void UpdateIgnoredBombs();
+
+	/** 깜빡임 시작: 가시화 리셋 + 0.1s 토글 타이머 arm. 무적·사망 연출 공용. */
+	void StartBlink();
 	void TickBlink();
 
 	/** 서버 전용: 비치명 피격 후 무적 시작. Duration 뒤 EndInvulnerability. */
@@ -150,5 +156,5 @@ private:
 	bool bDeathHandled = false;
 
 	/** 재바인딩 시 중복 방지·이전 핸들러 제거용. */
-	TWeakObjectPtr<AD1BomberPlayerState> BoundPlayerState;
+	TWeakObjectPtr<AD1BomberPlayerState> PSWeakPtr;
 };

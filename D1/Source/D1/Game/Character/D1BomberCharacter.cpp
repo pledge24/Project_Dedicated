@@ -57,7 +57,7 @@ void AD1BomberCharacter::BeginPlay()
 
 	// PossessedBy/OnRep_PlayerState가 BeginPlay 전에 와서 PS는 잡혔지만 컴포넌트(특히 WidgetComponent)가
 	// 아직 init 안 됐을 수 있다. 여기서 한 번 더 ready 신호를 발화해 BP가 안전하게 위젯에 접근하게 함.
-	if (BoundPlayerState.IsValid())
+	if (PSWeakPtr.IsValid())
 	{
 		OnPlayerStateReady();
 	}
@@ -100,13 +100,13 @@ void AD1BomberCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 void AD1BomberCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
-	RefreshPlayerStateBinding();
+	RefreshPlayerStateBinding();	// PS -> Pawn 순으로 Replicate 된 경우.
 }
 
 void AD1BomberCharacter::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
-	RefreshPlayerStateBinding();
+	RefreshPlayerStateBinding();	// Pawn -> PS 순으로 Replicate 된 경우.
 }
 
 void AD1BomberCharacter::DoMove(float Right, float Forward)
@@ -151,6 +151,7 @@ void AD1BomberCharacter::ReceiveExplosionHit()
 	UE_LOG(LogD1, Log, TEXT("Explosion hit: %s Lives=%d killed=%d"),
 		*GetName(), PS->GetLives(), bKilled ? 1 : 0);
 
+	// 사망하지 않은 경우 피격 연출.(사망 이벤트는 PS의 bAlive OnRep 바인딩으로 처리)
 	if (!bKilled)
 	{
 		StartInvulnerability(HitInvulnSec);
@@ -275,55 +276,12 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 	{
 		return;
 	}
-	if (bStunned)
-	{
-		return;
-	}
 
 	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
-	const int32 BombCap = PS ? PS->GetBombCapacity() : 1;
-	if (GetActiveBombCount() >= BombCap)
-	{
-		return;
-	}
-	if (!BombClass)
-	{
-		UE_LOG(LogD1, Warning, TEXT("BomberCharacter: BombClass not set"));
-		return;
-	}
-
-	AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
-	if (GS && GS->MatchPhase != EBomberMatchPhase::Playing)
-	{
-		return;
-	}
-
-	if (PS && !PS->IsAlive())
-	{
-		return;
-	}
-
 	const FIntPoint Cell = UD1BomberGridLibrary::WorldToCell(GetActorLocation());
-	if (GS && !GS->IsInsideGrid(Cell))
+	if (!CanPlaceBombAt(Cell, PS))
 	{
 		return;
-	}
-	if (GS && GS->IsWallCell(Cell))
-	{
-		return;
-	}
-
-	// 월드 폭탄 전역 검사해서 동일한 셀에 중복 설치 방지.
-	for (const AD1Bomb* Existing : TActorRange<AD1Bomb>(GetWorld()))
-	{
-		if (!IsValid(Existing))
-		{
-			continue;
-		}
-		if (UD1BomberGridLibrary::WorldToCell(Existing->GetActorLocation()) == Cell)
-		{
-			return;
-		}
 	}
 
 	// 폭탄 설치 진행.
@@ -425,15 +383,67 @@ int32 AD1BomberCharacter::GetActiveBombCount()
 	return ActiveBombs.Num();
 }
 
+bool AD1BomberCharacter::CanPlaceBombAt(const FIntPoint& Cell, AD1BomberPlayerState* PS)
+{
+	if (bStunned)
+	{
+		return false;
+	}
+
+	const int32 BombCap = PS ? PS->GetBombCapacity() : 1;
+	if (GetActiveBombCount() >= BombCap)
+	{
+		return false;
+	}
+	if (!BombClass)
+	{
+		UE_LOG(LogD1, Warning, TEXT("BomberCharacter: BombClass not set"));
+		return false;
+	}
+
+	const AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
+	if (GS && GS->MatchPhase != EBomberMatchPhase::Playing)
+	{
+		return false;
+	}
+	if (PS && !PS->IsAlive())
+	{
+		return false;
+	}
+	if (GS && !GS->IsInsideGrid(Cell))
+	{
+		return false;
+	}
+	if (GS && GS->IsWallCell(Cell))
+	{
+		return false;
+	}
+
+	// 월드 폭탄 전역 검사해서 동일한 셀에 중복 설치 방지.
+	for (const AD1Bomb* Existing : TActorRange<AD1Bomb>(GetWorld()))
+	{
+		if (!IsValid(Existing))
+		{
+			continue;
+		}
+		if (UD1BomberGridLibrary::WorldToCell(Existing->GetActorLocation()) == Cell)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
 void AD1BomberCharacter::RefreshPlayerStateBinding()
 {
 	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
-	if (!PS || BoundPlayerState.Get() == PS)
+	if (!PS || PSWeakPtr.Get() == PS)
 	{
 		return;
 	}
 
-	if (AD1BomberPlayerState* Prev = BoundPlayerState.Get())
+	if (AD1BomberPlayerState* Prev = PSWeakPtr.Get())
 	{
 		Prev->OnAliveStateChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
 		Prev->OnPlayerNameChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
@@ -442,7 +452,7 @@ void AD1BomberCharacter::RefreshPlayerStateBinding()
 	PS->OnAliveStateChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
 	PS->OnPlayerNameChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
 	PS->OnSpeedLevelChanged.AddDynamic(this, &AD1BomberCharacter::OnSpeedLevelChanged);
-	BoundPlayerState = PS;
+	PSWeakPtr = PS;
 
 	// 늦게 합류한 클라가 이미 올라간 SpeedLevel을 받았을 때 즉시 반영.
 	OnSpeedLevelChanged();
@@ -507,6 +517,13 @@ void AD1BomberCharacter::UpdateIgnoredBombs()
 	{
 		IgnoredBombs.Remove(W);
 	}
+}
+
+void AD1BomberCharacter::StartBlink()
+{
+	bBlinkVisible = true;
+	GetWorldTimerManager().SetTimer(BlinkTimerHandle, this,
+		&AD1BomberCharacter::TickBlink, 0.1f, true);
 }
 
 void AD1BomberCharacter::TickBlink()
