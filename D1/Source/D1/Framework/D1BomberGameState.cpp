@@ -32,18 +32,6 @@ void AD1BomberGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(AD1BomberGameState, FinalResults);
 }
 
-void AD1BomberGameState::AddPlayerState(APlayerState* PlayerState)
-{
-	Super::AddPlayerState(PlayerState);
-	MarkPlayerCardsDirty();
-}
-
-void AD1BomberGameState::RemovePlayerState(APlayerState* PlayerState)
-{
-	Super::RemovePlayerState(PlayerState);
-	MarkPlayerCardsDirty();
-}
-
 bool AD1BomberGameState::IsWallCell(const FIntPoint& Cell) const
 {
 	return WallCells.Contains(Cell);
@@ -57,6 +45,11 @@ bool AD1BomberGameState::IsSoftBlockCell(const FIntPoint& Cell) const
 bool AD1BomberGameState::IsInsideGrid(const FIntPoint& Cell) const
 {
 	return Cell.X >= 0 && Cell.X < GridSize.X && Cell.Y >= 0 && Cell.Y < GridSize.Y;
+}
+
+void AD1BomberGameState::RemoveSoftBlockCell(const FIntPoint& Cell)
+{
+	SoftBlockCells.Remove(Cell);
 }
 
 float AD1BomberGameState::GetRemainingTimeSec() const
@@ -74,6 +67,18 @@ float AD1BomberGameState::GetRemainingTimeSec() const
 
 	const float Elapsed = GetServerWorldTimeSeconds() - MatchStartServerTime;
 	return FMath::Clamp(MatchDurationSec - Elapsed, 0.0f, MatchDurationSec);
+}
+
+void AD1BomberGameState::AddPlayerState(APlayerState* PlayerState)
+{
+	Super::AddPlayerState(PlayerState);
+	MarkPlayerCardsDirty();
+}
+
+void AD1BomberGameState::RemovePlayerState(APlayerState* PlayerState)
+{
+	Super::RemovePlayerState(PlayerState);
+	MarkPlayerCardsDirty();
 }
 
 TArray<AD1BomberPlayerState*> AD1BomberGameState::GetPlayerStatesBySlot() const
@@ -112,11 +117,6 @@ void AD1BomberGameState::SetFinalResults(const TArray<FD1MatchResultEntry>& InRe
 	{
 		OnMatchFinished.Broadcast();
 	}
-}
-
-void AD1BomberGameState::RemoveSoftBlockCell(const FIntPoint& Cell)
-{
-	SoftBlockCells.Remove(Cell);
 }
 
 void AD1BomberGameState::OnRep_MatchPhase()

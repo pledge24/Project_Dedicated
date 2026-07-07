@@ -57,6 +57,16 @@ bool AD1BomberPlayerState::ApplyHit()
 	return false;
 }
 
+void AD1BomberPlayerState::OnRep_Lives()
+{
+	OnLivesChanged.Broadcast();
+}
+
+void AD1BomberPlayerState::OnRep_bIsAlive()
+{
+	OnAliveStateChanged.Broadcast();
+}
+
 void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)
 {
 	if (!HasAuthority())
@@ -72,22 +82,18 @@ void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)
 	OnRep_PlayerSlotIndex(); // Listen Server 대응
 }
 
-void AD1BomberPlayerState::SetPlacement(int32 NewPlacement)
+void AD1BomberPlayerState::OnRep_PlayerSlotIndex()
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
-	Placement = NewPlacement;
-}
+	OnSlotIndexChanged.Broadcast();
 
-void AD1BomberPlayerState::SetBackendUserId(int64 NewUserId)
-{
-	if (!HasAuthority())
+	// 컨테이너 위젯이 한 곳에서 카드 전체를 다시 그릴 수 있게 GameState 디스패처도 트리거.
+	if (UWorld* World = GetWorld())
 	{
-		return;
+		if (AD1BomberGameState* GS = World->GetGameState<AD1BomberGameState>())
+		{
+			GS->MarkPlayerCardsDirty();
+		}
 	}
-	BackendUserId = NewUserId;
 }
 
 void AD1BomberPlayerState::AddFirePower(int32 Delta)
@@ -118,37 +124,31 @@ void AD1BomberPlayerState::AddSpeedLevel(int32 Delta)
 	OnRep_SpeedLevel(); // Listen Server 대응 — 서버 캐릭터도 속도 반영
 }
 
+void AD1BomberPlayerState::OnRep_SpeedLevel()
+{
+	OnSpeedLevelChanged.Broadcast();
+}
+
+void AD1BomberPlayerState::SetPlacement(int32 NewPlacement)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	Placement = NewPlacement;
+}
+
 void AD1BomberPlayerState::OnRep_PlayerName()
 {
 	Super::OnRep_PlayerName();
 	OnPlayerNameChanged.Broadcast();
 }
 
-void AD1BomberPlayerState::OnRep_Lives()
+void AD1BomberPlayerState::SetBackendUserId(int64 NewUserId)
 {
-	OnLivesChanged.Broadcast();
-}
-
-void AD1BomberPlayerState::OnRep_bIsAlive()
-{
-	OnAliveStateChanged.Broadcast();
-}
-
-void AD1BomberPlayerState::OnRep_SpeedLevel()
-{
-	OnSpeedLevelChanged.Broadcast();
-}
-
-void AD1BomberPlayerState::OnRep_PlayerSlotIndex()
-{
-	OnSlotIndexChanged.Broadcast();
-
-	// 컨테이너 위젯이 한 곳에서 카드 전체를 다시 그릴 수 있게 GameState 디스패처도 트리거.
-	if (UWorld* World = GetWorld())
+	if (!HasAuthority())
 	{
-		if (AD1BomberGameState* GS = World->GetGameState<AD1BomberGameState>())
-		{
-			GS->MarkPlayerCardsDirty();
-		}
+		return;
 	}
+	BackendUserId = NewUserId;
 }

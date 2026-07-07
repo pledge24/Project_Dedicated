@@ -85,6 +85,38 @@ void UD1UWLobby::NativeDestruct()
 	Super::NativeDestruct();
 }
 
+void UD1UWLobby::HandleProfileUpdated()
+{
+	// /api/auth/me 갱신 완료 — 최신 score/level로 라벨 새로고침.
+	ApplyProfileToLabels();
+}
+
+void UD1UWLobby::ApplyProfileToLabels()
+{
+	const UD1GameInstance* GI = GetGameInstance<UD1GameInstance>();
+	if (!GI)
+	{
+		return;
+	}
+	const FAuthUserDTO& User = GI->GetCurrentUser();
+
+	if (NicknameLabel)
+	{
+		NicknameLabel->SetText(FText::FromString(User.Nickname));
+	}
+	if (LevelLabel)
+	{
+		LevelLabel->SetText(FText::Format(
+			NSLOCTEXT("Lobby", "LvFmt", "Lv. {0}"),
+			FText::AsNumber(User.Level)
+		));
+	}
+	if (ScoreLabel)
+	{
+		ScoreLabel->SetText(FText::AsNumber(User.Score));
+	}
+}
+
 void UD1UWLobby::OnStartMatchingClicked()
 {
 	UD1MatchmakingSubsystem* Matchmaking = GetGameInstance()->GetSubsystem<UD1MatchmakingSubsystem>();
@@ -165,37 +197,5 @@ void UD1UWLobby::HandleMatchmakingError(const FBackendResponse& Error)
 	{
 		// 에러 문구는 패널에 남겨두고 다시 시도 가능하게 Start 재활성
 		StartMatchingButton->SetIsEnabled(true);
-	}
-}
-
-void UD1UWLobby::HandleProfileUpdated()
-{
-	// /api/auth/me 갱신 완료 — 최신 score/level로 라벨 새로고침.
-	ApplyProfileToLabels();
-}
-
-void UD1UWLobby::ApplyProfileToLabels()
-{
-	const UD1GameInstance* GI = GetGameInstance<UD1GameInstance>();
-	if (!GI)
-	{
-		return;
-	}
-	const FAuthUserDTO& User = GI->GetCurrentUser();
-
-	if (NicknameLabel)
-	{
-		NicknameLabel->SetText(FText::FromString(User.Nickname));
-	}
-	if (LevelLabel)
-	{
-		LevelLabel->SetText(FText::Format(
-			NSLOCTEXT("Lobby", "LvFmt", "Lv. {0}"),
-			FText::AsNumber(User.Level)
-		));
-	}
-	if (ScoreLabel)
-	{
-		ScoreLabel->SetText(FText::AsNumber(User.Score));
 	}
 }

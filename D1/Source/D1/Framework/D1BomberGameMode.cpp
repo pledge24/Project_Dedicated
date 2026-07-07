@@ -185,6 +185,19 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 	return Chosen;
 }
 
+void AD1BomberGameMode::Logout(AController* Exiting)
+{
+	// 떠난 플레이어가 점유했던 PlayerStart를 해제 → fallback(순번) 경로 슬롯 누수 방지.
+	// 권위 슬롯 경로에선 슬롯이 고정이라 no-op이어도 무방.
+	if (Exiting && Exiting->StartSpot.IsValid())
+	{
+		UsedStarts.Remove(Exiting->StartSpot);
+	}
+	UsedStarts.RemoveAll([](const TWeakObjectPtr<AActor>& Ptr) { return !Ptr.IsValid(); });
+
+	Super::Logout(Exiting);
+}
+
 void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
@@ -197,17 +210,4 @@ void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 			Flow->HandlePlayerJoined();
 		}
 	}
-}
-
-void AD1BomberGameMode::Logout(AController* Exiting)
-{
-	// 떠난 플레이어가 점유했던 PlayerStart를 해제 → fallback(순번) 경로 슬롯 누수 방지.
-	// 권위 슬롯 경로에선 슬롯이 고정이라 no-op이어도 무방.
-	if (Exiting && Exiting->StartSpot.IsValid())
-	{
-		UsedStarts.Remove(Exiting->StartSpot);
-	}
-	UsedStarts.RemoveAll([](const TWeakObjectPtr<AActor>& Ptr) { return !Ptr.IsValid(); });
-
-	Super::Logout(Exiting);
 }

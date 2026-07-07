@@ -22,29 +22,16 @@ class UD1UWLobby : public UD1UserWidget
 {
 	GENERATED_BODY()
 
+//~ 공통
+
 protected:
-	//~ UUserWidget
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
-	//~ 버튼 핸들러
-	UFUNCTION()
-	void OnStartMatchingClicked();
+//~ 프로필 표시
 
-	UFUNCTION()
-	void OnCancelMatchingClicked();
-
-	//~ 매칭 이벤트 핸들러 (BackendSubsystem 멀티캐스트 구독)
-	UFUNCTION()
-	void HandleQueueJoined();
-
-	UFUNCTION()
-	void HandleMatchFound(const FMatchFoundDTO& Match);
-
-	UFUNCTION()
-	void HandleMatchmakingError(const FBackendResponse& Error);
-
-	//~ 프로필 갱신(/api/auth/me 완료) 구독 핸들러
+protected:
+	/** 프로필 갱신(/api/auth/me 완료) 구독. */
 	UFUNCTION()
 	void HandleProfileUpdated();
 
@@ -56,6 +43,29 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> ScoreLabel;
+
+private:
+	/** GameInstance 캐시(GetCurrentUser)의 닉네임/레벨/점수를 라벨에 반영. 캐시·갱신 양쪽에서 호출. */
+	void ApplyProfileToLabels();
+
+//~ WS 매칭
+
+protected:
+	UFUNCTION()
+	void OnStartMatchingClicked();
+
+	UFUNCTION()
+	void OnCancelMatchingClicked();
+
+	/** MatchmakingSubsystem 멀티캐스트 구독 (큐 입장·성사·에러). */
+	UFUNCTION()
+	void HandleQueueJoined();
+
+	UFUNCTION()
+	void HandleMatchFound(const FMatchFoundDTO& Match);
+
+	UFUNCTION()
+	void HandleMatchmakingError(const FBackendResponse& Error);
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UButton> StartMatchingButton;
@@ -69,10 +79,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> MatchStatusLabel;
 
-private:
-	/** GameInstance 캐시(GetCurrentUser)의 닉네임/레벨/점수를 라벨에 반영. 캐시·갱신 양쪽에서 호출. */
-	void ApplyProfileToLabels();
+//~ 비로그인 방어
 
+private:
 	/** 비로그인 시 복귀할 맵 — 디테일 패널에서 MP_Frontend 지정. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))
 	TSoftObjectPtr<UWorld> FrontendMap;
