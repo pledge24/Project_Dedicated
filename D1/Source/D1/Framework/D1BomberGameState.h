@@ -9,6 +9,7 @@
 
 class APlayerState;
 class AD1BomberPlayerState;
+class UD1MatchFlowComponent;
 
 UENUM(BlueprintType)
 enum class EBomberMatchPhase : uint8
@@ -59,6 +60,9 @@ public:
 	/** 서버 전용: 파괴된 블록 셀 제거 → 이후 폭발이 통과. */
 	void RemoveSoftBlockCell(const FIntPoint& Cell);
 
+	/** 매치 흐름 컴포넌트(서버 로직). 생성자에서 항상 생성 → non-null. */
+	UD1MatchFlowComponent* GetMatchFlow() const { return MatchFlowComp; }
+
 	//~ 이벤트
 	/** UI 카드 재바인딩 필요 시점마다 방송. 컨테이너가 1회 구독 후 전체 재스캔. */
 	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
@@ -101,4 +105,9 @@ protected:
 
 	UFUNCTION()
 	void OnRep_FinalResults();
+
+private:
+	/** 매치 흐름 로직 소유(서버 전용 실행). 복제 없음. */
+	UPROPERTY()
+	TObjectPtr<UD1MatchFlowComponent> MatchFlowComp;
 };

@@ -1,8 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Framework/D1BomberPlayerState.h"
-#include "Framework/D1BomberGameMode.h"
 #include "Framework/D1BomberGameState.h"
+#include "Framework/D1MatchFlowComponent.h"
 #include "Net/UnrealNetwork.h"
 
 namespace
@@ -41,10 +41,16 @@ bool AD1BomberPlayerState::ApplyHit()
 		bIsAlive = false;
 		OnRep_bIsAlive(); // Listen Server 대응
 
-		// 사망 전환의 매치 처리(등수·승패)는 상태 주인인 PS가 직접 GM에 보고.
-		if (AD1BomberGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AD1BomberGameMode>() : nullptr)
+		// 사망 전환의 매치 처리(등수·승패)는 상태 주인인 PS가 GameState의 매치 흐름 컴포넌트에 보고.
+		if (UWorld* World = GetWorld())
 		{
-			GM->NotifyPlayerDied(this);
+			if (AD1BomberGameState* GS = World->GetGameState<AD1BomberGameState>())
+			{
+				if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
+				{
+					Flow->NotifyPlayerDied(this);
+				}
+			}
 		}
 		return true;
 	}

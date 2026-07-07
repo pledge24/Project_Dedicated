@@ -7,11 +7,8 @@
 #include "D1BomberGameMode.generated.h"
 
 class APlayerController;
-class AD1BomberPlayerState;
 class AD1PowerupPickup;
-class AD1WallBlock;
 class UD1MapData;
-enum class EBomberEndReason : uint8;
 
 /** -Roster= 로 주입된 입장 토큰 → 권위 신원(userId) 매핑. 좌석은 DS가 입장 시 랜덤 배정. */
 struct FD1JoinEntry
@@ -32,6 +29,7 @@ public:
 	/** Login 통과후 해당 클라가 초대받은 손님인지 토큰으로 판단. */
 	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
 
+	/** PostLogin 시점에서 미사용 PlayerStart 랜덤 선택 */
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
 	/** 예상 인원 다 모이면 매치 시작(시작 게이트). */
@@ -40,27 +38,7 @@ public:
 	/** 점유 PlayerStart 해제 — fallback 경로 슬롯 누수 방지. */
 	virtual void Logout(AController* Exiting) override;
 
-	/** 서버 전용: 사망 등록·등수 부여, 1명 남으면 매치 종료. */
-	void NotifyPlayerDied(AD1BomberPlayerState* DeadPS);
-
 private:
-	/** Waiting→Playing + 매치 타이머 시작. 한 번만 실행(가드). */
-	void StartMatch();
-
-	/** 대기 타임아웃 → 현재 인원으로 매치 시작. */
-	void OnWaitForPlayersTimeout();
-
-	/** 매치 시간 만료 → 종료. placement 룰은 v2. */
-	void OnMatchTimeExpired();
-
-	void EnsureAliveListInitialized();
-
-	void EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason);
-
-	/** 매치 생애 질의 — GameState의 MatchPhase 단일 출처. */
-	bool HasMatchStarted() const;
-	bool IsMatchEnded() const;
-
 	/** 빌드할 맵 데이터. -MapData= 로 오버라이드 가능. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UD1MapData> MapData;
@@ -101,13 +79,7 @@ private:
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> UsedStarts;
 
-	UPROPERTY()
-	TArray<TObjectPtr<AD1BomberPlayerState>> AlivePlayerStates;
-
-	FTimerHandle MatchTimerHandle;
-	FTimerHandle WaitForPlayersTimerHandle;
-
-	/** -ExpectedPlayers= 로 주입. 이 수만큼 접속 시 매치 시작(0/1=즉시). */
+	/** -ExpectedPlayers= 로 주입. 매치 흐름 컴포넌트에 전달할 시작 정원(0/1=즉시). */
 	int32 ExpectedPlayerCount = 0;
 
 	/** -MatchId/-MatchToken 으로 주입. 결과 POST 인증용(비면 스킵). */

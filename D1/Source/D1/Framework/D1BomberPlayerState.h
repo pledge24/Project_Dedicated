@@ -83,6 +83,7 @@ private:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	int32 Placement = 0;
 
+	/** 자리에 대한 설정. 1p~4p중 하나. */
 	UPROPERTY(ReplicatedUsing = OnRep_PlayerSlotIndex, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	int32 PlayerSlotIndex = -1;
 

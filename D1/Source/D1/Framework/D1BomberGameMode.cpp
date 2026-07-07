@@ -3,31 +3,18 @@
 #include "Framework/D1BomberGameMode.h"
 #include "Framework/D1BomberGameState.h"
 #include "Framework/D1BomberPlayerState.h"
-#include "Network/D1DedicatedServerSubsystem.h"
+#include "Framework/D1MatchFlowComponent.h"
 #include "Systems/Map/D1MapBuilder.h"
 #include "Systems/Map/D1MapData.h"
 #include "Framework/D1MatchTypes.h"
 #include "Core/D1LogChannels.h"
-#include "Engine/GameInstance.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
-#include "Network/D1MatchResultSubsystem.h"
 
 namespace
 {
-	const TCHAR* EndReasonToString(EBomberEndReason Reason)
-	{
-		switch (Reason)
-		{
-		case EBomberEndReason::Winner:      return TEXT("winner");
-		case EBomberEndReason::Draw:        return TEXT("draw");
-		case EBomberEndReason::TimeExpired: return TEXT("time_expired");
-		default:                            return TEXT("abort");
-		}
-	}
-
 	// 이름순 정렬 — 슬롯 인덱스 일관성 확보.
 	void GatherSortedPlayerStarts(const UObject* WorldContext, TArray<AActor*>& OutStarts)
 	{
@@ -67,7 +54,7 @@ void AD1BomberGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 백엔드가 spawn 시 주입한 매치 식별자/토큰/예상 인원. 둘 다 없으면 PIE/standalone(결과 POST 스킵).
+	// DS spawn 시 백엔드가 주입한 커맨드라인에서 매치 식별자/토큰/예상 인원 파싱. 없으면 PIE/standalone(결과 POST 스킵).
 	FParse::Value(FCommandLine::Get(), TEXT("MatchId="), CurrentMatchId);
 	FParse::Value(FCommandLine::Get(), TEXT("MatchToken="), CurrentMatchToken);
 	FParse::Value(FCommandLine::Get(), TEXT("ExpectedPlayers="), ExpectedPlayerCount);
@@ -77,7 +64,8 @@ void AD1BomberGameMode::BeginPlay()
 			*CurrentMatchId, CurrentMatchToken.IsEmpty() ? TEXT("(none)") : TEXT("(set)"), ExpectedPlayerCount);
 	}
 
-	// 백엔드 권위 roster 주입({token}:{userId};…). InitNewPlayer가 ?join= 토큰으로 신원을 확정한다.
+	// DS spawn 시 백엔드가 주입한 커맨드라인에서 플레이어 명단 파싱.
+	// ({token}:{userId};…). InitNewPlayer가 ?join= 토큰으로 신원을 확정한다.
 	FString RosterStr;
 	if (FParse::Value(FCommandLine::Get(), TEXT("Roster="), RosterStr) && !RosterStr.IsEmpty())
 	{
@@ -117,18 +105,14 @@ void AD1BomberGameMode::BeginPlay()
 		UE_LOG(LogD1, Error, TEXT("[Map] 빌드 실패: %s"), *MapErr);
 	}
 
-	// 시작 게이트: 예상 인원 0/1(PIE·솔로)이면 즉시 시작, 아니면 전원 입장(PostLogin) 또는 타임아웃까지 Waiting.
-	if (ExpectedPlayerCount <= 1)
+	// 매치 흐름은 GameState의 컴포넌트가 소유. 설정을 넘기고 시작 게이트를 위임.
+	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
 	{
-		StartMatch();
-	}
-	else
-	{
-		GetWorldTimerManager().SetTimer(
-			WaitForPlayersTimerHandle, this, &AD1BomberGameMode::OnWaitForPlayersTimeout,
-			WaitForPlayersTimeoutSec, /*bLoop=*/false);
-		UE_LOG(LogD1, Log, TEXT("[Match] 시작 게이트 대기 — 예상 %d명 (타임아웃 %.0fs)"),
-			ExpectedPlayerCount, WaitForPlayersTimeoutSec);
+		if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
+		{
+			Flow->InitializeMatch(ExpectedPlayerCount, WaitForPlayersTimeoutSec, ShutdownGraceSec,
+				CurrentMatchId, CurrentMatchToken);
+		}
 	}
 }
 
@@ -171,11 +155,8 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 	TArray<AActor*> AllStarts;
 	GatherSortedPlayerStarts(this, AllStarts);
 
-	// 위치 선정은 순수 랜덤(사용자 지시): 안 쓴 Start 집합에서 균등 랜덤 1개를 뽑는다.
-	// 비복원(미사용만 후보)이라 한 매치의 슬롯 0~3은 항상 유일 → DB UNIQUE(match,slot)와 안전.
 	TArray<AActor*> FreeStarts;
 	FreeStarts.Reserve(AllStarts.Num());
-	// 미사용 Start만 후보로. (UsedStarts는 위에서 invalid 제거됨 → Contains 안전)
 	for (AActor* Start : AllStarts)
 	{
 		if (!UsedStarts.Contains(Start))
@@ -208,29 +189,13 @@ void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 
-	// 이미 시작했거나 게이트 비활성(PIE·솔로)이면 시작 게이트 카운트 생략.
-	if (HasMatchStarted() || ExpectedPlayerCount <= 1)
+	// 시작 게이트 카운트는 매치 흐름 컴포넌트가 담당.
+	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
 	{
-		return;
-	}
-
-	int32 Connected = 0;
-	if (const AGameStateBase* GS = GameState)
-	{
-		for (const APlayerState* PS : GS->PlayerArray)
+		if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
 		{
-			if (Cast<AD1BomberPlayerState>(PS))
-			{
-				++Connected;
-			}
+			Flow->HandlePlayerJoined();
 		}
-	}
-
-	UE_LOG(LogD1, Log, TEXT("[Match] 입장 %d/%d"), Connected, ExpectedPlayerCount);
-
-	if (Connected >= ExpectedPlayerCount)
-	{
-		StartMatch();
 	}
 }
 
@@ -245,204 +210,4 @@ void AD1BomberGameMode::Logout(AController* Exiting)
 	UsedStarts.RemoveAll([](const TWeakObjectPtr<AActor>& Ptr) { return !Ptr.IsValid(); });
 
 	Super::Logout(Exiting);
-}
-
-void AD1BomberGameMode::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
-{
-	if (IsMatchEnded() || !DeadPS)
-	{
-		return;
-	}
-
-	EnsureAliveListInitialized();
-
-	if (DeadPS->GetPlacement() <= 0)
-	{
-		// 등수 = 죽는 시점의 생존자 수(자기 포함).
-		DeadPS->SetPlacement(AlivePlayerStates.Num());
-		AlivePlayerStates.Remove(DeadPS);
-		UE_LOG(LogD1, Log, TEXT("Player died: %s Placement=%d Remaining=%d"),
-			*DeadPS->GetPlayerName(), DeadPS->GetPlacement(), AlivePlayerStates.Num());
-	}
-
-	if (AlivePlayerStates.Num() <= 1)
-	{
-		const bool bHasSurvivor = AlivePlayerStates.Num() == 1;
-		AD1BomberPlayerState* Winner = bHasSurvivor ? AlivePlayerStates[0].Get() : DeadPS;
-		EndMatchWithWinner(Winner, bHasSurvivor ? EBomberEndReason::Winner : EBomberEndReason::Draw);
-	}
-}
-
-void AD1BomberGameMode::StartMatch()
-{
-	if (HasMatchStarted())
-	{
-		return;
-	}
-	GetWorldTimerManager().ClearTimer(WaitForPlayersTimerHandle);
-
-	if (AD1BomberGameState* BomberGS = GetGameState<AD1BomberGameState>())
-	{
-		BomberGS->MatchStartServerTime = BomberGS->GetServerWorldTimeSeconds();
-		BomberGS->MatchPhase = EBomberMatchPhase::Playing;
-
-		GetWorldTimerManager().SetTimer(
-			MatchTimerHandle, this, &AD1BomberGameMode::OnMatchTimeExpired,
-			BomberGS->MatchDurationSec, /*bLoop=*/false);
-	}
-
-	UE_LOG(LogD1, Log, TEXT("[Match] 매치 시작 (Playing)"));
-}
-
-void AD1BomberGameMode::OnWaitForPlayersTimeout()
-{
-	if (HasMatchStarted())
-	{
-		return;
-	}
-	UE_LOG(LogD1, Warning, TEXT("[Match] 시작 게이트 타임아웃 — 현재 인원으로 시작"));
-	StartMatch();
-}
-
-void AD1BomberGameMode::OnMatchTimeExpired()
-{
-	if (IsMatchEnded())
-	{
-		return;
-	}
-	UE_LOG(LogD1, Log, TEXT("Match time expired -> ending match"));
-	// 생존자는 EndMatchWithWinner에서 공동 1위로 보정된다.
-	EndMatchWithWinner(nullptr, EBomberEndReason::TimeExpired);
-}
-
-void AD1BomberGameMode::EnsureAliveListInitialized()
-{
-	if (AlivePlayerStates.Num() > 0)
-	{
-		return;
-	}
-	if (AGameStateBase* GSB = GameState)
-	{
-		for (APlayerState* PS : GSB->PlayerArray)
-		{
-			if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
-			{
-				// ApplyHit가 NotifyPlayerDied보다 먼저 bIsAlive를 꺼서, 첫 사망자가
-				// 누락되면 등수가 1 모자람. 미랭크(Placement<=0) 기준으로 전원 포함.
-				if (B->GetPlacement() <= 0)
-				{
-					AlivePlayerStates.Add(B);
-				}
-			}
-		}
-	}
-}
-
-void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason)
-{
-	if (IsMatchEnded())
-	{
-		return;
-	}
-
-	if (WinnerPS && WinnerPS->GetPlacement() <= 0)
-	{
-		WinnerPS->SetPlacement(1);
-	}
-
-	AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
-	if (GS)
-	{
-		GS->MatchPhase = EBomberMatchPhase::Finished;
-	}
-
-	UE_LOG(LogD1, Log, TEXT("Match ended (%s). Winner=%s (Placement=%d)"),
-		EndReasonToString(Reason),
-		WinnerPS ? *WinnerPS->GetPlayerName() : TEXT("(none)"),
-		WinnerPS ? WinnerPS->GetPlacement() : 0);
-
-	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
-	{
-		if (APlayerController* PC = It->Get())
-		{
-			PC->DisableInput(PC);
-		}
-	}
-
-	if (!GS)
-	{
-		return;
-	}
-
-	// 최종 결과 스냅샷(UI 원자 복제) + 백엔드 보고용 수집을 한 번에.
-	TArray<FD1MatchResultEntry> Entries;
-	TArray<FMatchResultPlayer> ResultPlayers;
-	Entries.Reserve(GS->PlayerArray.Num());
-	ResultPlayers.Reserve(GS->PlayerArray.Num());
-	for (APlayerState* PS : GS->PlayerArray)
-	{
-		if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
-		{
-			// 미배정 생존자(시간 만료/무승부)는 공동 1위로 보정 — 백엔드는 placement 1~N만 허용.
-			if (B->GetPlacement() <= 0)
-			{
-				B->SetPlacement(1);
-			}
-
-			FD1MatchResultEntry Entry;
-			Entry.Placement = B->GetPlacement();
-			Entry.Nickname  = B->GetPlayerName();
-			Entry.SlotIndex = B->GetPlayerSlotIndex();
-			Entry.LivesLeft = B->GetLives();
-			Entries.Add(Entry);
-
-			FMatchResultPlayer RP;
-			RP.UserId    = B->GetBackendUserId();
-			RP.SlotIndex = B->GetPlayerSlotIndex();
-			RP.Placement = B->GetPlacement();
-			RP.LivesLeft = B->GetLives();
-			ResultPlayers.Add(RP);
-		}
-	}
-
-	// UI 표시용 결정적 순서: 등수 오름차순, 동률은 슬롯 순. (PlayerArray 순서는 비결정)
-	Entries.Sort([](const FD1MatchResultEntry& A, const FD1MatchResultEntry& B)
-	{
-		return A.Placement != B.Placement ? A.Placement < B.Placement : A.SlotIndex < B.SlotIndex;
-	});
-
-	GS->SetFinalResults(Entries);
-
-	// 백엔드가 띄운 DS일 때만 결과 보고(토큰 없으면 PIE/standalone → 스킵).
-	if (!CurrentMatchToken.IsEmpty())
-	{
-		if (UGameInstance* GI = GetGameInstance())
-		{
-			if (UD1MatchResultSubsystem* ResultClient = GI->GetSubsystem<UD1MatchResultSubsystem>())
-			{
-				const int32 DurationSec = FMath::Max(0,
-					FMath::RoundToInt(GS->GetServerWorldTimeSeconds() - GS->MatchStartServerTime));
-				ResultClient->ReportMatchResult(CurrentMatchId, CurrentMatchToken, GetWorld()->GetMapName(),
-					DurationSec, EndReasonToString(Reason), ResultPlayers);
-			}
-		}
-	}
-
-	// 클라들이 결과 화면 카운트다운 후 ClientTravel로 빠지면 DS가 스스로 종료.
-	if (UD1DedicatedServerSubsystem* DS = GetWorld()->GetSubsystem<UD1DedicatedServerSubsystem>())
-	{
-		DS->BeginShutdownWatch(ShutdownGraceSec);
-	}
-}
-
-bool AD1BomberGameMode::HasMatchStarted() const
-{
-	const AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
-	return GS && GS->MatchPhase != EBomberMatchPhase::Waiting;
-}
-
-bool AD1BomberGameMode::IsMatchEnded() const
-{
-	const AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
-	return GS && GS->MatchPhase == EBomberMatchPhase::Finished;
 }
