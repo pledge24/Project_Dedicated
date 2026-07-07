@@ -41,21 +41,6 @@ void UD1UWLogin::OnLoginClicked()
 	AuthSubsystem->Login(LoginId, Password, Cb);
 }
 
-void UD1UWLogin::OnGotoRegisterClicked()
-{
-	if (!RegisterWidgetClass)
-	{
-		UE_LOG(LogD1, Warning, TEXT("[Login] RegisterWidgetClass가 비어있음 (디테일 패널에서 지정 필요)"));
-		return;
-	}
-
-	AD1MenuPlayerController* PC = Cast<AD1MenuPlayerController>(GetOwningPlayer());
-	if (PC)
-	{
-		PC->SwitchToWidget(RegisterWidgetClass);
-	}
-}
-
 void UD1UWLogin::OnLoginCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User)
 {
 	if (!FinishAuthSubmit(Response))
@@ -70,4 +55,19 @@ void UD1UWLogin::OnLoginCompletedInternal(const FBackendResponse& Response, cons
 	}
 
 	UGameplayStatics::OpenLevelBySoftObjectPtr(this, LobbyMap);
+}
+
+void UD1UWLogin::OnGotoRegisterClicked()
+{
+	if (!RegisterWidgetClass)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Login] RegisterWidgetClass가 비어있음 (디테일 패널에서 지정 필요)"));
+		return;
+	}
+
+	AD1MenuPlayerController* PC = Cast<AD1MenuPlayerController>(GetOwningPlayer());
+	if (PC)
+	{
+		PC->SwitchToWidget(RegisterWidgetClass);
+	}
 }

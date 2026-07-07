@@ -22,10 +22,23 @@ class UD1UWMatchResult : public UD1UserWidget
 {
 	GENERATED_BODY()
 
+//~ 결과 행 채우기
+
 public:
 	/** 결과 배열을 등수순 정렬해 행 위젯으로 채운다. */
 	UFUNCTION(BlueprintCallable, Category = "MatchResult")
 	void SetResults(const TArray<FD1MatchResultEntry>& Results);
+
+protected:
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UVerticalBox> ResultListPanel;
+
+private:
+	/** 행 위젯 클래스 — 디테일 패널에서 WBP_MatchResultRow 지정. */
+	UPROPERTY(EditDefaultsOnly, Category = "MatchResult", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UD1UWMatchResultRow> RowWidgetClass;
+
+//~ 카운트다운·로비 복귀
 
 protected:
 	virtual void NativeConstruct() override;
@@ -33,9 +46,6 @@ protected:
 	/** LeaveButton 클릭 — 즉시 로비로. */
 	UFUNCTION()
 	void OnLeaveClicked();
-
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
-	TObjectPtr<UVerticalBox> ResultListPanel;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UButton> LeaveButton;
@@ -50,10 +60,6 @@ private:
 
 	/** DS 연결을 끊고 MP_Lobby로 Travel. 중복 호출 가드. */
 	void ReturnToLobby();
-
-	/** 행 위젯 클래스 — 디테일 패널에서 WBP_MatchResultRow 지정. */
-	UPROPERTY(EditDefaultsOnly, Category = "MatchResult", meta = (AllowPrivateAccess = "true"))
-	TSubclassOf<UD1UWMatchResultRow> RowWidgetClass;
 
 	/** 복귀할 로비 맵 — 디테일 패널에서 MP_Lobby 지정. */
 	UPROPERTY(EditDefaultsOnly, Category = "MatchResult", meta = (AllowPrivateAccess = "true"))

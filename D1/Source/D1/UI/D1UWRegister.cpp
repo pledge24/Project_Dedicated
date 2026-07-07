@@ -41,21 +41,6 @@ void UD1UWRegister::OnRegisterClicked()
 	AuthSubsystem->Register(LoginId, Password, Nickname, Cb);
 }
 
-void UD1UWRegister::OnBackToLoginClicked()
-{
-	if (!LoginWidgetClass)
-	{
-		UE_LOG(LogD1, Warning, TEXT("[Register] LoginWidgetClass가 비어있음"));
-		return;
-	}
-
-	AD1MenuPlayerController* PC = Cast<AD1MenuPlayerController>(GetOwningPlayer());
-	if (PC)
-	{
-		PC->SwitchToWidget(LoginWidgetClass);
-	}
-}
-
 void UD1UWRegister::OnRegisterCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User)
 {
 	if (!FinishAuthSubmit(Response))
@@ -71,5 +56,20 @@ void UD1UWRegister::OnRegisterCompletedInternal(const FBackendResponse& Response
 		{
 			PC->SwitchToWidget(LoginWidgetClass);
 		}
+	}
+}
+
+void UD1UWRegister::OnBackToLoginClicked()
+{
+	if (!LoginWidgetClass)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Register] LoginWidgetClass가 비어있음"));
+		return;
+	}
+
+	AD1MenuPlayerController* PC = Cast<AD1MenuPlayerController>(GetOwningPlayer());
+	if (PC)
+	{
+		PC->SwitchToWidget(LoginWidgetClass);
 	}
 }

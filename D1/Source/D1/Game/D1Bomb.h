@@ -24,29 +24,16 @@ class AD1Bomb : public AActor
 {
 	GENERATED_BODY()
 
+//~ 공통
+
 public:
 	AD1Bomb();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	/** 서버 전용: 설치자 화력으로 폭발 범위 덮어쓰기(스폰 직후). */
-	void SetRange(int32 InRange);
-
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-
-	/** 폭발 이펙트 스폰 Multicast */
-	UFUNCTION(NetMulticast, Reliable)
-	void MulticastOnExploded(const TArray<FIntPoint>& AffectedCells);
-
-	UFUNCTION()
-	void OnRep_DetonationServerTime();
-
-	void DoExplode();
-
-	/** 서버 전용: 다른 폭탄에 휘말렸을 때 거의 즉시 폭발하도록 예약. */
-	void TriggerChainDetonation();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UBoxComponent> CollisionComp;
@@ -54,8 +41,37 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> MeshComp;
 
+//~ 격발 타이밍
+
+protected:
+	UFUNCTION()
+	void OnRep_DetonationServerTime();
+
 private:
-	void ChainDetonateBombs(const TArray<FIntPoint>& Cells);
+	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
+	float FuseSec = 3.f;
+
+	UPROPERTY(ReplicatedUsing = OnRep_DetonationServerTime, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
+	float DetonationServerTime = 0.f;
+
+	FTimerHandle FuseTimerHandle;
+
+	ED1BombState State = ED1BombState::Fusing;
+
+//~ 폭발 처리
+
+public:
+	/** 서버 전용: 설치자 화력으로 폭발 범위 덮어쓰기(스폰 직후). */
+	void SetRange(int32 InRange);
+
+protected:
+	/** 폭발 이펙트 스폰 Multicast */
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastOnExploded(const TArray<FIntPoint>& AffectedCells);
+
+	void DoExplode();
+
+private:
 	void DestroySoftBlocks(const TArray<FIntPoint>& SoftBlockHits);
 	void SpawnExplosionHazard(const TArray<FIntPoint>& Cells);
 
@@ -70,21 +86,20 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	int32 Range = 2;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
-	float FuseSec = 3.f;
-
-	/** 다른 폭탄에 휘말렸을 때 체인 폭발까지의 지연(초). */
-	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
-	float ChainDetonationDelay = 0.05f;
-
 	/** 폭발 불꽃이 피해를 주는 지속 시간(초). 비주얼 AD1ExplosionFX::Lifetime 이하로 유지. */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	float ExplosionLingerDurationSec = 0.5f;
 
-	UPROPERTY(ReplicatedUsing = OnRep_DetonationServerTime, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
-	float DetonationServerTime = 0.f;
+//~ 체인 폭발
 
-	FTimerHandle FuseTimerHandle;
+protected:
+	/** 서버 전용: 다른 폭탄에 휘말렸을 때 거의 즉시 폭발하도록 예약. */
+	void TriggerChainDetonation();
 
-	ED1BombState State = ED1BombState::Fusing;
+private:
+	void ChainDetonateBombs(const TArray<FIntPoint>& Cells);
+
+	/** 다른 폭탄에 휘말렸을 때 체인 폭발까지의 지연(초). */
+	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
+	float ChainDetonationDelay = 0.05f;
 };

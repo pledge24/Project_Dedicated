@@ -93,32 +93,6 @@ void UD1MatchFlowComponent::HandlePlayerJoined()
 	}
 }
 
-void UD1MatchFlowComponent::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
-{
-	if (!HasServerAuthority() || IsMatchEnded() || !DeadPS)
-	{
-		return;
-	}
-
-	EnsureAliveListInitialized();
-
-	if (DeadPS->GetPlacement() <= 0)
-	{
-		// 등수 = 죽는 시점의 생존자 수(자기 포함).
-		DeadPS->SetPlacement(AlivePlayerStates.Num());
-		AlivePlayerStates.Remove(DeadPS);
-		UE_LOG(LogD1, Log, TEXT("Player died: %s Placement=%d Remaining=%d"),
-			*DeadPS->GetPlayerName(), DeadPS->GetPlacement(), AlivePlayerStates.Num());
-	}
-
-	if (AlivePlayerStates.Num() <= 1)
-	{
-		const bool bHasSurvivor = AlivePlayerStates.Num() == 1;
-		AD1BomberPlayerState* Winner = bHasSurvivor ? AlivePlayerStates[0].Get() : DeadPS;
-		EndMatchWithWinner(Winner, bHasSurvivor ? EBomberEndReason::Winner : EBomberEndReason::Draw);
-	}
-}
-
 void UD1MatchFlowComponent::StartMatch()
 {
 	if (HasMatchStarted())
@@ -158,15 +132,30 @@ void UD1MatchFlowComponent::OnWaitForPlayersTimeout()
 	StartMatch();
 }
 
-void UD1MatchFlowComponent::OnMatchTimeExpired()
+void UD1MatchFlowComponent::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 {
-	if (IsMatchEnded())
+	if (!HasServerAuthority() || IsMatchEnded() || !DeadPS)
 	{
 		return;
 	}
-	UE_LOG(LogD1, Log, TEXT("Match time expired -> ending match"));
-	// 생존자는 EndMatchWithWinner에서 공동 1위로 보정된다.
-	EndMatchWithWinner(nullptr, EBomberEndReason::TimeExpired);
+
+	EnsureAliveListInitialized();
+
+	if (DeadPS->GetPlacement() <= 0)
+	{
+		// 등수 = 죽는 시점의 생존자 수(자기 포함).
+		DeadPS->SetPlacement(AlivePlayerStates.Num());
+		AlivePlayerStates.Remove(DeadPS);
+		UE_LOG(LogD1, Log, TEXT("Player died: %s Placement=%d Remaining=%d"),
+			*DeadPS->GetPlayerName(), DeadPS->GetPlacement(), AlivePlayerStates.Num());
+	}
+
+	if (AlivePlayerStates.Num() <= 1)
+	{
+		const bool bHasSurvivor = AlivePlayerStates.Num() == 1;
+		AD1BomberPlayerState* Winner = bHasSurvivor ? AlivePlayerStates[0].Get() : DeadPS;
+		EndMatchWithWinner(Winner, bHasSurvivor ? EBomberEndReason::Winner : EBomberEndReason::Draw);
+	}
 }
 
 void UD1MatchFlowComponent::EnsureAliveListInitialized()
@@ -194,6 +183,17 @@ void UD1MatchFlowComponent::EnsureAliveListInitialized()
 			}
 		}
 	}
+}
+
+void UD1MatchFlowComponent::OnMatchTimeExpired()
+{
+	if (IsMatchEnded())
+	{
+		return;
+	}
+	UE_LOG(LogD1, Log, TEXT("Match time expired -> ending match"));
+	// 생존자는 EndMatchWithWinner에서 공동 1위로 보정된다.
+	EndMatchWithWinner(nullptr, EBomberEndReason::TimeExpired);
 }
 
 void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason)

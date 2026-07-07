@@ -27,18 +27,23 @@ class AD1PowerupPickup : public AActor
 {
 	GENERATED_BODY()
 
+//~ 공통
+
 public:
 	AD1PowerupPickup();
 
-	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
-	/** 서버 전용: 스폰 직후 타입 지정(드롭 시 GameMode가 호출). */
-	void SetPowerupType(EPowerupType InType);
 
 protected:
 	virtual void BeginPlay() override;
 
+//~ 타입·획득
+
+public:
+	/** 서버 전용: 스폰 직후 타입 지정(드롭 시 GameMode가 호출). */
+	void SetPowerupType(EPowerupType InType);
+
+protected:
 	UFUNCTION()
 	void OnRep_PowerupType();
 
@@ -49,6 +54,16 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USphereComponent> CollisionComp;
 
+private:
+	UPROPERTY(ReplicatedUsing = OnRep_PowerupType, meta = (AllowPrivateAccess = "true"))
+	EPowerupType PowerupType = EPowerupType::Fire;
+
+//~ 빌보드 비주얼·부유
+
+public:
+	virtual void Tick(float DeltaSeconds) override;
+
+protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UMaterialBillboardComponent> BillboardComp;
 
@@ -75,9 +90,6 @@ private:
 	/** 빌보드 기준 높이(cm). bob은 이 값 기준으로 위아래. */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	float BillboardBaseZ = 50.f;
-
-	UPROPERTY(ReplicatedUsing = OnRep_PowerupType, meta = (AllowPrivateAccess = "true"))
-	EPowerupType PowerupType = EPowerupType::Fire;
 
 	/** 액터별 bob 위상 오프셋(동시 흔들림 방지). 스폰 위치로 결정. */
 	float BobPhase = 0.f;

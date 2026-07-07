@@ -19,20 +19,21 @@ class UD1UWRegister : public UD1UWAuthBase
 {
 	GENERATED_BODY()
 
+//~ 공통
+
 protected:
-	//~ UUserWidget
 	virtual void NativeConstruct() override;
+
+//~ 회원가입 제출
+
+protected:
+	virtual UButton* GetSubmitButton() const override { return RegisterButton; }
 
 	UFUNCTION()
 	void OnRegisterClicked();
 
 	UFUNCTION()
-	void OnBackToLoginClicked();
-
-	UFUNCTION()
 	void OnRegisterCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User);
-
-	virtual UButton* GetSubmitButton() const override { return RegisterButton; }
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UEditableTextBox> NicknameTextBox;
@@ -40,11 +41,17 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UButton> RegisterButton;
 
+//~ 로그인 전환
+
+protected:
+	UFUNCTION()
+	void OnBackToLoginClicked();
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UButton> BackToLoginButton;
 
 private:
-	/** WBP_Login 클래스 — 디테일 패널에서 지정. */
+	/** WBP_Login 클래스 — 디테일 패널에서 지정. 가입 성공 복귀에도 사용. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Register", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<UUserWidget> LoginWidgetClass;
 };

@@ -40,15 +40,6 @@ void AD1Bomb::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 	DOREPLIFETIME(AD1Bomb, DetonationServerTime);
 }
 
-void AD1Bomb::SetRange(int32 InRange)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-	Range = FMath::Max(1, InRange);
-}
-
 void AD1Bomb::BeginPlay()
 {
 	Super::BeginPlay();
@@ -80,6 +71,20 @@ void AD1Bomb::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+void AD1Bomb::OnRep_DetonationServerTime()
+{
+	// 클라 카운트다운 VFX(메시 펄스, 사운드 등) 자리.
+}
+
+void AD1Bomb::SetRange(int32 InRange)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	Range = FMath::Max(1, InRange);
+}
+
 void AD1Bomb::MulticastOnExploded_Implementation(const TArray<FIntPoint>& AffectedCells)
 {
 	UWorld* World = GetWorld();
@@ -97,11 +102,6 @@ void AD1Bomb::MulticastOnExploded_Implementation(const TArray<FIntPoint>& Affect
 		UClass* FXClass = ExplosionFXClass ? ExplosionFXClass.Get() : AD1ExplosionFX::StaticClass();
 		World->SpawnActor<AD1ExplosionFX>(FXClass, Center, FRotator::ZeroRotator, Params);
 	}
-}
-
-void AD1Bomb::OnRep_DetonationServerTime()
-{
-	// 클라 카운트다운 VFX(메시 펄스, 사운드 등) 자리.
 }
 
 void AD1Bomb::DoExplode()
@@ -136,41 +136,6 @@ void AD1Bomb::DoExplode()
 	}
 
 	Destroy();
-}
-
-void AD1Bomb::TriggerChainDetonation()
-{
-	if (!HasAuthority() || State != ED1BombState::Fusing)
-	{
-		return;
-	}
-
-	State = ED1BombState::Detonating;
-	// SetTimer가 같은 핸들의 도화선 타이머를 자동으로 clear 후 교체한다.
-	GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, ChainDetonationDelay, false);
-}
-
-void AD1Bomb::ChainDetonateBombs(const TArray<FIntPoint>& Cells)
-{
-	// 폭발 십자 위에 있는 다른 폭탄 격발.
-	for (AD1Bomb* Other : TActorRange<AD1Bomb>(GetWorld()))
-	{
-		if (!IsValid(Other) || Other == this)
-		{
-			continue;
-		}
-		
-		if (Other->State != ED1BombState::Fusing)
-		{
-			continue;
-		}
-
-		const FIntPoint OtherCell = UD1BomberGridLibrary::WorldToCell(Other->GetActorLocation());
-		if (Cells.Contains(OtherCell))
-		{
-			Other->TriggerChainDetonation();
-		}
-	}
 }
 
 void AD1Bomb::DestroySoftBlocks(const TArray<FIntPoint>& SoftBlockHits)
@@ -218,5 +183,40 @@ void AD1Bomb::SpawnExplosionHazard(const TArray<FIntPoint>& Cells)
 	if (AD1ExplosionHazard* Hazard = World->SpawnActor<AD1ExplosionHazard>(HazardClass, GetActorLocation(), FRotator::ZeroRotator, Params))
 	{
 		Hazard->Initialize(Cells, ExplosionLingerDurationSec);
+	}
+}
+
+void AD1Bomb::TriggerChainDetonation()
+{
+	if (!HasAuthority() || State != ED1BombState::Fusing)
+	{
+		return;
+	}
+
+	State = ED1BombState::Detonating;
+	// SetTimer가 같은 핸들의 도화선 타이머를 자동으로 clear 후 교체한다.
+	GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, ChainDetonationDelay, false);
+}
+
+void AD1Bomb::ChainDetonateBombs(const TArray<FIntPoint>& Cells)
+{
+	// 폭발 십자 위에 있는 다른 폭탄 격발.
+	for (AD1Bomb* Other : TActorRange<AD1Bomb>(GetWorld()))
+	{
+		if (!IsValid(Other) || Other == this)
+		{
+			continue;
+		}
+		
+		if (Other->State != ED1BombState::Fusing)
+		{
+			continue;
+		}
+
+		const FIntPoint OtherCell = UD1BomberGridLibrary::WorldToCell(Other->GetActorLocation());
+		if (Cells.Contains(OtherCell))
+		{
+			Other->TriggerChainDetonation();
+		}
 	}
 }

@@ -34,18 +34,6 @@ void AD1SoftBlock::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 	DOREPLIFETIME(AD1SoftBlock, bDestroying);
 }
 
-void AD1SoftBlock::SetHeldItem(EPowerupType InType, TSubclassOf<AD1PowerupPickup> InPickupClass, float InDropZ)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-	HeldItem = InType;
-	PickupClass = InPickupClass;
-	DropZ = InDropZ;
-	bHasItem = true;
-}
-
 void AD1SoftBlock::StartDestroying()
 {
 	if (!HasAuthority() || bDestroying)
@@ -101,4 +89,16 @@ void AD1SoftBlock::CompleteDestruction()
 	}
 
 	Destroy();
+}
+
+void AD1SoftBlock::SetHeldItem(EPowerupType InType, TSubclassOf<AD1PowerupPickup> InPickupClass, float InDropZ)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	HeldItem = InType;
+	PickupClass = InPickupClass;
+	DropZ = InDropZ;
+	bHasItem = true;
 }
