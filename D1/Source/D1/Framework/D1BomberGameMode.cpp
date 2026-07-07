@@ -13,7 +13,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
-#include "Network/BackendSubsystem.h"
+#include "Network/D1MatchResultSubsystem.h"
 
 namespace
 {
@@ -418,11 +418,11 @@ void AD1BomberGameMode::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomb
 	{
 		if (UGameInstance* GI = GetGameInstance())
 		{
-			if (UBackendSubsystem* Backend = GI->GetSubsystem<UBackendSubsystem>())
+			if (UD1MatchResultSubsystem* ResultClient = GI->GetSubsystem<UD1MatchResultSubsystem>())
 			{
 				const int32 DurationSec = FMath::Max(0,
 					FMath::RoundToInt(GS->GetServerWorldTimeSeconds() - GS->MatchStartServerTime));
-				Backend->ReportMatchResult(CurrentMatchId, CurrentMatchToken, GetWorld()->GetMapName(),
+				ResultClient->ReportMatchResult(CurrentMatchId, CurrentMatchToken, GetWorld()->GetMapName(),
 					DurationSec, EndReasonToString(Reason), ResultPlayers);
 			}
 		}

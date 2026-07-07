@@ -6,7 +6,7 @@
 #include "UI/D1UserWidget.h"
 #include "D1UWAuthBase.generated.h"
 
-class UBackendSubsystem;
+class UD1AuthSubsystem;
 class UButton;
 class UEditableTextBox;
 class UTextBlock;
@@ -43,7 +43,7 @@ protected:
 	void OnRequestFinished(bool bSuccess, const FString& ErrorMessage);
 
 	//~ 공용 인증 플로우 (자식 클릭/완료 핸들러가 사용)
-	UBackendSubsystem* ResolveBackend();
+	UD1AuthSubsystem* ResolveBackend();
 	void BeginAuthSubmit();
 	bool FinishAuthSubmit(const FBackendResponse& Response);
 

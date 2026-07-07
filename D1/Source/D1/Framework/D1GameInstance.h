@@ -10,7 +10,7 @@
 /**
  *  D1 GameInstance.
  *  맵 전환 사이에서 살아남는 세션 상태(JWT, 로그인 유저) 보관 전담(100% 유저용).
- *  통신은 UBackendSubsystem이 담당, 여기는 데이터만.
+ *  통신은 백엔드 Subsystem(Auth/Matchmaking/Result)이 담당, 여기는 데이터만.
  */
 UCLASS()
 class UD1GameInstance : public UGameInstance

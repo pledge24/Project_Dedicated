@@ -6,7 +6,7 @@
 #include "Components/EditableTextBox.h"
 #include "Core/D1LogChannels.h"
 #include "Framework/Menu/D1MenuPlayerController.h"
-#include "Network/BackendSubsystem.h"
+#include "Network/D1AuthSubsystem.h"
 
 void UD1UWRegister::NativeConstruct()
 {
@@ -24,7 +24,7 @@ void UD1UWRegister::NativeConstruct()
 
 void UD1UWRegister::OnRegisterClicked()
 {
-	UBackendSubsystem* Backend = ResolveBackend();
+	UD1AuthSubsystem* Backend = ResolveBackend();
 	if (!Backend)
 	{
 		return;

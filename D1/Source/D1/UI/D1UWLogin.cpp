@@ -7,7 +7,7 @@
 #include "Core/D1LogChannels.h"
 #include "Kismet/GameplayStatics.h"
 #include "Framework/Menu/D1MenuPlayerController.h"
-#include "Network/BackendSubsystem.h"
+#include "Network/D1AuthSubsystem.h"
 
 void UD1UWLogin::NativeConstruct()
 {
@@ -25,7 +25,7 @@ void UD1UWLogin::NativeConstruct()
 
 void UD1UWLogin::OnLoginClicked()
 {
-	UBackendSubsystem* Backend = ResolveBackend();
+	UD1AuthSubsystem* Backend = ResolveBackend();
 	if (!Backend)
 	{
 		return;

@@ -6,7 +6,7 @@
 #include "Components/TextBlock.h"
 #include "Core/D1LogChannels.h"
 #include "Network/BackendErrorMessages.h"
-#include "Network/BackendSubsystem.h"
+#include "Network/D1AuthSubsystem.h"
 
 void UD1UWAuthBase::NativeConstruct()
 {
@@ -38,12 +38,12 @@ void UD1UWAuthBase::EndRequest(bool bSuccess, const FString& ErrorMessage)
 	OnRequestFinished(bSuccess, ErrorMessage);
 }
 
-UBackendSubsystem* UD1UWAuthBase::ResolveBackend()
+UD1AuthSubsystem* UD1UWAuthBase::ResolveBackend()
 {
-	UBackendSubsystem* Backend = GetGameInstance() ? GetGameInstance()->GetSubsystem<UBackendSubsystem>() : nullptr;
+	UD1AuthSubsystem* Backend = GetGameInstance() ? GetGameInstance()->GetSubsystem<UD1AuthSubsystem>() : nullptr;
 	if (!Backend)
 	{
-		UE_LOG(LogD1, Error, TEXT("[Auth] UBackendSubsystem을 찾을 수 없음"));
+		UE_LOG(LogD1, Error, TEXT("[Auth] UD1AuthSubsystem을 찾을 수 없음"));
 		EndRequest(false, FBackendErrorMessages::Lookup(EBackendErrorCode::InternalError));
 	}
 	return Backend;
