@@ -20,12 +20,10 @@ class UD1UWLogin : public UD1UWAuthBase
 	GENERATED_BODY()
 
 //~ 공통
-
 protected:
 	virtual void NativeConstruct() override;
 
 //~ 로그인 제출
-
 protected:
 	virtual UButton* GetSubmitButton() const override { return LoginButton; }
 
@@ -44,7 +42,6 @@ private:
 	TSoftObjectPtr<UWorld> LobbyMap;
 
 //~ 회원가입 전환
-
 protected:
 	UFUNCTION()
 	void OnGotoRegisterClicked();

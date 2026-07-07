@@ -25,7 +25,6 @@ class AD1Bomb : public AActor
 	GENERATED_BODY()
 
 //~ 공통
-
 public:
 	AD1Bomb();
 
@@ -42,7 +41,6 @@ protected:
 	TObjectPtr<UStaticMeshComponent> MeshComp;
 
 //~ 격발 타이밍
-
 protected:
 	UFUNCTION()
 	void OnRep_DetonationServerTime();
@@ -59,7 +57,6 @@ private:
 	ED1BombState State = ED1BombState::Fusing;
 
 //~ 폭발 처리
-
 public:
 	/** 서버 전용: 설치자 화력으로 폭발 범위 덮어쓰기(스폰 직후). */
 	void SetRange(int32 InRange);
@@ -91,7 +88,6 @@ private:
 	float ExplosionLingerDurationSec = 0.5f;
 
 //~ 체인 폭발
-
 protected:
 	/** 서버 전용: 다른 폭탄에 휘말렸을 때 거의 즉시 폭발하도록 예약. */
 	void TriggerChainDetonation();

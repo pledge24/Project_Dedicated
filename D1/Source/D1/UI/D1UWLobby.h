@@ -23,13 +23,11 @@ class UD1UWLobby : public UD1UserWidget
 	GENERATED_BODY()
 
 //~ 공통
-
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
 //~ 프로필 표시
-
 protected:
 	/** 프로필 갱신(/api/auth/me 완료) 구독. */
 	UFUNCTION()
@@ -49,7 +47,6 @@ private:
 	void ApplyProfileToLabels();
 
 //~ WS 매칭
-
 protected:
 	UFUNCTION()
 	void OnStartMatchingClicked();
@@ -80,7 +77,6 @@ protected:
 	TObjectPtr<UTextBlock> MatchStatusLabel;
 
 //~ 비로그인 방어
-
 private:
 	/** 비로그인 시 복귀할 맵 — 디테일 패널에서 MP_Frontend 지정. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))

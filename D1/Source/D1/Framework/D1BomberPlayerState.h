@@ -18,12 +18,10 @@ class AD1BomberPlayerState : public APlayerState
 	GENERATED_BODY()
 
 //~ 공통
-
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 //~ 생명·사망
-
 public:
 	/** 서버 전용. 사망 전환 시 true 반환. */
 	bool ApplyHit();
@@ -51,7 +49,6 @@ private:
 	bool bIsAlive = true;
 
 //~ 슬롯 배정
-
 public:
 	/** 서버 전용. */
 	void SetPlayerSlotIndex(int32 NewIndex);
@@ -70,7 +67,6 @@ private:
 	int32 PlayerSlotIndex = -1;
 
 //~ 파워업 (화력·폭탄·속도)
-
 public:
 	/** 서버 전용. 캡까지만 증가. */
 	void AddFirePower(int32 Delta);
@@ -101,7 +97,6 @@ private:
 	int32 SpeedLevel = 0;
 
 //~ 등수
-
 public:
 	/** 서버 전용. */
 	void SetPlacement(int32 NewPlacement);
@@ -112,7 +107,6 @@ private:
 	int32 Placement = 0;
 
 //~ 플레이어 이름
-
 public:
 	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
 	FOnPlayerNameChanged OnPlayerNameChanged;
@@ -121,7 +115,6 @@ protected:
 	virtual void OnRep_PlayerName() override;
 
 //~ 백엔드 신원
-
 public:
 	/** 서버 전용. */
 	void SetBackendUserId(int64 NewUserId);

@@ -20,14 +20,12 @@ class AD1BomberCharacter : public ACharacter
 	GENERATED_BODY()
 
 //~ 공통
-
 public:
 	AD1BomberCharacter(const FObjectInitializer& ObjectInitializer);
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 //~ 이동·입력
-
 public:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
@@ -46,7 +44,6 @@ private:
 	TObjectPtr<UInputAction> PlaceBombAction;
 
 //~ 속도 스탯
-
 protected:
 	/** PS OnSpeedLevelChanged 핸들러. SpeedLevel을 MaxWalkSpeed에 반영. */
 	UFUNCTION()
@@ -62,7 +59,6 @@ private:
 	float SpeedStep = 60.f;
 
 //~ 폭탄 설치·추적
-
 public:
 	virtual void Tick(float DeltaSeconds) override;
 
@@ -92,7 +88,6 @@ private:
 	TSubclassOf<AD1Bomb> BombClass;
 
 //~ 폭발 피격·무적
-
 public:
 	/** 서버 전용: 폭발 피격 처리 진입점 */
 	void ReceiveExplosionHit();
@@ -120,7 +115,6 @@ private:
 	FTimerHandle InvulnTimerHandle;
 
 //~ 스턴
-
 private:
 	/** 서버 전용: 피격 경직 시작. StunDuration 동안 입력 차단. */
 	void ApplyHitStun();
@@ -138,7 +132,6 @@ private:
 	FTimerHandle StunTimerHandle;
 
 //~ 점멸
-
 private:
 	/** 깜빡임 시작: 가시화 리셋 + 0.1s 토글 타이머 arm. 무적·사망 연출 공용. */
 	void StartBlink();
@@ -148,7 +141,6 @@ private:
 	bool bBlinkVisible = true;
 
 //~ 사망 연출
-
 public:
 	/**
 	 *  사망 정리. bIsAlive 복제로 서버·각 클라에서 1회씩 실행(bDeathHandled=인스턴스 재진입 가드).
@@ -178,7 +170,6 @@ private:
 	bool bDeathHandled = false;
 
 //~ PS 바인딩·이름표
-
 public:
 	virtual void BeginPlay() override;
 	virtual void PossessedBy(AController* NewController) override;
@@ -201,7 +192,6 @@ private:
 	TWeakObjectPtr<AD1BomberPlayerState> PSWeakPtr;
 
 //~ 공용 헬퍼
-
 public:
 	/** 박스 안의 봄버 캐릭터 수집(Pawn 오버랩 질의 공용화). */
 	static void OverlapBomberCharacters(const UObject* WorldContext, const FVector& Center, const FVector& Extent, TArray<AD1BomberCharacter*>& OutChars);

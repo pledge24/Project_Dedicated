@@ -23,7 +23,6 @@ class UD1UWMatchResult : public UD1UserWidget
 	GENERATED_BODY()
 
 //~ 결과 행 채우기
-
 public:
 	/** 결과 배열을 등수순 정렬해 행 위젯으로 채운다. */
 	UFUNCTION(BlueprintCallable, Category = "MatchResult")
@@ -39,7 +38,6 @@ private:
 	TSubclassOf<UD1UWMatchResultRow> RowWidgetClass;
 
 //~ 카운트다운·로비 복귀
-
 protected:
 	virtual void NativeConstruct() override;
 

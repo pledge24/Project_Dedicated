@@ -22,12 +22,10 @@ class UD1MatchFlowComponent : public UActorComponent
 	GENERATED_BODY()
 
 //~ 공통
-
 public:
 	UD1MatchFlowComponent();
 
 //~ 시작 게이트
-
 public:
 	/** GameMode::BeginPlay가 cmdline 파싱·맵빌드 후 호출. 설정을 받고 시작 게이트를 arm. */
 	void InitializeMatch(int32 InExpectedPlayers, float InWaitTimeoutSec, float InShutdownGraceSec,
@@ -47,7 +45,6 @@ private:
 	float WaitForPlayersTimeoutSec = 20.f;
 
 //~ 사망·등수
-
 public:
 	/** 서버 전용: 사망 등록·등수 부여, 1명 남으면 매치 종료. PlayerState::ApplyHit이 GameState 경유로 호출. */
 	void NotifyPlayerDied(AD1BomberPlayerState* DeadPS);
@@ -59,7 +56,6 @@ private:
 	TArray<TObjectPtr<AD1BomberPlayerState>> AlivePlayerStates;
 
 //~ 매치 종료·셧다운
-
 private:
 	void OnMatchTimeExpired();
 	void EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason);
@@ -72,7 +68,6 @@ private:
 	FString CurrentMatchToken;
 
 //~ 상태 질의
-
 private:
 	/** GameState의 MatchPhase 단일 출처. */
 	bool HasMatchStarted() const;

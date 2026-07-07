@@ -18,7 +18,6 @@ class AD1SoftBlock : public AActor
 	GENERATED_BODY()
 
 //~ 공통
-
 public:
 	AD1SoftBlock();
 
@@ -32,7 +31,6 @@ protected:
 	TObjectPtr<UStaticMeshComponent> MeshComp;
 
 //~ 파괴 연출
-
 public:
 	/** 서버 전용: "파괴 중" 진입. 반투명 유지 후 Destroy. 콜리전·폭발 차단은 유지. */
 	void StartDestroying();
@@ -61,7 +59,6 @@ private:
 	FTimerHandle DestroyingTimerHandle;
 
 //~ 아이템 드롭
-
 public:
 	/** 서버 전용: 빌드 시 숨길 파워업·드롭 방법 사전 배정. 파괴 시 스폰. */
 	void SetHeldItem(EPowerupType InType, TSubclassOf<AD1PowerupPickup> InPickupClass, float InDropZ);

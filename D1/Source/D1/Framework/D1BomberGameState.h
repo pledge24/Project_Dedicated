@@ -28,14 +28,12 @@ class AD1BomberGameState : public AGameStateBase
 	GENERATED_BODY()
 
 //~ 공통
-
 public:
 	AD1BomberGameState();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 //~ 그리드·맵
-
 public:
 	UFUNCTION(BlueprintPure, Category = "Bomber")
 	bool IsWallCell(const FIntPoint& Cell) const;
@@ -62,7 +60,6 @@ public:
 	TArray<FIntPoint> SoftBlockCells;
 
 //~ 매치 타이머
-
 public:
 	UFUNCTION(BlueprintPure, Category = "Bomber|Match")
 	float GetRemainingTimeSec() const;
@@ -76,7 +73,6 @@ public:
 	float MatchDurationSec = 300.0f;
 
 //~ 슬롯·플레이어 카드
-
 public:
 	virtual void AddPlayerState(APlayerState* PlayerState) override;
 	virtual void RemovePlayerState(APlayerState* PlayerState) override;
@@ -93,7 +89,6 @@ public:
 	FOnPlayerCardsDirty OnPlayerCardsDirty;
 
 //~ 매치 종료·결과
-
 public:
 	/** 서버 전용: 결과 스냅샷 설정 + OnMatchFinished 방송(리슨 서버 자기 클라 포함). */
 	void SetFinalResults(const TArray<FD1MatchResultEntry>& InResults);
@@ -117,7 +112,6 @@ protected:
 	void OnRep_FinalResults();
 
 //~ 매치 흐름 컴포넌트
-
 public:
 	/** 매치 흐름 컴포넌트(서버 로직). 생성자에서 항상 생성 → non-null. */
 	UD1MatchFlowComponent* GetMatchFlow() const { return MatchFlowComp; }

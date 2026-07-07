@@ -19,7 +19,6 @@ class AD1PlayerController : public APlayerController
 	GENERATED_BODY()
 
 //~ 공통
-
 public:
 	AD1PlayerController();
 
@@ -27,7 +26,6 @@ protected:
 	virtual void BeginPlay() override;
 
 //~ 입력 매핑
-
 protected:
 	virtual void SetupInputComponent() override;
 
@@ -38,7 +36,6 @@ protected:
 	TArray<UInputMappingContext*> MobileExcludedMappingContexts;
 
 //~ 인게임 HUD
-
 protected:
 	/** 인게임 HUD 위젯 클래스. BP에서 WBP_BomberHUD 지정. */
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
@@ -49,7 +46,6 @@ private:
 	TObjectPtr<UUserWidget> HUDWidget;
 
 //~ 매치 결과 위젯
-
 protected:
 	/** GameState.OnMatchFinished 콜백 — 결과 위젯 생성·표시. */
 	UFUNCTION()

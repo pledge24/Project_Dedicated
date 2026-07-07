@@ -28,7 +28,6 @@ class AD1PowerupPickup : public AActor
 	GENERATED_BODY()
 
 //~ 공통
-
 public:
 	AD1PowerupPickup();
 
@@ -38,7 +37,6 @@ protected:
 	virtual void BeginPlay() override;
 
 //~ 타입·획득
-
 public:
 	/** 서버 전용: 스폰 직후 타입 지정(드롭 시 GameMode가 호출). */
 	void SetPowerupType(EPowerupType InType);
@@ -59,7 +57,6 @@ private:
 	EPowerupType PowerupType = EPowerupType::Fire;
 
 //~ 빌보드 비주얼·부유
-
 public:
 	virtual void Tick(float DeltaSeconds) override;
 

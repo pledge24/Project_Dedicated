@@ -20,12 +20,10 @@ class UD1UWRegister : public UD1UWAuthBase
 	GENERATED_BODY()
 
 //~ 공통
-
 protected:
 	virtual void NativeConstruct() override;
 
 //~ 회원가입 제출
-
 protected:
 	virtual UButton* GetSubmitButton() const override { return RegisterButton; }
 
@@ -42,7 +40,6 @@ protected:
 	TObjectPtr<UButton> RegisterButton;
 
 //~ 로그인 전환
-
 protected:
 	UFUNCTION()
 	void OnBackToLoginClicked();
