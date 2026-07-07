@@ -36,6 +36,7 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+	/** 폭발 이펙트 스폰 Multicast */
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastOnExploded(const TArray<FIntPoint>& AffectedCells);
 

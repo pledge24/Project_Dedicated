@@ -152,7 +152,7 @@ void AD1Bomb::TriggerChainDetonation()
 
 void AD1Bomb::ChainDetonateBombs(const TArray<FIntPoint>& Cells)
 {
-	// 폭발 십자에 걸린 다른 폭탄 체인 점화.
+	// 폭발 십자 위에 있는 다른 폭탄 격발.
 	for (AD1Bomb* Other : TActorRange<AD1Bomb>(GetWorld()))
 	{
 		if (!IsValid(Other) || Other == this)

@@ -184,13 +184,13 @@ void UD1MatchFlowComponent::EnsureAliveListInitialized()
 
 	for (APlayerState* PS : GS->PlayerArray)
 	{
-		if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
+		if (AD1BomberPlayerState* BPS = Cast<AD1BomberPlayerState>(PS))
 		{
 			// ApplyHit가 NotifyPlayerDied보다 먼저 bIsAlive를 꺼서, 첫 사망자가
 			// 누락되면 등수가 1 모자람. 미랭크(Placement<=0) 기준으로 전원 포함.
-			if (B->GetPlacement() <= 0)
+			if (BPS->GetPlacement() <= 0)
 			{
-				AlivePlayerStates.Add(B);
+				AlivePlayerStates.Add(BPS);
 			}
 		}
 	}
