@@ -116,6 +116,13 @@ void AD1BomberCharacter::DoMove(float Right, float Forward)
 		return;
 	}
 
+	// 죽은 폰 예측 이동 방지 — 이동 차단이 서버 권위로 옮겨져, 오너 클라의 입력을 여기서 막는다.
+	const AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
+	if (PS && !PS->IsAlive())
+	{
+		return;
+	}
+
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (PC && PC->PlayerCameraManager)
 	{
@@ -167,17 +174,28 @@ void AD1BomberCharacter::HandleDeath()
 	}
 	bDeathHandled = true;
 
-	// 충돌·이동 즉시 정지.
-	if (UCapsuleComponent* Cap = GetCapsuleComponent())
+	// 권위 정리(서버 전용): 콜리전/이동 차단 + 무적 지속 타이머 취소.
+	// 이동은 ReplicatedMovementMode로 클라 자동 수렴, 콜리전은 클라에서 무관(ignore-Pawn/Visibility).
+	if (HasAuthority())
 	{
-		Cap->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	}
-	if (UCharacterMovementComponent* Move = GetCharacterMovement())
-	{
-		Move->DisableMovement();
+		if (UCapsuleComponent* Cap = GetCapsuleComponent())
+		{
+			Cap->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		}
+		if (UCharacterMovementComponent* Move = GetCharacterMovement())
+		{
+			Move->DisableMovement();
+		}
+		GetWorldTimerManager().ClearTimer(InvulnTimerHandle);
 	}
 
-	// 캐릭터 머리 위 NameTag 처리.
+	// 이하 코드는 순수 클라 연출이라 DS는 여기서 종료.
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+
+	// 캐릭터 머리 위 NameTag 숨김 처리.
 	TArray<UWidgetComponent*> WidgetComps;
 	GetComponents<UWidgetComponent>(WidgetComps);
 	for (UWidgetComponent* WC : WidgetComps)
@@ -185,37 +203,32 @@ void AD1BomberCharacter::HandleDeath()
 		WC->SetVisibility(false);
 	}
 
-	// 무적 연출은 미리 클리어해둔다.
-	GetWorldTimerManager().ClearTimer(InvulnTimerHandle);
-
-	// 사망 연출: 깜빡임 연출 + 사망 몽타주 재생.
+	
+	// 사망 블링크: 이전 blink 위상과 무관하게 메시를 보이는 상태로 맞춘 뒤 시작.
+	if (USkeletalMeshComponent* SK = GetMesh())
 	{
-		bBlinkVisible = true;
-		if (USkeletalMeshComponent* SK = GetMesh())
-		{
-			SK->SetVisibility(true);
-		}
-		GetWorldTimerManager().SetTimer(BlinkTimerHandle, this,
-			&AD1BomberCharacter::TickBlink, 0.1f, true);
+		SK->SetVisibility(true);
+	}
+	StartBlink();
 
-		// 몽타주는 각 인스턴스에서 로컬 재생(HandleDeath가 서버·클라 양쪽에서 불림 → RPC 불필요).
-		float HideAfter = DeathHideDelay;
-		if (DeathMontage)
+	// 사망 몽타주 재생.
+	float HideAfter = DeathHideDelay;
+	if (DeathMontage)
+	{
+		if (UAnimInstance* AnimInst = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
 		{
-			if (UAnimInstance* AnimInst = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+			const float MontageLen = AnimInst->Montage_Play(DeathMontage);
+			if (MontageLen > 0.f)
 			{
-				const float MontageLen = AnimInst->Montage_Play(DeathMontage);
-				if (MontageLen > 0.f)
-				{
-					HideAfter = MontageLen + DeathHideDelay;
-				}
+				HideAfter = MontageLen + DeathHideDelay;
 			}
 		}
-
-		// 사망 애니 종료 + 딜레이 후 메시 숨김.
-		GetWorldTimerManager().SetTimer(DeathHideTimerHandle, this,
-			&AD1BomberCharacter::FinishDeath, HideAfter, false);
 	}
+
+	// 사망 종료 타이머 설정.
+	GetWorldTimerManager().SetTimer(DeathHideTimerHandle, this,
+		&AD1BomberCharacter::FinishDeath, HideAfter, false);
+	
 }
 
 void AD1BomberCharacter::NotifyBombDestroyed(AD1Bomb* Bomb)
@@ -307,10 +320,17 @@ void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 
 void AD1BomberCharacter::OnRep_Invulnerable()
 {
+	// 본문 전체가 연출(히트 애니·점멸) — 렌더 없는 데디 서버에선 스킵.
+	// Start/EndInvulnerability의 수동 OnRep 호출이 데디에서도 불리므로 여기서 가드.
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+
 	if (bIsInvulnerable)
 	{
 		// 피격 리액션: AS_HitBomb를 DefaultSlot에 동적 몽타주로 재생.
-		// invuln 복제로 모든 인스턴스에서 OnRep_Invulnerable이 불려 함께 재생됨.
+		// invuln 복제로 렌더 인스턴스(클라·리슨호스트)에서 OnRep_Invulnerable이 불려 함께 재생됨.
 		if (HitAnim && !bDeathHandled)
 		{
 			if (UAnimInstance* AnimInst = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
@@ -319,9 +339,7 @@ void AD1BomberCharacter::OnRep_Invulnerable()
 			}
 		}
 
-		bBlinkVisible = true;
-		GetWorldTimerManager().SetTimer(BlinkTimerHandle, this,
-			&AD1BomberCharacter::TickBlink, 0.1f, true);
+		StartBlink();
 	}
 	else
 	{
