@@ -24,8 +24,8 @@ void UD1UWRegister::NativeConstruct()
 
 void UD1UWRegister::OnRegisterClicked()
 {
-	UD1AuthSubsystem* Backend = ResolveBackend();
-	if (!Backend)
+	UD1AuthSubsystem* AuthSubsystem = GetAuthSubsystem();
+	if (!AuthSubsystem)
 	{
 		return;
 	}
@@ -38,7 +38,7 @@ void UD1UWRegister::OnRegisterClicked()
 
 	FOnAuthCompleted Cb;
 	Cb.BindDynamic(this, &UD1UWRegister::OnRegisterCompletedInternal);
-	Backend->Register(LoginId, Password, Nickname, Cb);
+	AuthSubsystem->Register(LoginId, Password, Nickname, Cb);
 }
 
 void UD1UWRegister::OnBackToLoginClicked()

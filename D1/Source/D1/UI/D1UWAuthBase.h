@@ -26,11 +26,11 @@ protected:
 	//~ UUserWidget
 	virtual void NativeConstruct() override;
 
-	/** 요청 시작전 처리 — 에러 텍스트 숨김. 자식이 자기 버튼 비활성화. */
+	/** 요청 시작전 UI 표시 처리 */
 	UFUNCTION(BlueprintCallable, Category = "Auth")
 	void BeginRequest();
 
-	/** 요청 종료(Res 수신)전 처리 — 실패 시 에러 텍스트 표시. */
+	/** 요청 종료(Res 수신)후 UI 표시 처리 */
 	UFUNCTION(BlueprintCallable, Category = "Auth")
 	void EndRequest(bool bSuccess, const FString& ErrorMessage);
 
@@ -43,7 +43,7 @@ protected:
 	void OnRequestFinished(bool bSuccess, const FString& ErrorMessage);
 
 	//~ 공용 인증 플로우 (자식 클릭/완료 핸들러가 사용)
-	UD1AuthSubsystem* ResolveBackend();
+	UD1AuthSubsystem* GetAuthSubsystem();
 	void BeginAuthSubmit();
 	bool FinishAuthSubmit(const FBackendResponse& Response);
 

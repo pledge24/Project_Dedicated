@@ -38,15 +38,15 @@ void UD1UWAuthBase::EndRequest(bool bSuccess, const FString& ErrorMessage)
 	OnRequestFinished(bSuccess, ErrorMessage);
 }
 
-UD1AuthSubsystem* UD1UWAuthBase::ResolveBackend()
+UD1AuthSubsystem* UD1UWAuthBase::GetAuthSubsystem()
 {
-	UD1AuthSubsystem* Backend = GetGameInstance() ? GetGameInstance()->GetSubsystem<UD1AuthSubsystem>() : nullptr;
-	if (!Backend)
+	UD1AuthSubsystem* AuthSystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UD1AuthSubsystem>() : nullptr;
+	if (!AuthSystem)
 	{
 		UE_LOG(LogD1, Error, TEXT("[Auth] UD1AuthSubsystem을 찾을 수 없음"));
 		EndRequest(false, FBackendErrorMessages::Lookup(EBackendErrorCode::InternalError));
 	}
-	return Backend;
+	return AuthSystem;
 }
 
 void UD1UWAuthBase::BeginAuthSubmit()
