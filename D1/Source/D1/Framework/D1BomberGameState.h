@@ -32,6 +32,8 @@ public:
 	AD1BomberGameState();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void AddPlayerState(APlayerState* PlayerState) override;
+	virtual void RemovePlayerState(APlayerState* PlayerState) override;
 
 //~ 그리드·맵
 public:
@@ -74,9 +76,6 @@ public:
 
 //~ 슬롯·플레이어 카드
 public:
-	virtual void AddPlayerState(APlayerState* PlayerState) override;
-	virtual void RemovePlayerState(APlayerState* PlayerState) override;
-
 	/** 슬롯 0~3 순 정렬, 빈 슬롯은 nullptr. UI 카드가 인덱스로 바인딩. */
 	UFUNCTION(BlueprintPure, Category = "Bomber|Match")
 	TArray<AD1BomberPlayerState*> GetPlayerStatesBySlot() const;

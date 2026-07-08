@@ -28,6 +28,19 @@ AD1PowerupPickup::AD1PowerupPickup()
 	BillboardComp->SetRelativeLocation(FVector(0.f, 0.f, BillboardBaseZ));
 }
 
+void AD1PowerupPickup::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (!BillboardComp)
+	{
+		return;
+	}
+	const float T = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	const float Z = BillboardBaseZ + BobAmplitude * FMath::Sin(BobSpeed * T + BobPhase);
+	BillboardComp->SetRelativeLocation(FVector(0.f, 0.f, Z));
+}
+
 void AD1PowerupPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -104,19 +117,6 @@ void AD1PowerupPickup::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComp,
 		break;
 	}
 	Destroy(); // 복제로 클라에서도 사라짐
-}
-
-void AD1PowerupPickup::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-
-	if (!BillboardComp)
-	{
-		return;
-	}
-	const float T = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-	const float Z = BillboardBaseZ + BobAmplitude * FMath::Sin(BobSpeed * T + BobPhase);
-	BillboardComp->SetRelativeLocation(FVector(0.f, 0.f, Z));
 }
 
 void AD1PowerupPickup::RefreshVisual()

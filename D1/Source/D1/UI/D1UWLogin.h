@@ -22,11 +22,10 @@ class UD1UWLogin : public UD1UWAuthBase
 //~ 공통
 protected:
 	virtual void NativeConstruct() override;
+	virtual UButton* GetSubmitButton() const override { return LoginButton; }
 
 //~ 로그인 제출
 protected:
-	virtual UButton* GetSubmitButton() const override { return LoginButton; }
-
 	UFUNCTION()
 	void OnLoginClicked();
 

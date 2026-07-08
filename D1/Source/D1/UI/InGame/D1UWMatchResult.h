@@ -22,6 +22,10 @@ class UD1UWMatchResult : public UD1UserWidget
 {
 	GENERATED_BODY()
 
+//~ 공통
+protected:
+	virtual void NativeConstruct() override;
+
 //~ 결과 행 채우기
 public:
 	/** 결과 배열을 등수순 정렬해 행 위젯으로 채운다. */
@@ -39,8 +43,6 @@ private:
 
 //~ 카운트다운·로비 복귀
 protected:
-	virtual void NativeConstruct() override;
-
 	/** LeaveButton 클릭 — 즉시 로비로. */
 	UFUNCTION()
 	void OnLeaveClicked();

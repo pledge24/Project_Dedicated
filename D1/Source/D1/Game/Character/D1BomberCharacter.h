@@ -23,12 +23,15 @@ class AD1BomberCharacter : public ACharacter
 public:
 	AD1BomberCharacter(const FObjectInitializer& ObjectInitializer);
 
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+	virtual void PossessedBy(AController* NewController) override;
+	virtual void OnRep_PlayerState() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 //~ 이동·입력
 public:
-	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
-
 	/** 탑다운: 입력을 카메라 yaw 축으로 투영. */
 	UFUNCTION(BlueprintCallable, Category = "Input")
 	void DoMove(float Right, float Forward);
@@ -60,8 +63,6 @@ private:
 
 //~ 폭탄 설치·추적
 public:
-	virtual void Tick(float DeltaSeconds) override;
-
 	void NotifyBombDestroyed(AD1Bomb* Bomb);
 	void AddIgnoredBomb(AD1Bomb* Bomb);
 
@@ -170,11 +171,6 @@ private:
 	bool bDeathHandled = false;
 
 //~ PS 바인딩·이름표
-public:
-	virtual void BeginPlay() override;
-	virtual void PossessedBy(AController* NewController) override;
-	virtual void OnRep_PlayerState() override;
-
 protected:
 	/** PS OnPlayerNameChanged 핸들러. 이름표 재푸시 위해 OnPlayerStateReady 재호출. */
 	UFUNCTION()

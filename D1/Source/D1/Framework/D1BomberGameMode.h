@@ -27,6 +27,18 @@ public:
 
 	virtual void BeginPlay() override;
 
+	/** Login 통과후 해당 클라가 초대받은 손님인지 토큰으로 판단. */
+	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
+
+	/** PostLogin 시점에서 미사용 PlayerStart 랜덤 선택 */
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+
+	/** 예상 인원 다 모이면 매치 시작(시작 게이트). */
+	virtual void PostLogin(APlayerController* NewPlayer) override;
+
+	/** 점유 PlayerStart 해제 — fallback 경로 슬롯 누수 방지. */
+	virtual void Logout(AController* Exiting) override;
+
 //~ 맵 빌드
 private:
 	/** 빌드할 맵 데이터. -MapData= 로 오버라이드 가능. */
@@ -61,10 +73,6 @@ private:
 	float PowerupZ = 40.f;
 
 //~ 인증 — 접속 신원 검증
-public:
-	/** Login 통과후 해당 클라가 초대받은 손님인지 토큰으로 판단. */
-	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
-
 private:
 	/** -MatchId/-MatchToken 으로 주입. 결과 POST 인증용(비면 스킵). */
 	FString CurrentMatchId;
@@ -74,22 +82,11 @@ private:
 	TMap<FString, FD1JoinEntry> JoinRoster;
 
 //~ 슬롯 배정
-public:
-	/** PostLogin 시점에서 미사용 PlayerStart 랜덤 선택 */
-	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
-
-	/** 점유 PlayerStart 해제 — fallback 경로 슬롯 누수 방지. */
-	virtual void Logout(AController* Exiting) override;
-
 private:
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> UsedStarts;
 
 //~ 시작 게이트·매치 흐름
-public:
-	/** 예상 인원 다 모이면 매치 시작(시작 게이트). */
-	virtual void PostLogin(APlayerController* NewPlayer) override;
-
 private:
 	/** 시작 게이트 대기 상한(초). 안 차도 이 시간 뒤 시작. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))

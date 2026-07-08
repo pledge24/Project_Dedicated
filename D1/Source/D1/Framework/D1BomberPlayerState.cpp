@@ -26,6 +26,12 @@ void AD1BomberPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(AD1BomberPlayerState, SpeedLevel);
 }
 
+void AD1BomberPlayerState::OnRep_PlayerName()
+{
+	Super::OnRep_PlayerName();
+	OnPlayerNameChanged.Broadcast();
+}
+
 bool AD1BomberPlayerState::ApplyHit()
 {
 	if (!HasAuthority() || !bIsAlive)
@@ -136,12 +142,6 @@ void AD1BomberPlayerState::SetPlacement(int32 NewPlacement)
 		return;
 	}
 	Placement = NewPlacement;
-}
-
-void AD1BomberPlayerState::OnRep_PlayerName()
-{
-	Super::OnRep_PlayerName();
-	OnPlayerNameChanged.Broadcast();
 }
 
 void AD1BomberPlayerState::SetBackendUserId(int64 NewUserId)

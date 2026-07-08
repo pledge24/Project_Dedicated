@@ -31,6 +31,7 @@ class AD1PowerupPickup : public AActor
 public:
 	AD1PowerupPickup();
 
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
@@ -57,9 +58,6 @@ private:
 	EPowerupType PowerupType = EPowerupType::Fire;
 
 //~ 빌보드 비주얼·부유
-public:
-	virtual void Tick(float DeltaSeconds) override;
-
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UMaterialBillboardComponent> BillboardComp;

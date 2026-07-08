@@ -51,12 +51,25 @@ AD1BomberCharacter::AD1BomberCharacter(const FObjectInitializer& ObjectInitializ
 	}
 }
 
-void AD1BomberCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+void AD1BomberCharacter::BeginPlay()
 {
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	Super::BeginPlay();
 
-	DOREPLIFETIME(AD1BomberCharacter, bIsInvulnerable);
-	DOREPLIFETIME(AD1BomberCharacter, bStunned);
+	// PossessedBy/OnRep_PlayerState가 BeginPlay 전에 와서 PS는 잡혔지만 컴포넌트(특히 WidgetComponent)가
+	// 아직 init 안 됐을 수 있다. 여기서 한 번 더 ready 신호를 발화해 BP가 안전하게 위젯에 접근하게 함.
+	if (PSWeakPtr.IsValid())
+	{
+		OnPlayerStateReady();
+	}
+}
+
+void AD1BomberCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	// 서버/클라 양쪽에서 실행해 양쪽 캡슐 스윕이 일치하도록.
+	// (클라 이동 예측은 자체 MoveIgnoreActors 리스트를 따로 가짐.)
+	UpdateIgnoredBombs();
 }
 
 void AD1BomberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -74,6 +87,26 @@ void AD1BomberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 			EIC->BindAction(PlaceBombAction, ETriggerEvent::Started, this, &AD1BomberCharacter::ServerTryPlaceBomb);
 		}
 	}
+}
+
+void AD1BomberCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	RefreshPlayerStateBinding();	// PS -> Pawn 순으로 Replicate 된 경우.
+}
+
+void AD1BomberCharacter::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+	RefreshPlayerStateBinding();	// Pawn -> PS 순으로 Replicate 된 경우.
+}
+
+void AD1BomberCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AD1BomberCharacter, bIsInvulnerable);
+	DOREPLIFETIME(AD1BomberCharacter, bStunned);
 }
 
 void AD1BomberCharacter::DoMove(float Right, float Forward)
@@ -125,15 +158,6 @@ void AD1BomberCharacter::OnSpeedLevelChanged()
 	{
 		Move->MaxWalkSpeed = BaseWalkSpeed + PS->GetSpeedLevel() * SpeedStep;
 	}
-}
-
-void AD1BomberCharacter::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-
-	// 서버/클라 양쪽에서 실행해 양쪽 캡슐 스윕이 일치하도록.
-	// (클라 이동 예측은 자체 MoveIgnoreActors 리스트를 따로 가짐.)
-	UpdateIgnoredBombs();
 }
 
 void AD1BomberCharacter::NotifyBombDestroyed(AD1Bomb* Bomb)
@@ -508,30 +532,6 @@ void AD1BomberCharacter::FinishDeath()
 	{
 		SK->SetVisibility(false);
 	}
-}
-
-void AD1BomberCharacter::BeginPlay()
-{
-	Super::BeginPlay();
-
-	// PossessedBy/OnRep_PlayerState가 BeginPlay 전에 와서 PS는 잡혔지만 컴포넌트(특히 WidgetComponent)가
-	// 아직 init 안 됐을 수 있다. 여기서 한 번 더 ready 신호를 발화해 BP가 안전하게 위젯에 접근하게 함.
-	if (PSWeakPtr.IsValid())
-	{
-		OnPlayerStateReady();
-	}
-}
-
-void AD1BomberCharacter::PossessedBy(AController* NewController)
-{
-	Super::PossessedBy(NewController);
-	RefreshPlayerStateBinding();	// PS -> Pawn 순으로 Replicate 된 경우.
-}
-
-void AD1BomberCharacter::OnRep_PlayerState()
-{
-	Super::OnRep_PlayerState();
-	RefreshPlayerStateBinding();	// Pawn -> PS 순으로 Replicate 된 경우.
 }
 
 void AD1BomberCharacter::OnPlayerNameRefreshed()

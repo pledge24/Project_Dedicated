@@ -21,6 +21,9 @@ class AD1BomberPlayerState : public APlayerState
 public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+protected:
+	virtual void OnRep_PlayerName() override;
+
 //~ 생명·사망
 public:
 	/** 서버 전용. 사망 전환 시 true 반환. */
@@ -110,9 +113,6 @@ private:
 public:
 	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
 	FOnPlayerNameChanged OnPlayerNameChanged;
-
-protected:
-	virtual void OnRep_PlayerName() override;
 
 //~ 백엔드 신원
 public:

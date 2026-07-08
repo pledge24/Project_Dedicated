@@ -22,11 +22,10 @@ class UD1UWRegister : public UD1UWAuthBase
 //~ 공통
 protected:
 	virtual void NativeConstruct() override;
+	virtual UButton* GetSubmitButton() const override { return RegisterButton; }
 
 //~ 회원가입 제출
 protected:
-	virtual UButton* GetSubmitButton() const override { return RegisterButton; }
-
 	UFUNCTION()
 	void OnRegisterClicked();
 
