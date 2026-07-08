@@ -34,12 +34,6 @@ AD1Bomb::AD1Bomb()
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
-void AD1Bomb::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AD1Bomb, DetonationServerTime);
-}
-
 void AD1Bomb::BeginPlay()
 {
 	Super::BeginPlay();
@@ -69,6 +63,12 @@ void AD1Bomb::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	// 소멸 경로 일원화: 미발화 도화선 타이머 정리.
 	GetWorldTimerManager().ClearAllTimersForObject(this);
 	Super::EndPlay(EndPlayReason);
+}
+
+void AD1Bomb::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AD1Bomb, DetonationServerTime);
 }
 
 void AD1Bomb::OnRep_DetonationServerTime()

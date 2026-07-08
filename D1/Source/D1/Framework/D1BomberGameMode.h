@@ -16,6 +16,7 @@ struct FD1JoinEntry
 	int64 UserId = 0;
 };
 
+/** 봄버맨 매치 GameMode(서버 전용) — 맵 빌드·접속 신원 검증·슬롯 배정·시작 게이트. */
 UCLASS(abstract)
 class AD1BomberGameMode : public AGameModeBase
 {
@@ -25,6 +26,7 @@ class AD1BomberGameMode : public AGameModeBase
 public:
 	AD1BomberGameMode();
 
+protected:
 	virtual void BeginPlay() override;
 
 	/** Login 통과후 해당 클라가 초대받은 손님인지 토큰으로 판단. */
@@ -33,6 +35,7 @@ public:
 	/** PostLogin 시점에서 미사용 PlayerStart 랜덤 선택 */
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
+public:
 	/** 예상 인원 다 모이면 매치 시작(시작 게이트). */
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 

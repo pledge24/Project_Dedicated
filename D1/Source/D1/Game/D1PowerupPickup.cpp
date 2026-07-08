@@ -28,25 +28,6 @@ AD1PowerupPickup::AD1PowerupPickup()
 	BillboardComp->SetRelativeLocation(FVector(0.f, 0.f, BillboardBaseZ));
 }
 
-void AD1PowerupPickup::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-
-	if (!BillboardComp)
-	{
-		return;
-	}
-	const float T = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-	const float Z = BillboardBaseZ + BobAmplitude * FMath::Sin(BobSpeed * T + BobPhase);
-	BillboardComp->SetRelativeLocation(FVector(0.f, 0.f, Z));
-}
-
-void AD1PowerupPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AD1PowerupPickup, PowerupType);
-}
-
 void AD1PowerupPickup::BeginPlay()
 {
 	Super::BeginPlay();
@@ -67,6 +48,25 @@ void AD1PowerupPickup::BeginPlay()
 	}
 
 	RefreshVisual();
+}
+
+void AD1PowerupPickup::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (!BillboardComp)
+	{
+		return;
+	}
+	const float T = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	const float Z = BillboardBaseZ + BobAmplitude * FMath::Sin(BobSpeed * T + BobPhase);
+	BillboardComp->SetRelativeLocation(FVector(0.f, 0.f, Z));
+}
+
+void AD1PowerupPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AD1PowerupPickup, PowerupType);
 }
 
 void AD1PowerupPickup::SetPowerupType(EPowerupType InType)

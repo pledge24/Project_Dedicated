@@ -23,9 +23,11 @@ class AD1MenuPlayerController : public APlayerController
 public:
 	AD1MenuPlayerController();
 
-	//~ Override 함수
+//~ APlayerController
+protected:
 	virtual void BeginPlay() override;
 
+public:
 	/** 다른 위젯으로 교체 (로그인 ↔ 회원가입 등). 기존 위젯은 RemoveFromParent. */
 	UFUNCTION(BlueprintCallable, Category = "Menu")
 	void SwitchToWidget(TSubclassOf<UUserWidget> NewWidgetClass);

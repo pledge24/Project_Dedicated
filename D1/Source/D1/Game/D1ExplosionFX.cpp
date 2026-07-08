@@ -17,6 +17,12 @@ AD1ExplosionFX::AD1ExplosionFX()
 	SetActorScale3D(FVector(InitialScale));
 }
 
+void AD1ExplosionFX::BeginPlay()
+{
+	Super::BeginPlay();
+	Elapsed = 0.f;
+}
+
 void AD1ExplosionFX::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -41,10 +47,4 @@ void AD1ExplosionFX::Tick(float DeltaSeconds)
 		Scale = FMath::Lerp(PeakScale, InitialScale, A);
 	}
 	SetActorScale3D(FVector(Scale));
-}
-
-void AD1ExplosionFX::BeginPlay()
-{
-	Super::BeginPlay();
-	Elapsed = 0.f;
 }

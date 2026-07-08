@@ -10,6 +10,7 @@ class UMaterialBillboardComponent;
 class UMaterialInterface;
 class USphereComponent;
 
+/** 파워업 종류. */
 UENUM(BlueprintType)
 enum class EPowerupType : uint8
 {
@@ -31,11 +32,12 @@ class AD1PowerupPickup : public AActor
 public:
 	AD1PowerupPickup();
 
-	virtual void Tick(float DeltaSeconds) override;
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
 protected:
 	virtual void BeginPlay() override;
+
+public:
+	virtual void Tick(float DeltaSeconds) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 //~ 타입·획득
 public:

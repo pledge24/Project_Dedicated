@@ -14,6 +14,7 @@ class UInputAction;
 class UInputComponent;
 struct FInputActionValue;
 
+/** 봄버 캐릭터 — 이동·폭탄 설치·피격/무적/스턴·사망 연출. */
 UCLASS(abstract)
 class AD1BomberCharacter : public ACharacter
 {
@@ -23,11 +24,22 @@ class AD1BomberCharacter : public ACharacter
 public:
 	AD1BomberCharacter(const FObjectInitializer& ObjectInitializer);
 
+protected:
 	virtual void BeginPlay() override;
+
+public:
 	virtual void Tick(float DeltaSeconds) override;
+
+protected:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+public:
 	virtual void PossessedBy(AController* NewController) override;
+
+protected:
 	virtual void OnRep_PlayerState() override;
+
+public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 //~ 이동·입력
@@ -100,6 +112,7 @@ protected:
 private:
 	/** 서버 전용: 비치명 피격 후 무적 시작. Duration 뒤 EndInvulnerability. */
 	void StartInvulnerability(float Duration);
+	/** 서버 전용. */
 	void EndInvulnerability();
 
 	/** 피격 시 재생 애니. DefaultSlot 동적 몽타주. */

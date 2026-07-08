@@ -14,11 +14,15 @@ class UStaticMeshComponent;
 /** 폭탄 생애 단계(서버 전용 상태). */
 enum class ED1BombState : uint8
 {
-	Fusing,      // 도화선 카운트다운 중
-	Detonating,  // 체인 격발 예약됨(짧은 지연 대기)
-	Exploding,   // 폭발 처리 시작됨(곧 Destroy)
+	/** 도화선 카운트다운 중. */
+	Fusing,
+	/** 체인 격발 예약됨(짧은 지연 대기). */
+	Detonating,
+	/** 폭발 처리 시작됨(곧 Destroy). */
+	Exploding,
 };
 
+/** 그리드 스냅 폭탄 — 도화선 카운트다운 후 십자 폭발, 다른 폭탄에 휘말리면 체인 격발. */
 UCLASS()
 class AD1Bomb : public AActor
 {
@@ -28,12 +32,14 @@ class AD1Bomb : public AActor
 public:
 	AD1Bomb();
 
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+public:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UBoxComponent> CollisionComp;
 
@@ -66,10 +72,12 @@ protected:
 	UFUNCTION(NetMulticast, Reliable)
 	void MulticastOnExploded(const TArray<FIntPoint>& AffectedCells);
 
+	/** 서버 전용. */
 	void DoExplode();
 
 private:
 	void DestroySoftBlocks(const TArray<FIntPoint>& SoftBlockHits);
+	/** 서버 전용. */
 	void SpawnExplosionHazard(const TArray<FIntPoint>& Cells);
 
 	/** 폭발 셀마다 스폰하는 FX 액터. 미지정 시 C++ 클래스로 폴백. */
