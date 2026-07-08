@@ -28,16 +28,18 @@ class AD1PowerupPickup : public AActor
 {
 	GENERATED_BODY()
 
-//~ 공통
 public:
 	AD1PowerupPickup();
 
-protected:
-	virtual void BeginPlay() override;
-
-public:
+	//~ Begin AActor Interface
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	//~ End AActor Interface
+
+protected:
+	//~ Begin AActor Interface
+	virtual void BeginPlay() override;
+	//~ End AActor Interface
 
 //~ 타입·획득
 public:

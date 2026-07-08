@@ -21,7 +21,6 @@ class UD1MatchFlowComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
-//~ 공통
 public:
 	UD1MatchFlowComponent();
 

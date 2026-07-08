@@ -23,7 +23,9 @@ public:
 	AD1MapCameraManager();
 
 protected:
+	//~ Begin APlayerCameraManager Interface
 	virtual void UpdateViewTarget(FTViewTarget& OutVT, float DeltaTime) override;
+	//~ End APlayerCameraManager Interface
 
 private:
 	AActor* ResolveMapCamera();

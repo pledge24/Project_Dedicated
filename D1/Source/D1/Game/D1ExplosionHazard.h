@@ -20,7 +20,9 @@ public:
 	void Initialize(const TArray<FIntPoint>& InCells, float InDurationSec);
 
 protected:
+	//~ Begin AActor Interface
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	//~ End AActor Interface
 
 private:
 	void TickHazard();

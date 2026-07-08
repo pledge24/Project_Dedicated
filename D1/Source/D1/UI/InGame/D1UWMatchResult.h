@@ -22,9 +22,10 @@ class UD1UWMatchResult : public UD1UserWidget
 {
 	GENERATED_BODY()
 
-//~ 공통
 protected:
+	//~ Begin UUserWidget Interface
 	virtual void NativeConstruct() override;
+	//~ End UUserWidget Interface
 
 //~ 결과 행 채우기
 public:

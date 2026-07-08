@@ -23,8 +23,9 @@ class UD1UWAuthBase : public UD1UserWidget
 	GENERATED_BODY()
 
 protected:
-	//~ UUserWidget
+	//~ Begin UUserWidget Interface
 	virtual void NativeConstruct() override;
+	//~ End UUserWidget Interface
 
 	/** 요청 시작전 UI 표시 처리 */
 	UFUNCTION(BlueprintCallable, Category = "Auth")

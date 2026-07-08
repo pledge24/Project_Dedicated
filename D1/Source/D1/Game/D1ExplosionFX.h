@@ -21,13 +21,15 @@ class AD1ExplosionFX : public AActor
 public:
 	AD1ExplosionFX();
 
-protected:
-	virtual void BeginPlay() override;
-
-public:
+	//~ Begin AActor Interface
 	virtual void Tick(float DeltaSeconds) override;
+	//~ End AActor Interface
 
 protected:
+	//~ Begin AActor Interface
+	virtual void BeginPlay() override;
+	//~ End AActor Interface
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> MeshComp;
 

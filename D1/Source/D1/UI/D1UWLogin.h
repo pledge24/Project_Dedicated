@@ -19,10 +19,14 @@ class UD1UWLogin : public UD1UWAuthBase
 {
 	GENERATED_BODY()
 
-//~ 공통
 protected:
+	//~ Begin UUserWidget Interface
 	virtual void NativeConstruct() override;
+	//~ End UUserWidget Interface
+
+	//~ Begin UD1UWAuthBase Interface
 	virtual UButton* GetSubmitButton() const override { return LoginButton; }
+	//~ End UD1UWAuthBase Interface
 
 //~ 로그인 제출
 protected:

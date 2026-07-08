@@ -19,8 +19,9 @@ class UD1MatchmakingSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
-	//~ USubsystem
+	//~ Begin USubsystem Interface
 	virtual void Deinitialize() override;
+	//~ End USubsystem Interface
 
 	//~ 외부 API — 매칭 (BP에서 위젯이 호출)
 	UFUNCTION(BlueprintCallable, Category = "Backend|Match")

@@ -22,25 +22,27 @@ class AD1BomberGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 
-//~ 공통
 public:
 	AD1BomberGameMode();
 
-protected:
-	virtual void BeginPlay() override;
-
-	/** Login 통과후 해당 클라가 초대받은 손님인지 토큰으로 판단. */
-	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
-
-	/** PostLogin 시점에서 미사용 PlayerStart 랜덤 선택 */
-	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
-
-public:
+	//~ Begin AGameModeBase Interface
 	/** 예상 인원 다 모이면 매치 시작(시작 게이트). */
 	virtual void PostLogin(APlayerController* NewPlayer) override;
-
 	/** 점유 PlayerStart 해제 — fallback 경로 슬롯 누수 방지. */
 	virtual void Logout(AController* Exiting) override;
+	//~ End AGameModeBase Interface
+
+protected:
+	//~ Begin AActor Interface
+	virtual void BeginPlay() override;
+	//~ End AActor Interface
+
+	//~ Begin AGameModeBase Interface
+	/** Login 통과후 해당 클라가 초대받은 손님인지 토큰으로 판단. */
+	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal = TEXT("")) override;
+	/** PostLogin 시점에서 미사용 PlayerStart 랜덤 선택 */
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+	//~ End AGameModeBase Interface
 
 //~ 맵 빌드
 private:

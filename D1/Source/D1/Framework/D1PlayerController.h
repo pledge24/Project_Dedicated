@@ -18,13 +18,17 @@ class AD1PlayerController : public APlayerController
 {
 	GENERATED_BODY()
 
-//~ 공통
 public:
 	AD1PlayerController();
 
 protected:
+	//~ Begin AActor Interface
 	virtual void BeginPlay() override;
+	//~ End AActor Interface
+
+	//~ Begin APlayerController Interface
 	virtual void SetupInputComponent() override;
+	//~ End APlayerController Interface
 
 //~ 입력 매핑
 protected:

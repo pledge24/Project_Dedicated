@@ -28,17 +28,20 @@ class AD1Bomb : public AActor
 {
 	GENERATED_BODY()
 
-//~ 공통
 public:
 	AD1Bomb();
 
+	//~ Begin AActor Interface
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	//~ End AActor Interface
+
 protected:
+	//~ Begin AActor Interface
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	//~ End AActor Interface
 
-public:
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
+//~ 컴포넌트
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UBoxComponent> CollisionComp;

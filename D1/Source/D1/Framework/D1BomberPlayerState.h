@@ -18,12 +18,15 @@ class AD1BomberPlayerState : public APlayerState
 {
 	GENERATED_BODY()
 
-//~ 공통
 public:
+	//~ Begin AActor Interface
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	//~ End AActor Interface
 
 protected:
+	//~ Begin APlayerState Interface
 	virtual void OnRep_PlayerName() override;
+	//~ End APlayerState Interface
 
 //~ 생명·사망
 public:

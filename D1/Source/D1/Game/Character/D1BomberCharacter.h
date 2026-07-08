@@ -20,27 +20,27 @@ class AD1BomberCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
-//~ 공통
 public:
 	AD1BomberCharacter(const FObjectInitializer& ObjectInitializer);
 
-protected:
-	virtual void BeginPlay() override;
-
-public:
+	//~ Begin AActor Interface
 	virtual void Tick(float DeltaSeconds) override;
-
-protected:
-	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
-
-public:
-	virtual void PossessedBy(AController* NewController) override;
-
-protected:
-	virtual void OnRep_PlayerState() override;
-
-public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	//~ End AActor Interface
+
+	//~ Begin APawn Interface
+	virtual void PossessedBy(AController* NewController) override;
+	//~ End APawn Interface
+
+protected:
+	//~ Begin AActor Interface
+	virtual void BeginPlay() override;
+	//~ End AActor Interface
+
+	//~ Begin APawn Interface
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+	virtual void OnRep_PlayerState() override;
+	//~ End APawn Interface
 
 //~ 이동·입력
 public:

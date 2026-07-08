@@ -18,12 +18,14 @@ class AD1SoftBlock : public AActor
 {
 	GENERATED_BODY()
 
-//~ 공통
 public:
 	AD1SoftBlock();
 
+	//~ Begin AActor Interface
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	//~ End AActor Interface
 
+//~ 컴포넌트
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UBoxComponent> CollisionComp;

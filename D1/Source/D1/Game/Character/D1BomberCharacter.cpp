@@ -51,6 +51,29 @@ AD1BomberCharacter::AD1BomberCharacter(const FObjectInitializer& ObjectInitializ
 	}
 }
 
+void AD1BomberCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	// 서버/클라 양쪽에서 실행해 양쪽 캡슐 스윕이 일치하도록.
+	// (클라 이동 예측은 자체 MoveIgnoreActors 리스트를 따로 가짐.)
+	UpdateIgnoredBombs();
+}
+
+void AD1BomberCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AD1BomberCharacter, bIsInvulnerable);
+	DOREPLIFETIME(AD1BomberCharacter, bStunned);
+}
+
+void AD1BomberCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	RefreshPlayerStateBinding();	// PS -> Pawn 순으로 Replicate 된 경우.
+}
+
 void AD1BomberCharacter::BeginPlay()
 {
 	Super::BeginPlay();
@@ -61,15 +84,6 @@ void AD1BomberCharacter::BeginPlay()
 	{
 		OnPlayerStateReady();
 	}
-}
-
-void AD1BomberCharacter::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-
-	// 서버/클라 양쪽에서 실행해 양쪽 캡슐 스윕이 일치하도록.
-	// (클라 이동 예측은 자체 MoveIgnoreActors 리스트를 따로 가짐.)
-	UpdateIgnoredBombs();
 }
 
 void AD1BomberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -89,24 +103,10 @@ void AD1BomberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	}
 }
 
-void AD1BomberCharacter::PossessedBy(AController* NewController)
-{
-	Super::PossessedBy(NewController);
-	RefreshPlayerStateBinding();	// PS -> Pawn 순으로 Replicate 된 경우.
-}
-
 void AD1BomberCharacter::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
 	RefreshPlayerStateBinding();	// Pawn -> PS 순으로 Replicate 된 경우.
-}
-
-void AD1BomberCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-	DOREPLIFETIME(AD1BomberCharacter, bIsInvulnerable);
-	DOREPLIFETIME(AD1BomberCharacter, bStunned);
 }
 
 void AD1BomberCharacter::DoMove(float Right, float Forward)

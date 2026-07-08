@@ -29,13 +29,17 @@ class AD1BomberGameState : public AGameStateBase
 {
 	GENERATED_BODY()
 
-//~ 공통
 public:
 	AD1BomberGameState();
 
+	//~ Begin AActor Interface
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	//~ End AActor Interface
+
+	//~ Begin AGameStateBase Interface
 	virtual void AddPlayerState(APlayerState* PlayerState) override;
 	virtual void RemovePlayerState(APlayerState* PlayerState) override;
+	//~ End AGameStateBase Interface
 
 //~ 그리드·맵
 public:

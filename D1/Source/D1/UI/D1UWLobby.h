@@ -22,10 +22,11 @@ class UD1UWLobby : public UD1UserWidget
 {
 	GENERATED_BODY()
 
-//~ 공통
 protected:
+	//~ Begin UUserWidget Interface
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
+	//~ End UUserWidget Interface
 
 //~ 프로필 표시
 protected:
