@@ -75,6 +75,7 @@ private:
 
 //~ 폭탄 설치·추적
 public:
+	/** 폭탄이 터지면서 호출 — 소유자 슬롯 회수. */
 	void NotifyBombDestroyed(AD1Bomb* Bomb);
 	void AddIgnoredBomb(AD1Bomb* Bomb);
 

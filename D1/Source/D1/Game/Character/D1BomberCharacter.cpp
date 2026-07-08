@@ -162,7 +162,6 @@ void AD1BomberCharacter::OnSpeedLevelChanged()
 
 void AD1BomberCharacter::NotifyBombDestroyed(AD1Bomb* Bomb)
 {
-	// 폭탄이 터지면서 호출 — 소유자 슬롯 회수.
 	ActiveBombs.RemoveAll([Bomb](const TWeakObjectPtr<AD1Bomb>& W)
 	{
 		return !W.IsValid() || W.Get() == Bomb;

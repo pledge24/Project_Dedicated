@@ -27,7 +27,8 @@ namespace
 			return false;
 		}
 
-		// 드롭 확정.
+		// 드롭 확정.(아이템 종류가 3개 밖에 없어 if-else 방식 사용.
+		// 종류가 많아지면 lower-bound 사용 고려 중)
 		const int32 Roll = FMath::RandRange(0, TotalWeight - 1);
 		if (Roll < Cfg.FireWeight)
 		{
