@@ -34,11 +34,9 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Auth")
 	void EndRequest(bool bSuccess, const FString& ErrorMessage);
 
-	/** 요청 시작 이벤트 바인딩 함수 */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Auth|Events")
 	void OnRequestStarted();
 
-	/** 요청 종료(Res 수신) 이벤트 바인딩 함수 */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Auth|Events")
 	void OnRequestFinished(bool bSuccess, const FString& ErrorMessage);
 

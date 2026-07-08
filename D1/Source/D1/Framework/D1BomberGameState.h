@@ -11,6 +11,7 @@ class APlayerState;
 class AD1BomberPlayerState;
 class UD1MatchFlowComponent;
 
+/** 매치 진행 단계. */
 UENUM(BlueprintType)
 enum class EBomberMatchPhase : uint8
 {
@@ -22,6 +23,7 @@ enum class EBomberMatchPhase : uint8
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerCardsDirty);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnMatchFinished);
 
+/** 매치 공유 상태 — 그리드·타이머·결과를 복제하고 매치 흐름 컴포넌트를 소유. */
 UCLASS()
 class AD1BomberGameState : public AGameStateBase
 {

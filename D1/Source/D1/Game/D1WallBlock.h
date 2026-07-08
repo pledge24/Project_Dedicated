@@ -9,6 +9,7 @@
 class UBoxComponent;
 class UStaticMeshComponent;
 
+/** 파괴 불가 벽 블록. */
 UCLASS()
 class AD1WallBlock : public AActor
 {

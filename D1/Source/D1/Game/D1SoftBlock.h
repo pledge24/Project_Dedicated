@@ -12,6 +12,7 @@ class UMaterialInterface;
 class UStaticMeshComponent;
 enum class EPowerupType : uint8;
 
+/** 파괴 가능 블록 — 파괴 연출 후 보유 아이템 드롭. */
 UCLASS()
 class AD1SoftBlock : public AActor
 {

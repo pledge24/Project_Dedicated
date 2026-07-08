@@ -12,6 +12,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerNameChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSlotIndexChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSpeedLevelChanged);
 
+/** 플레이어 복제 상태 — 생명·슬롯·파워업·등수·백엔드 신원. */
 UCLASS()
 class AD1BomberPlayerState : public APlayerState
 {
@@ -65,7 +66,7 @@ protected:
 	void OnRep_PlayerSlotIndex();
 
 private:
-	/** 자리에 대한 설정. 1p~4p중 하나. */
+	/** 좌석 슬롯 0~3, -1=미배정. */
 	UPROPERTY(ReplicatedUsing = OnRep_PlayerSlotIndex, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	int32 PlayerSlotIndex = -1;
 

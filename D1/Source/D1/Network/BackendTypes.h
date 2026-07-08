@@ -15,7 +15,8 @@ enum class EBackendErrorCode : uint8
 	DuplicateLoginId,
 	DuplicateNickname,
 	RateLimited,
-	NetworkError,        // HTTP 자체 실패 (서버 다운 / DNS / 타임아웃)
+	/** HTTP 자체 실패 (서버 다운 / DNS / 타임아웃). */
+	NetworkError,
 	InternalError,
 	Unknown
 };
@@ -24,10 +25,14 @@ enum class EBackendErrorCode : uint8
 UENUM(BlueprintType)
 enum class EMatchmakingState : uint8
 {
-	Idle,        // 큐 밖
-	Connecting,  // WS 연결 시도 중
-	Queued,      // 큐 입장 완료, 상대 대기
-	Matched      // 매칭 성사
+	/** 큐 밖. */
+	Idle,
+	/** WS 연결 시도 중. */
+	Connecting,
+	/** 큐 입장 완료, 상대 대기. */
+	Queued,
+	/** 매칭 성사. */
+	Matched
 };
 
 /** 인증된 유저 정보 (토큰 제외 — 토큰은 GameInstance가 별도 보관). */

@@ -75,7 +75,7 @@ bool UD1MapBuilder::Build(UWorld* World, AD1BomberGameState* GS, const FD1MapBui
 		return false;
 	}
 
-	// 2. ==맵 레이아웃 생성==
+	// 2. 맵 레이아웃 생성
 	FD1MapLayout Layout;
 	FString ParseErr;
 	if (!MapToUse->BuildLayout(Layout, ParseErr))
@@ -89,7 +89,7 @@ bool UD1MapBuilder::Build(UWorld* World, AD1BomberGameState* GS, const FD1MapBui
 	GS->WallCells = Layout.WallCells;
 	GS->SoftBlockCells = Layout.SoftBlockCells;
 
-	// 3. ==맵 스폰==
+	// 3. 맵 스폰
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
