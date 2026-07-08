@@ -31,15 +31,25 @@ export function computeFfaEloDeltas(ratings: number[], placements: number[], k: 
                 continue;
             }
 
-            const expected = 1 / (1 + 10 ** ((ratings[j] - ratings[i]) / 400));
-            const actual = placements[i] < placements[j] ? 1
-                : placements[i] > placements[j] ? 0
-                    : 0.5;
-            sum += actual - expected;
+            sum += actualScore(placements[i], placements[j]) - expectedScore(ratings[i], ratings[j]);
         }
 
         deltas.push(Math.round((k / (n - 1)) * sum));
     }
 
     return deltas;
+}
+
+/** 표준 ELO 기대 승률: E = 1/(1+10^((상대-나)/400)). */
+function expectedScore(mine: number, opponent: number): number
+{
+    return 1 / (1 + 10 ** ((opponent - mine) / 400));
+}
+
+/** 쌍대결 실제 점수: 이기면 1, 지면 0, 동순위 0.5. placement는 작을수록 상위. */
+function actualScore(myPlacement: number, opponentPlacement: number): number
+{
+    return myPlacement < opponentPlacement ? 1
+        : myPlacement > opponentPlacement ? 0
+            : 0.5;
 }

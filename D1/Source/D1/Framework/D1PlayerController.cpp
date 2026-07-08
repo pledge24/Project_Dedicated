@@ -18,28 +18,6 @@ AD1PlayerController::AD1PlayerController()
 	PlayerCameraManagerClass = AD1MapCameraManager::StaticClass();
 }
 
-void AD1PlayerController::SetupInputComponent()
-{
-	Super::SetupInputComponent();
-
-	// 로컬 플레이어 컨트롤러에만 IMC 추가
-	if (IsLocalPlayerController())
-	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
-		{
-			for (UInputMappingContext* CurrentContext : DefaultMappingContexts)
-			{
-				Subsystem->AddMappingContext(CurrentContext, 0);
-			}
-
-			for (UInputMappingContext* CurrentContext : MobileExcludedMappingContexts)
-			{
-				Subsystem->AddMappingContext(CurrentContext, 0);
-			}
-		}
-	}
-}
-
 void AD1PlayerController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -67,6 +45,28 @@ void AD1PlayerController::BeginPlay()
 
 	// 매치 종료 시 결과 위젯을 띄우기 위해 GameState 이벤트 구독.
 	TryBindMatchFinished();
+}
+
+void AD1PlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+
+	// 로컬 플레이어 컨트롤러에만 IMC 추가
+	if (IsLocalPlayerController())
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+		{
+			for (UInputMappingContext* CurrentContext : DefaultMappingContexts)
+			{
+				Subsystem->AddMappingContext(CurrentContext, 0);
+			}
+
+			for (UInputMappingContext* CurrentContext : MobileExcludedMappingContexts)
+			{
+				Subsystem->AddMappingContext(CurrentContext, 0);
+			}
+		}
+	}
 }
 
 void AD1PlayerController::HandleMatchFinished()

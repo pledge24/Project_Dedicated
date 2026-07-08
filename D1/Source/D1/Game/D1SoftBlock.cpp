@@ -5,7 +5,6 @@
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
-#include "UObject/ConstructorHelpers.h"
 
 #include "Framework/D1BomberGameState.h"
 #include "Game/D1BomberGridLibrary.h"
@@ -26,70 +25,43 @@ AD1SoftBlock::AD1SoftBlock()
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
 	MeshComp->SetupAttachment(RootComponent);
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	// /Engine/BasicShapes/Cube는 100cm, 피벗 중앙. 셀(100x100x100)에 딱 맞춤.
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshAsset(
-		TEXT("/Engine/BasicShapes/Cube.Cube"));
-	if (CubeMeshAsset.Succeeded())
-	{
-		MeshComp->SetStaticMesh(CubeMeshAsset.Object);
-	}
-
-	// 파괴 중 반투명 머티리얼 기본값. 에셋 없으면 null → 반투명 표현만 생략.
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DyingMat(
-		TEXT("/Game/D1/Materials/M_SoftBlock_Dying.M_SoftBlock_Dying"));
-	if (DyingMat.Succeeded())
-	{
-		DyingMaterial = DyingMat.Object;
-	}
+	// 메시·파괴중 머티리얼은 BP(BP_SoftBlock)에서 지정.
 }
 
 void AD1SoftBlock::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AD1SoftBlock, bDying);
+	DOREPLIFETIME(AD1SoftBlock, bDestroying);
 }
 
-void AD1SoftBlock::StartDying()
+void AD1SoftBlock::StartDestroying()
 {
-	if (!HasAuthority() || bDying)
+	if (!HasAuthority() || bDestroying)
 	{
 		return;
 	}
 
-	bDying = true;
+	bDestroying = true;
 
 	// OnRep은 서버 자신에게 안 불리므로(리슨 서버) 수동 호출. DS는 보이는 화면이 없어 무해.
-	OnRep_bDying();
+	OnRep_bDestroying();
 
 	// 콜리전·셀은 그대로 둔 채 일정 시간 후 실제 파괴.
 	GetWorldTimerManager().SetTimer(
-		DyingTimerHandle, this, &AD1SoftBlock::CompleteDestruction, DyingDurationSec, /*bLoop=*/false);
+		DestroyingTimerHandle, this, &AD1SoftBlock::CompleteDestruction, DestroyingDurationSec, /*bLoop=*/false);
 }
 
-void AD1SoftBlock::SetHeldItem(EPowerupType InType, TSubclassOf<AD1PowerupPickup> InPickupClass, float InDropZ)
+void AD1SoftBlock::OnRep_bDestroying()
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
-	HeldItem = InType;
-	PickupClass = InPickupClass;
-	DropZ = InDropZ;
-	bHasItem = true;
-}
-
-void AD1SoftBlock::OnRep_bDying()
-{
-	if (!bDying)
+	if (!bDestroying)
 	{
 		return;
 	}
 
 	// 반투명 머티리얼로 교체만. 콜리전은 건드리지 않음(파괴 중에도 통과 불가).
-	if (DyingMaterial)
+	if (DestroyingMaterial)
 	{
-		MeshComp->SetMaterial(0, DyingMaterial);
+		MeshComp->SetMaterial(0, DestroyingMaterial);
 	}
 }
 
@@ -117,4 +89,16 @@ void AD1SoftBlock::CompleteDestruction()
 	}
 
 	Destroy();
+}
+
+void AD1SoftBlock::SetHeldItem(EPowerupType InType, TSubclassOf<AD1PowerupPickup> InPickupClass, float InDropZ)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	HeldItem = InType;
+	PickupClass = InPickupClass;
+	DropZ = InDropZ;
+	bHasItem = true;
 }

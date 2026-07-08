@@ -2,6 +2,7 @@
 
 #include "Framework/D1BomberGameState.h"
 #include "Framework/D1BomberPlayerState.h"
+#include "Framework/D1MatchFlowComponent.h"
 #include "Net/UnrealNetwork.h"
 
 namespace
@@ -11,13 +12,11 @@ namespace
 
 AD1BomberGameState::AD1BomberGameState()
 {
-	MatchPhase = EBomberMatchPhase::Waiting;
-	MatchStartServerTime = 0.0f;
-	MatchDurationSec = 300.0f; // 5분
-	GridSize = FIntPoint::ZeroValue;
-
 	// 서버시간 복제 주기 기본 5초 → 0.5초. HUD 타이머 클라간 드리프트 완화.
 	ServerWorldTimeSecondsUpdateFrequency = 0.5f;
+
+	// 매치 흐름 로직은 컴포넌트로 위임(서버 전용 실행). GameState 수명과 동일.
+	MatchFlowComp = CreateDefaultSubobject<UD1MatchFlowComponent>(TEXT("MatchFlow"));
 }
 
 void AD1BomberGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -60,6 +59,11 @@ bool AD1BomberGameState::IsInsideGrid(const FIntPoint& Cell) const
 	return Cell.X >= 0 && Cell.X < GridSize.X && Cell.Y >= 0 && Cell.Y < GridSize.Y;
 }
 
+void AD1BomberGameState::RemoveSoftBlockCell(const FIntPoint& Cell)
+{
+	SoftBlockCells.Remove(Cell);
+}
+
 float AD1BomberGameState::GetRemainingTimeSec() const
 {
 	// 시작 전: 풀 시간.
@@ -89,7 +93,7 @@ TArray<AD1BomberPlayerState*> AD1BomberGameState::GetPlayerStatesBySlot() const
 		{
 			continue;
 		}
-		const int32 Idx = BomberPS->PlayerSlotIndex;
+		const int32 Idx = BomberPS->GetPlayerSlotIndex();
 		if (BySlot.IsValidIndex(Idx))
 		{
 			BySlot[Idx] = BomberPS;
@@ -113,11 +117,6 @@ void AD1BomberGameState::SetFinalResults(const TArray<FD1MatchResultEntry>& InRe
 	{
 		OnMatchFinished.Broadcast();
 	}
-}
-
-void AD1BomberGameState::RemoveSoftBlockCell(const FIntPoint& Cell)
-{
-	SoftBlockCells.Remove(Cell);
 }
 
 void AD1BomberGameState::OnRep_MatchPhase()

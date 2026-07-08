@@ -21,27 +21,32 @@ class AD1ExplosionFX : public AActor
 public:
 	AD1ExplosionFX();
 
+	//~ Begin AActor Interface
 	virtual void Tick(float DeltaSeconds) override;
+	//~ End AActor Interface
 
 protected:
+	//~ Begin AActor Interface
 	virtual void BeginPlay() override;
+	//~ End AActor Interface
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> MeshComp;
 
 private:
+	/** 비주얼 수명(초). 게임플레이 피해 지속 AD1Bomb::ExplosionLingerDurationSec과 동일하게 유지. */
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
-	float Lifetime;
+	float Lifetime = 0.5f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
-	float ExpansionTime;
+	float ExpansionTime = 0.2f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
-	float PeakScale;
+	float PeakScale = 0.9f;
 
 	/** 폭발 시작·소멸 시 스케일(작게 시작→PeakScale→작게). */
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
-	float InitialScale;
+	float InitialScale = 0.05f;
 
-	float Elapsed;
+	float Elapsed = 0.f;
 };

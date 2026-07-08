@@ -1,9 +1,9 @@
-// 매치 라우터 (network 레이어) — 결과 보고 엔드포인트에 rate-limit 부착.
+// 결과 라우터 (network 레이어) — 결과 보고 엔드포인트에 rate-limit 부착.
 import express from 'express';
 
 import { config } from '../common/config.js';
 import { makeRateLimiter } from '../common/rateLimit.js';
-import * as handler from './match.handler.js';
+import * as handler from './result.handler.js';
 
 const resultLimiter = makeRateLimiter(config.rateLimit.resultMax);
 

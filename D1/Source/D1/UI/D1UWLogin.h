@@ -20,22 +20,34 @@ class UD1UWLogin : public UD1UWAuthBase
 	GENERATED_BODY()
 
 protected:
-	//~ UUserWidget
+	//~ Begin UUserWidget Interface
 	virtual void NativeConstruct() override;
+	//~ End UUserWidget Interface
 
+	//~ Begin UD1UWAuthBase Interface
+	virtual UButton* GetSubmitButton() const override { return LoginButton; }
+	//~ End UD1UWAuthBase Interface
+
+//~ 로그인 제출
+protected:
 	UFUNCTION()
 	void OnLoginClicked();
 
 	UFUNCTION()
-	void OnGotoRegisterClicked();
-
-	UFUNCTION()
 	void OnLoginCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User);
-
-	virtual UButton* GetSubmitButton() const override { return LoginButton; }
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UButton> LoginButton;
+
+private:
+	/** 로그인 성공 후 이동할 맵 — 디테일 패널에서 MP_Lobby 지정. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Login", meta = (AllowPrivateAccess = "true"))
+	TSoftObjectPtr<UWorld> LobbyMap;
+
+//~ 회원가입 전환
+protected:
+	UFUNCTION()
+	void OnGotoRegisterClicked();
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UButton> GotoRegisterButton;
@@ -44,8 +56,4 @@ private:
 	/** WBP_Register 클래스 — 디테일 패널에서 지정. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Login", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<UUserWidget> RegisterWidgetClass;
-
-	/** 로그인 성공 후 이동할 맵 — 디테일 패널에서 MP_Lobby 지정. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Login", meta = (AllowPrivateAccess = "true"))
-	TSoftObjectPtr<UWorld> LobbyMap;
 };

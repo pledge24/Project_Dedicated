@@ -4,27 +4,27 @@ import { isDuplicateKeyError } from '../common/db.js';
 import { AppError, Codes } from '../common/errors.js';
 import type { MatchResultRequest, MatchResultResponse } from '../common/types.js';
 import * as repo from './result.repository.js';
-import * as roster from './roster.js';
+import * as rosters from './roster.js';
 
 /** 서버 토큰을 검증하고 결과를 기록한다. 실패 케이스별 AppError를 throw. */
 export async function submitResult(serverToken: string, req: MatchResultRequest): Promise<MatchResultResponse>
 {
-    const rec = roster.get(req.matchId);
-    if (!rec)
+    const roster = rosters.get(req.matchId);
+    if (!roster)
     {
         throw new AppError(Codes.MATCH_NOT_FOUND, '해당 매치를 찾을 수 없습니다.');
     }
-    if (serverToken !== rec.serverToken)
+    if (serverToken !== roster.serverToken)
     {
         throw new AppError(Codes.INVALID_SERVER_TOKEN, '서버 토큰이 유효하지 않습니다.');
     }
 
-    assertResultsMatchRoster(rec.players, req.results);
+    // assert 체크.
+    assertResultsMatchRoster(roster.players, req.results);
 
-    // 신원·닉네임은 roster(권위)에서, 좌석(slotIndex)은 DS가 보고한 값을 그대로 저장한다.
     const participants = req.results.map((r) =>
     {
-        const rp = rec.players.find((p) => p.userId === r.userId)!; // 위 검증으로 존재 보장
+        const rp = roster.players.find((p) => p.userId === r.userId)!; // 위 검증으로 존재 보장
 
         return {
             userId: r.userId,
@@ -40,7 +40,7 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
         const saved = await repo.saveResult({
             matchId: req.matchId,
             mapName: req.mapName,
-            startedAt: new Date(rec.startedAt),
+            startedAt: new Date(roster.startedAt),
             endedAt: new Date(),
             durationSec: req.durationSec,
             endReason: req.endReason,
@@ -69,7 +69,7 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
 }
 
 /** 보고된 userId 집합이 roster와 정확히 일치하는지(누락·외부인·중복 없음) 검증. */
-function assertResultsMatchRoster(players: roster.RosterPlayer[], results: MatchResultRequest['results']): void
+function assertResultsMatchRoster(players: rosters.RosterPlayer[], results: MatchResultRequest['results']): void
 {
     const expected = new Set(players.map((p) => p.userId));
     if (results.length !== expected.size)

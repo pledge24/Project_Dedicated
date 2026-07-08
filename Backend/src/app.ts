@@ -9,7 +9,7 @@ import { pingDb } from './common/db.js';
 import { fail, ok } from './common/envelope.js';
 import { AppError, Codes } from './common/errors.js';
 import { logger } from './common/logger.js';
-import matchRouter from './match/match.router.js';
+import resultRouter from './match/result.router.js';
 import rankingRouter from './ranking/ranking.router.js';
 
 export default function buildApp(): Express
@@ -60,7 +60,7 @@ export default function buildApp(): Express
 
     // 라우터 마운트
     app.use('/api/auth', authRouter);
-    app.use('/api/match', matchRouter);
+    app.use('/api/match', resultRouter);
     app.use('/api/ranking', rankingRouter);
 
     // 라이브니스: 의존성(DB) 검사 금지 — 프로세스 생존만 본다.

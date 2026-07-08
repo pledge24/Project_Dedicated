@@ -47,19 +47,15 @@ void AD1PowerupPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AD1PowerupPickup, PowerupType);
 }
 
-void AD1PowerupPickup::SetPowerupType(EPowerupType InType)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-	PowerupType = InType;
-	RefreshVisual(); // Listen Server 자기 화면 대응(DS는 무해)
-}
-
 void AD1PowerupPickup::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// 데디 서버는 빌보드를 렌더하지 않음 — bob(코스메틱) tick은 헤드리스 서버에서 불필요.
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		SetActorTickEnabled(false);
+	}
 
 	// 같은 프레임에 떨어진 여러 아이템이 똑같이 흔들리지 않게 위상 분산.
 	const FVector Loc = GetActorLocation();
@@ -71,6 +67,16 @@ void AD1PowerupPickup::BeginPlay()
 	}
 
 	RefreshVisual();
+}
+
+void AD1PowerupPickup::SetPowerupType(EPowerupType InType)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	PowerupType = InType;
+	RefreshVisual(); // Listen Server 자기 화면 대응(DS는 무해)
 }
 
 void AD1PowerupPickup::OnRep_PowerupType()
@@ -93,7 +99,7 @@ void AD1PowerupPickup::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComp,
 	}
 
 	AD1BomberPlayerState* PS = BC->GetPlayerState<AD1BomberPlayerState>();
-	if (!PS || !PS->bIsAlive)
+	if (!PS || !PS->IsAlive())
 	{
 		return;
 	}

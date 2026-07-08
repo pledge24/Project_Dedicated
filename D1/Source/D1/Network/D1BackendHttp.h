@@ -1,0 +1,38 @@
+// Copyright Epic Games, Inc. All Rights Reserved.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Interfaces/IHttpRequest.h"
+#include "Network/BackendTypes.h"
+
+class FJsonObject;
+class UGameInstance;
+
+/**
+ *  백엔드 HTTP/JSON 공용 substrate. 상태 없는 자유함수 모음 —
+ *  Auth/Matchmaking/Result Subsystem이 공유(중복 제거). 세션 JWT는 GameInstance에서 읽는다.
+ */
+namespace D1BackendHttp
+{
+	/** UD1OnlineSettings의 BaseUrl. */
+	const FString& GetBaseUrl();
+
+	/** "Bearer <token>". */
+	FString MakeBearer(const FString& Token);
+
+	/** GameInstance 세션 JWT(없으면 빈 문자열). */
+	FString GetSessionJwt(const UGameInstance* GameInstance);
+
+	/** POST + JSON 본문 요청 생성. bAttachAuth면 세션 JWT를 Authorization으로 첨부. */
+	TSharedRef<IHttpRequest> BuildPostJson(const UGameInstance* GameInstance, const FString& Path,
+		const TSharedRef<FJsonObject>& Body, bool bAttachAuth);
+
+	/** 서버 응답 error.code 문자열 → enum. */
+	EBackendErrorCode ParseErrorCode(const FString& CodeStr);
+
+	//~ JSON 헬퍼
+	bool DeserializeJson(const FString& Content, TSharedPtr<FJsonObject>& OutRoot);
+	bool GetObjectField(const TSharedPtr<FJsonObject>& Obj, const TCHAR* Field, const TSharedPtr<FJsonObject>*& Out);
+	FString SerializeJson(const TSharedRef<FJsonObject>& Body);
+}

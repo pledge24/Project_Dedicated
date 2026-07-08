@@ -28,7 +28,7 @@ public:
 
 	/** 4방향 Range칸 진행, 벽/그리드 끝에서 멈춤(원점 제외).
 	 *  파괴 블록 셀은 OutCells에서 빼고 OutSoftBlockHits로 보고 후 정지. */
-	static void EnumerateCrossCells(
+	static void TraceExplosionCells(
 		const AD1BomberGameState* GameState,
 		const FIntPoint& Origin,
 		int32 Range,

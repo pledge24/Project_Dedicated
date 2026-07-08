@@ -6,7 +6,7 @@
 #include "Components/EditableTextBox.h"
 #include "Core/D1LogChannels.h"
 #include "Framework/Menu/D1MenuPlayerController.h"
-#include "Network/BackendSubsystem.h"
+#include "Network/D1AuthSubsystem.h"
 
 void UD1UWRegister::NativeConstruct()
 {
@@ -24,8 +24,8 @@ void UD1UWRegister::NativeConstruct()
 
 void UD1UWRegister::OnRegisterClicked()
 {
-	UBackendSubsystem* Backend = ResolveBackend();
-	if (!Backend)
+	UD1AuthSubsystem* AuthSubsystem = GetAuthSubsystem();
+	if (!AuthSubsystem)
 	{
 		return;
 	}
@@ -38,22 +38,7 @@ void UD1UWRegister::OnRegisterClicked()
 
 	FOnAuthCompleted Cb;
 	Cb.BindDynamic(this, &UD1UWRegister::OnRegisterCompletedInternal);
-	Backend->Register(LoginId, Password, Nickname, Cb);
-}
-
-void UD1UWRegister::OnBackToLoginClicked()
-{
-	if (!LoginWidgetClass)
-	{
-		UE_LOG(LogD1, Warning, TEXT("[Register] LoginWidgetClass가 비어있음"));
-		return;
-	}
-
-	AD1MenuPlayerController* PC = Cast<AD1MenuPlayerController>(GetOwningPlayer());
-	if (PC)
-	{
-		PC->SwitchToWidget(LoginWidgetClass);
-	}
+	AuthSubsystem->Register(LoginId, Password, Nickname, Cb);
 }
 
 void UD1UWRegister::OnRegisterCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User)
@@ -71,5 +56,20 @@ void UD1UWRegister::OnRegisterCompletedInternal(const FBackendResponse& Response
 		{
 			PC->SwitchToWidget(LoginWidgetClass);
 		}
+	}
+}
+
+void UD1UWRegister::OnBackToLoginClicked()
+{
+	if (!LoginWidgetClass)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Register] LoginWidgetClass가 비어있음"));
+		return;
+	}
+
+	AD1MenuPlayerController* PC = Cast<AD1MenuPlayerController>(GetOwningPlayer());
+	if (PC)
+	{
+		PC->SwitchToWidget(LoginWidgetClass);
 	}
 }

@@ -4,26 +4,28 @@
 // (지우면 재제출이 404가 되어 409와 의미가 갈림.) 대신 만료분만 register 시 청소한다.
 import { config } from '../common/config.js';
 
+/** 명단에 저장된 플레이어 데이터 단위 */
 export interface RosterPlayer
 {
     userId: number;
     nickname: string;
-    /** 매치별 1회용 입장 토큰. DS가 ?join= 으로 받은 토큰을 이 신원에 매핑. */
-    joinToken: string;
+    joinToken: string;      // 매치별 1회용 입장 토큰. DS가 ?join= 으로 받은 토큰을 이 신원에 매핑.
 }
 
+/** 매치된 게임의 플레이어 명단(roster) */
 export interface MatchRoster
 {
     matchId: string;
     serverToken: string;
     mapName: string;
-    startedAt: number;   // epoch ms
+    startedAt: number;      // epoch ms
     players: RosterPlayer[];
 }
 
+/** 명단 모음 - 모든 매치의 명단이 이 곳에 저장된다(중요!) */
 const rosters = new Map<string, MatchRoster>();
 
-/** 매치 성사 시 등록. 등록 때마다 만료(maxLifetime 초과) roster를 청소한다(결과 미수신 누수 방지). */
+/** 매치 성사 시 등록. 등록 때마다 sweep 실행(결과 미수신 누수 방지) */
 export function register(roster: MatchRoster): void
 {
     sweep(Date.now());
@@ -40,6 +42,7 @@ export function size(): number
     return rosters.size;
 }
 
+/** 만료된 roster(DS 수명 시각 초과)를 자료구조에서 제거. */
 function sweep(now: number): void
 {
     const maxAge = config.match.ds.maxLifetimeMs;

@@ -23,16 +23,19 @@ class AD1MenuPlayerController : public APlayerController
 public:
 	AD1MenuPlayerController();
 
-	//~ APlayerController
+protected:
+	//~ Begin AActor Interface
 	virtual void BeginPlay() override;
+	//~ End AActor Interface
 
+public:
 	/** 다른 위젯으로 교체 (로그인 ↔ 회원가입 등). 기존 위젯은 RemoveFromParent. */
 	UFUNCTION(BlueprintCallable, Category = "Menu")
 	void SwitchToWidget(TSubclassOf<UUserWidget> NewWidgetClass);
 
 private:
-	void ShowInitialWidgetFromGameMode();
 	void ShowBackground();
+	void ShowInitialWidgetFromGameMode();
 	void ApplyUiOnlyInputMode();
 	static UWidget* FindFirstFocusableWidget(UUserWidget* Root);
 

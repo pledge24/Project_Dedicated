@@ -6,14 +6,14 @@
 #include "UI/D1UserWidget.h"
 #include "D1UWAuthBase.generated.h"
 
-class UBackendSubsystem;
+class UD1AuthSubsystem;
 class UButton;
 class UEditableTextBox;
 class UTextBlock;
 struct FBackendResponse;
 
 /**
- *  로그인/회원가입 공용 베이스.
+ *  로그인/회원가입 공용 베이스 클래스(상속 전용).
  *  요청 잠금/해제, 에러 텍스트 표시를 한 곳에서.
  *  자식 위젯은 NativeConstruct에서 버튼 OnClicked 바인딩만 하면 된다.
  */
@@ -23,14 +23,15 @@ class UD1UWAuthBase : public UD1UserWidget
 	GENERATED_BODY()
 
 protected:
-	//~ UUserWidget
+	//~ Begin UUserWidget Interface
 	virtual void NativeConstruct() override;
+	//~ End UUserWidget Interface
 
-	/** 통신 시작 — 에러 텍스트 숨김. 자식이 자기 버튼 비활성화. */
+	/** 요청 시작전 UI 표시 처리 */
 	UFUNCTION(BlueprintCallable, Category = "Auth")
 	void BeginRequest();
 
-	/** 응답 도착 — 실패 시 에러 텍스트 표시. */
+	/** 요청 종료(Res 수신)후 UI 표시 처리 */
 	UFUNCTION(BlueprintCallable, Category = "Auth")
 	void EndRequest(bool bSuccess, const FString& ErrorMessage);
 
@@ -41,7 +42,7 @@ protected:
 	void OnRequestFinished(bool bSuccess, const FString& ErrorMessage);
 
 	//~ 공용 인증 플로우 (자식 클릭/완료 핸들러가 사용)
-	UBackendSubsystem* ResolveBackend();
+	UD1AuthSubsystem* GetAuthSubsystem();
 	void BeginAuthSubmit();
 	bool FinishAuthSubmit(const FBackendResponse& Response);
 

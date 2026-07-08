@@ -1,6 +1,25 @@
 // 랭킹 도메인의 DB 쿼리만 담당 (repository 레이어)
+import type { RowDataPacket } from 'mysql2';
+
 import { getPool } from '../common/db.js';
-import type { CountRow, RankingRow } from '../common/types.js';
+
+/** DB player_profiles JOIN users 행 (랭킹 페이지 쿼리). */
+export interface RankingRow extends RowDataPacket
+{
+    user_id: number;
+    nickname: string;
+    score: number;
+    level: number;
+    wins: number;
+    losses: number;
+    matches_played: number;
+}
+
+/** COUNT(*) 행. */
+interface CountRow extends RowDataPacket
+{
+    total: number;
+}
 
 /**
  * score DESC, user_id ASC 정렬로 한 페이지 조회. idx_pp_score_desc 활용.

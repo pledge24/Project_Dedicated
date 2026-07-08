@@ -23,8 +23,8 @@ export const config = Object.freeze({
         registerMax: asNumber('RATE_LIMIT_REGISTER_MAX', 10),
         resultMax: asNumber('RATE_LIMIT_RESULT_MAX', 30),    // DS 결과 보고(/api/match/result)
         rankingMax: asNumber('RATE_LIMIT_RANKING_MAX', 60),  // 랭킹 조회(/api/ranking)
+        wsMax: asNumber('RATE_LIMIT_WS_MAX', 100),           // 매칭 WS 메시지(연결당) — OWASP 시작점
     }),
-    // 매칭 큐 파라미터. score 디폴트 1000 기준 합리값. 전부 MATCH_* env로 override 가능.
     match: Object.freeze({
         playersPerMatch: asNumber('MATCH_PLAYERS_PER_MATCH', 4),
         baseWindow:      asNumber('MATCH_BASE_WINDOW', 200),   // 시작 점수 윈도우(±)
@@ -51,7 +51,7 @@ export const config = Object.freeze({
             maxLifetimeMs: asNumber('MATCH_DS_MAX_LIFETIME_MS', 900_000), // 15분 후 강제 회수
         }),
     }),
-    // 랭킹 조회 페이지네이션 한도. limit 미지정 시 defaultLimit, 상한은 maxLimit로 클램프.
+    // 랭킹 조회 페이지네이션 한도. limit 미지정 시 defaultLimit, 상한은 maxLimit로 clamp.
     ranking: Object.freeze({
         defaultLimit: asNumber('RANKING_DEFAULT_LIMIT', 50),
         maxLimit:     asNumber('RANKING_MAX_LIMIT', 100),

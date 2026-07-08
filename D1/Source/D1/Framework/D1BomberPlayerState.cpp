@@ -2,6 +2,7 @@
 
 #include "Framework/D1BomberPlayerState.h"
 #include "Framework/D1BomberGameState.h"
+#include "Framework/D1MatchFlowComponent.h"
 #include "Net/UnrealNetwork.h"
 
 namespace
@@ -9,18 +10,6 @@ namespace
 	constexpr int32 MaxFirePower = 10;
 	constexpr int32 MaxBombCapacity = 10;
 	constexpr int32 MaxSpeedLevel = 5;
-}
-
-AD1BomberPlayerState::AD1BomberPlayerState()
-{
-	Lives = 3;
-	bIsAlive = true;
-	Placement = 0;
-	PlayerSlotIndex = -1;
-	FirePower = 2;
-	BombCapacity = 1;
-	SpeedLevel = 0;
-	BackendUserId = 0;
 }
 
 void AD1BomberPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -37,6 +26,12 @@ void AD1BomberPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(AD1BomberPlayerState, SpeedLevel);
 }
 
+void AD1BomberPlayerState::OnRep_PlayerName()
+{
+	Super::OnRep_PlayerName();
+	OnPlayerNameChanged.Broadcast();
+}
+
 bool AD1BomberPlayerState::ApplyHit()
 {
 	if (!HasAuthority() || !bIsAlive)
@@ -51,9 +46,31 @@ bool AD1BomberPlayerState::ApplyHit()
 	{
 		bIsAlive = false;
 		OnRep_bIsAlive(); // Listen Server 대응
+
+		// 사망 전환의 매치 처리(등수·승패)는 상태 주인인 PS가 GameState의 매치 흐름 컴포넌트에 보고.
+		if (UWorld* World = GetWorld())
+		{
+			if (AD1BomberGameState* GS = World->GetGameState<AD1BomberGameState>())
+			{
+				if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
+				{
+					Flow->NotifyPlayerDied(this);
+				}
+			}
+		}
 		return true;
 	}
 	return false;
+}
+
+void AD1BomberPlayerState::OnRep_Lives()
+{
+	OnLivesChanged.Broadcast();
+}
+
+void AD1BomberPlayerState::OnRep_bIsAlive()
+{
+	OnAliveStateChanged.Broadcast();
 }
 
 void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)
@@ -69,6 +86,20 @@ void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)
 	}
 	PlayerSlotIndex = NewIndex;
 	OnRep_PlayerSlotIndex(); // Listen Server 대응
+}
+
+void AD1BomberPlayerState::OnRep_PlayerSlotIndex()
+{
+	OnSlotIndexChanged.Broadcast();
+
+	// 컨테이너 위젯이 한 곳에서 카드 전체를 다시 그릴 수 있게 GameState 디스패처도 트리거.
+	if (UWorld* World = GetWorld())
+	{
+		if (AD1BomberGameState* GS = World->GetGameState<AD1BomberGameState>())
+		{
+			GS->MarkPlayerCardsDirty();
+		}
+	}
 }
 
 void AD1BomberPlayerState::AddFirePower(int32 Delta)
@@ -99,37 +130,25 @@ void AD1BomberPlayerState::AddSpeedLevel(int32 Delta)
 	OnRep_SpeedLevel(); // Listen Server 대응 — 서버 캐릭터도 속도 반영
 }
 
-void AD1BomberPlayerState::OnRep_PlayerName()
-{
-	Super::OnRep_PlayerName();
-	OnPlayerNameChanged.Broadcast();
-}
-
-void AD1BomberPlayerState::OnRep_Lives()
-{
-	OnLivesChanged.Broadcast();
-}
-
-void AD1BomberPlayerState::OnRep_bIsAlive()
-{
-	OnAliveStateChanged.Broadcast();
-}
-
 void AD1BomberPlayerState::OnRep_SpeedLevel()
 {
 	OnSpeedLevelChanged.Broadcast();
 }
 
-void AD1BomberPlayerState::OnRep_PlayerSlotIndex()
+void AD1BomberPlayerState::SetPlacement(int32 NewPlacement)
 {
-	OnSlotIndexChanged.Broadcast();
-
-	// 컨테이너 위젯이 한 곳에서 카드 전체를 다시 그릴 수 있게 GameState 디스패처도 트리거.
-	if (UWorld* World = GetWorld())
+	if (!HasAuthority())
 	{
-		if (AD1BomberGameState* GS = World->GetGameState<AD1BomberGameState>())
-		{
-			GS->MarkPlayerCardsDirty();
-		}
+		return;
 	}
+	Placement = NewPlacement;
+}
+
+void AD1BomberPlayerState::SetBackendUserId(int64 NewUserId)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	BackendUserId = NewUserId;
 }

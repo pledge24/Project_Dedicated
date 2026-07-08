@@ -7,20 +7,11 @@ export type ClientMessage =
     | { type: 'queue:join' }
     | { type: 'queue:cancel' };
 
-/** match:found data의 플레이어 1명. 좌석(슬롯)은 DS가 입장 시 랜덤 배정하므로 여기엔 없다. */
-export interface MatchPlayer
-{
-    userId: number;
-    nickname: string;
-    score: number;
-}
-
 /** match:found data. joinToken은 수신자 본인 것(per-recipient). */
 export interface MatchFoundData
 {
     matchId: string;
     server: { host: string; port: number };
-    players: MatchPlayer[];
     /** 수신자 본인의 입장 토큰. DS에 ?join= 으로 제시 → 권위 신원 매핑. */
     joinToken: string;
 }

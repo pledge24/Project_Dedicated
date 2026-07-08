@@ -16,7 +16,7 @@ class UD1DedicatedServerSubsystem : public UWorldSubsystem
 	GENERATED_BODY()
 
 public:
-	/** 매치 종료 시 호출(서버). 전원 퇴장 또는 GraceSec 경과 시 DS 프로세스를 종료. 실 DS 아니면 no-op. */
+	/** 서버 전용: 매치 종료 시 호출. 전원 퇴장 또는 GraceSec 경과 시 DS 프로세스를 종료. 실 DS 아니면 no-op. */
 	void BeginShutdownWatch(float InGraceSec);
 
 private:
@@ -26,6 +26,5 @@ private:
 	FTimerHandle WatchTimerHandle;
 
 	float Elapsed = 0.f;
-
 	float GraceSec = 0.f;
 };

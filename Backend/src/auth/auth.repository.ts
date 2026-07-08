@@ -1,8 +1,35 @@
 // 인증 도메인의 DB 쿼리만 담당 (repository 레이어)
-import type { ResultSetHeader } from 'mysql2';
+import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 
 import { queryOne, withTransaction } from '../common/db.js';
-import type { PlayerProfileRow, UserRow } from '../common/types.js';
+
+/** DB users 행. */
+export interface UserRow extends RowDataPacket
+{
+    id: number;
+    login_id: string;
+    password_hash: string;
+    nickname: string;
+}
+
+/** token_version 단건 조회용 행. */
+interface TokenVersionRow extends RowDataPacket
+{
+    token_version: number;
+}
+
+/** DB player_profiles 행. */
+export interface PlayerProfileRow extends RowDataPacket
+{
+    user_id: number;
+    score: number;
+    level: number;
+    exp: number;
+    wins: number;
+    losses: number;
+    matches_played: number;
+    last_match_at: Date | null;
+}
 
 export async function findByLoginId(loginId: string): Promise<UserRow | null>
 {
@@ -53,4 +80,25 @@ export async function findProfileByUserId(userId: number): Promise<PlayerProfile
         'FROM player_profiles WHERE user_id = ? LIMIT 1',
         [userId]
     );
+}
+
+/**
+ * token_version을 +1 하고 새 값을 반환한다 (단일 세션 강제).
+ * UPDATE→SELECT를 한 트랜잭션으로 묶어 동시 로그인 경합에도 실제 반영값을 돌려준다.
+ */
+export async function bumpTokenVersion(userId: number): Promise<number>
+{
+    return withTransaction(async (conn) =>
+    {
+        await conn.execute(
+            'UPDATE users SET token_version = token_version + 1 WHERE id = ?',
+            [userId]
+        );
+        const [rows] = await conn.execute<TokenVersionRow[]>(
+            'SELECT token_version FROM users WHERE id = ? LIMIT 1',
+            [userId]
+        );
+
+        return rows[0].token_version;
+    });
 }

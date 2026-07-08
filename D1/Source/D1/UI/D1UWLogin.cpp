@@ -7,7 +7,7 @@
 #include "Core/D1LogChannels.h"
 #include "Kismet/GameplayStatics.h"
 #include "Framework/Menu/D1MenuPlayerController.h"
-#include "Network/BackendSubsystem.h"
+#include "Network/D1AuthSubsystem.h"
 
 void UD1UWLogin::NativeConstruct()
 {
@@ -25,8 +25,8 @@ void UD1UWLogin::NativeConstruct()
 
 void UD1UWLogin::OnLoginClicked()
 {
-	UBackendSubsystem* Backend = ResolveBackend();
-	if (!Backend)
+	UD1AuthSubsystem* AuthSubsystem = GetAuthSubsystem();
+	if (!AuthSubsystem)
 	{
 		return;
 	}
@@ -38,22 +38,7 @@ void UD1UWLogin::OnLoginClicked()
 
 	FOnAuthCompleted Cb;
 	Cb.BindDynamic(this, &UD1UWLogin::OnLoginCompletedInternal);
-	Backend->Login(LoginId, Password, Cb);
-}
-
-void UD1UWLogin::OnGotoRegisterClicked()
-{
-	if (!RegisterWidgetClass)
-	{
-		UE_LOG(LogD1, Warning, TEXT("[Login] RegisterWidgetClass가 비어있음 (디테일 패널에서 지정 필요)"));
-		return;
-	}
-
-	AD1MenuPlayerController* PC = Cast<AD1MenuPlayerController>(GetOwningPlayer());
-	if (PC)
-	{
-		PC->SwitchToWidget(RegisterWidgetClass);
-	}
+	AuthSubsystem->Login(LoginId, Password, Cb);
 }
 
 void UD1UWLogin::OnLoginCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User)
@@ -70,4 +55,19 @@ void UD1UWLogin::OnLoginCompletedInternal(const FBackendResponse& Response, cons
 	}
 
 	UGameplayStatics::OpenLevelBySoftObjectPtr(this, LobbyMap);
+}
+
+void UD1UWLogin::OnGotoRegisterClicked()
+{
+	if (!RegisterWidgetClass)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Login] RegisterWidgetClass가 비어있음 (디테일 패널에서 지정 필요)"));
+		return;
+	}
+
+	AD1MenuPlayerController* PC = Cast<AD1MenuPlayerController>(GetOwningPlayer());
+	if (PC)
+	{
+		PC->SwitchToWidget(RegisterWidgetClass);
+	}
 }

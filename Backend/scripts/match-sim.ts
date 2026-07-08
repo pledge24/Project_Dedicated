@@ -2,6 +2,7 @@
 // 실행: npm run match:sim  (전부 PASS여야 머지 — CLAUDE.md '알고리즘은 테스트 도구로 검증 후 머지')
 import assert from 'node:assert/strict';
 
+import { selectRequeue } from '../src/match/formation.js';
 import { MatchQueue } from '../src/match/queue.js';
 import type { MatchQueueParams } from '../src/match/queue.js';
 
@@ -103,6 +104,81 @@ const scenarios: Array<[string, () => void]> = [
         const m = q.runCycle(1000);
         assert.equal(m.length, 2);
         assert.equal(q.size, 0);
+    }],
+
+    ['HOL 해소 — 고립 고MMR 시드 뒤의 4명이 막히지 않고 매치', () =>
+    {
+        const q = makeQueue();
+        add(q, 99, 5000, 0); // 극단 MMR + 최장 대기(=시드 후보)
+        add(q, 1, 1000, 1); add(q, 2, 1000, 2); add(q, 3, 1000, 3); add(q, 4, 1000, 4);
+        const m = q.runCycle(1_000_000); // 큰 now라도 5000↔1000=4000 > maxWindow → 못 끌어옴
+        assert.equal(m.length, 1);
+        assert.deepEqual(idsOf(m[0]), [1, 2, 3, 4]);
+        assert.equal(q.size, 1);
+        assert.equal(q.snapshot()[0].userId, 99); // 아웃라이어만 잔류
+    }],
+
+    ['HOL 해소 — 고립 시드 뒤 두 클러스터가 한 사이클에 2매치', () =>
+    {
+        const q = makeQueue();
+        add(q, 99, 5000, 0); // 최장 대기 아웃라이어
+        for (let i = 1; i <= 4; i++)
+        {
+            add(q, i, 1000, i); // 저 클러스터
+        }
+        for (let i = 5; i <= 8; i++)
+        {
+            add(q, i, 2500, i); // 고 클러스터(5000과도 2500 > 2000)
+        }
+        const m = q.runCycle(1_000_000);
+        assert.equal(m.length, 2);
+        assert.equal(q.size, 1);
+        assert.equal(q.snapshot()[0].userId, 99);
+    }],
+
+    ['앵커 강제 포함 — 성사된 방은 반드시 앵커(브리지)를 담는다', () =>
+    {
+        const q = makeQueue();
+        // P들(joinedAt 0 = 최장대기)은 각자 앵커론 실패. X만 전원을 잇는 브리지 앵커.
+        add(q, 10, 600, 0); add(q, 11, 600, 0); add(q, 12, 1400, 0); add(q, 13, 1400, 0);
+        add(q, 1, 1000, 1000); // X: window=200+4*50=400 → [600,1400] 전원 포함(단, 짧게 대기)
+        const m = q.runCycle(5000);
+        assert.equal(m.length, 1);
+        assert.ok(idsOf(m[0]).includes(1), '앵커 X(id 1)가 방에 포함돼야 함(단순 slice면 밀려남)');
+    }],
+
+    ['selectRequeue — inFormation+open+미큐만 재큐 대상', () =>
+    {
+        // ref는 'open'/'closed' 문자열이면 충분 — 순수 함수는 ref를 predicate로만 본다.
+        const entries = [
+            { userId: 1, ref: 'open' },   // 전부 충족 → 재큐
+            { userId: 2, ref: 'closed' }, // 소켓 닫힘 → 제외
+            { userId: 3, ref: 'open' },   // inFormation 아님(이탈) → 제외
+            { userId: 4, ref: 'open' },   // 이미 큐에 있음 → 제외
+        ];
+        const inForm = new Set([1, 2, 4]);
+        const queued = new Set([4]);
+        const out = selectRequeue(entries, {
+            isInFormation: (id) => inForm.has(id),
+            isOpen: (ref) => ref === 'open',
+            isQueued: (id) => queued.has(id),
+        });
+        assert.deepEqual(out.map((e) => e.userId), [1]);
+    }],
+
+    ['enqueue seq 보존 — 동률 joinedAt에서 재삽입 우선순위 유지', () =>
+    {
+        const q = makeQueue();
+        // 삽입 순서와 무관하게 seq 작은 4명이 뽑히고 seq 큰 1명이 남아야(재큐가 원 seq 보존 시의 거동).
+        q.enqueue({ userId: 1, nickname: 'u1', score: 1000, joinedAt: 0, ref: 1, seq: 40 }); // 최대 → 잔류
+        q.enqueue({ userId: 2, nickname: 'u2', score: 1000, joinedAt: 0, ref: 2, seq: 10 });
+        q.enqueue({ userId: 3, nickname: 'u3', score: 1000, joinedAt: 0, ref: 3, seq: 20 });
+        q.enqueue({ userId: 4, nickname: 'u4', score: 1000, joinedAt: 0, ref: 4, seq: 30 });
+        q.enqueue({ userId: 5, nickname: 'u5', score: 1000, joinedAt: 0, ref: 5, seq: 5 });
+        const m = q.runCycle(100);
+        assert.equal(m.length, 1);
+        assert.deepEqual(idsOf(m[0]), [2, 3, 4, 5]); // seq 5,10,20,30 선택
+        assert.equal(q.snapshot()[0].userId, 1);      // seq 40 잔류
     }],
 ];
 

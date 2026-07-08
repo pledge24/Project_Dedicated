@@ -2,31 +2,33 @@
 // score 오름차순 정렬 유지 + joinedAt(동률 seq)로 선착순 우대.
 import { AppError, Codes } from '../common/errors.js';
 
-/** 큐의 한 자리. ref는 불투명 핸들(WS 레이어의 소켓 등) — 알고리즘은 안 읽는다. */
+/** Queue 단위. ref는 불투명 핸들(WS 레이어의 소켓 등) */
 export interface QueueEntry<Ref = unknown>
 {
     userId: number;
     nickname: string;
     score: number;
-    joinedAt: number; // epoch ms
-    seq: number;       // 입장 순서 (joinedAt 동률 tiebreak)
+    joinedAt: number;       // epoch ms
+    seq: number;            // 입장 순서 (joinedAt 동률 tiebreak)
     ref: Ref;
 }
 
-/** 성사된 한 매치(playersPerMatch 명). */
+/** 매치 단위(playersPerMatch 명). */
 export interface MatchGroup<Ref = unknown>
 {
     entries: QueueEntry<Ref>[];
 }
 
+/** 매치 Queue 파라미터(Config) */
 export interface MatchQueueParams
 {
     playersPerMatch: number;
     baseWindow: number;
-    expandRate: number; // 대기 1초당 윈도우 확장폭
+    expandRate: number;     // 대기 1초당 윈도우 확장폭
     maxWindow: number;
 }
 
+/** 매치 Queue 클래스 */
 export class MatchQueue<Ref = unknown>
 {
     private entries: QueueEntry<Ref>[] = []; // score 오름차순 유지
@@ -56,15 +58,18 @@ export class MatchQueue<Ref = unknown>
         return true;
     }
 
-    /** userId당 1자리. 중복이면 AppError(ALREADY_IN_QUEUE). score 정렬 위치에 삽입. */
-    enqueue(input: { userId: number; nickname: string; score: number; joinedAt: number; ref: Ref }): QueueEntry<Ref>
+    /**
+     * userId당 1자리. 중복이면 AppError(ALREADY_IN_QUEUE). score 정렬 위치에 삽입.
+     * seq는 보통 자동 부여하지만, 재큐(확정 실패 복귀) 시 원 seq를 넘겨 동률 joinedAt 우선순위를 보존한다.
+     */
+    enqueue(input: { userId: number; nickname: string; score: number; joinedAt: number; ref: Ref; seq?: number }): QueueEntry<Ref>
     {
         if (this.has(input.userId))
         {
             throw new AppError(Codes.ALREADY_IN_QUEUE, '이미 매칭 큐에 있습니다.');
         }
 
-        const entry: QueueEntry<Ref> = { ...input, seq: this.seqCounter++ };
+        const entry: QueueEntry<Ref> = { ...input, seq: input.seq ?? this.seqCounter++ };
         const idx = this.lowerBound(entry.score);
         this.entries.splice(idx, 0, entry);
 
@@ -78,30 +83,56 @@ export class MatchQueue<Ref = unknown>
 
     /**
      * 1 사이클 매칭. now(ms)는 주입형 — 테스트 결정론을 위해 외부에서 시각을 넘긴다.
-     * 절차: seed=최장대기 → seed 윈도우 안 후보 ≥N이면 그중 최장대기 N명 매치.
-     *       같은 tick에서 더 못 만들 때까지 반복(여러 매치 가능).
-     * seed가 매치를 못 만들면 break — 선착순(최장대기 우선)을 깨지 않는다.
+     *
+     * 대기 오래된 유저를 "앵커"로 우선 시도하되, 앵커가 방을 못 채우면
+     * 그 앵커만 건너뛰고(다음 앵커로) 계속한다. 앵커는 큐에 남으므로
+     * 다음 사이클에도 우선권을 유지한다.
+     *
+     * 매치된 유저는 즉시 지우지 않고 표시(matched)만 하고, 사이클 끝에 일괄 제거한다.
      */
     runCycle(now: number): MatchGroup<Ref>[]
     {
         const { playersPerMatch } = this.params;
         const matches: MatchGroup<Ref>[] = [];
+        const matched = new Set<number>(); // 이번 사이클에 방에 편입된 userId
 
-        while (this.entries.length >= playersPerMatch)
+        // 대기 오래된 순으로 앵커를 순회한다. now가 고정이라 이 정렬은 사이클 내내 안정적.
+        const anchors = [...this.entries].sort(byWait);
+
+        for (const seed of anchors)
         {
-            const seed = this.pickSeed();
-            const window = this.windowFor(seed, now);
-            const candidates = this.entries.filter((e) => Math.abs(e.score - seed.score) <= window);
-            if (candidates.length < playersPerMatch)
+            if (matched.has(seed.userId))
             {
-                break;
+                continue; // 이미 앞선 앵커의 방에 들어감
             }
 
-            candidates.sort(byWait);
-            const chosen = candidates.slice(0, playersPerMatch);
-            const chosenIds = new Set(chosen.map((e) => e.userId));
-            this.entries = this.entries.filter((e) => !chosenIds.has(e.userId));
+            const window = this.windowFor(seed, now);
+            const others = this.entries.filter(
+                (e) =>
+                    e.userId !== seed.userId &&
+                    !matched.has(e.userId) &&
+                    Math.abs(e.score - seed.score) <= window,
+            );
+
+            if (others.length < playersPerMatch - 1)
+            {
+                continue;
+            }
+
+            // 앵커는 반드시 자기 방에 포함. 나머지 자리는 윈도우 내 최장 대기자로 채운다.
+            others.sort(byWait);
+            const chosen = [seed, ...others.slice(0, playersPerMatch - 1)];
+            for (const e of chosen)
+            {
+                matched.add(e.userId);
+            }
             matches.push({ entries: chosen });
+        }
+
+        // 사이클 끝에 일괄 제거 (표시 → 제거 분리로 순회 중 인덱스 흔들림 방지)
+        if (matched.size > 0)
+        {
+            this.entries = this.entries.filter((e) => !matched.has(e.userId));
         }
 
         return matches;
@@ -132,21 +163,6 @@ export class MatchQueue<Ref = unknown>
         }
 
         return lo;
-    }
-
-    /** 최장대기 자리 = byWait 최소. */
-    private pickSeed(): QueueEntry<Ref>
-    {
-        let seed = this.entries[0];
-        for (const e of this.entries)
-        {
-            if (byWait(e, seed) < 0)
-            {
-                seed = e;
-            }
-        }
-
-        return seed;
     }
 
     private windowFor(seed: QueueEntry<Ref>, now: number): number

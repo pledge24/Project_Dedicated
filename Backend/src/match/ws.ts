@@ -12,12 +12,13 @@ import { AppError, Codes } from '../common/errors.js';
 import type { ErrorKind } from '../common/errors.js';
 import * as jwtUtil from '../common/jwt.js';
 import { logger } from '../common/logger.js';
+import { getCurrentTokenVersion, onSuperseded } from '../common/session.js';
 import type { AuthedUser } from '../common/types.js';
 import * as ds from './ds.js';
+import * as service from './matchmaking.service.js';
 import type { ClientMessage, ServerMessage, ServerMessageType } from './protocol.js';
 import type { MatchGroup } from './queue.js';
 import * as roster from './roster.js';
-import * as service from './service.js';
 
 const WS_PATH = '/ws/match';
 
@@ -27,14 +28,19 @@ interface AuthedWs extends WebSocket
     userId: number;
     nickname: string;
     isAlive: boolean;
+    msgWindowStart: number;  // rate limit 고정 윈도우 시작 시각(epoch ms)
+    msgCount: number;        // 현재 윈도우의 수신 메시지 수
+    limitNotified: boolean;  // 이번 윈도우에 초과 경고를 이미 보냈는가
 }
 
 /** http.Server에 매칭 WS를 붙이고 사이클/heartbeat를 기동. stop()으로 정리. */
 export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
 {
-    const wss = new WebSocketServer({ noServer: true });
+    // maxPayload: ws 기본값 100MiB → 16KB. 큐 메시지는 수십 바이트라 대형 메시지 flood 차단.
+    const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 
-    server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) =>
+    /** upgrade 이벤트(클라가 요청) 핸들 함수 추가 */
+    server.on('upgrade', async (req: IncomingMessage, socket: Duplex, head: Buffer) =>
     {
         const { pathname } = new URL(req.url ?? '', 'http://localhost');
         if (pathname !== WS_PATH)
@@ -44,9 +50,12 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
             return;
         }
 
+        /** socket error 이벤트에 핸들링 함수를 추가했다 삭제하는 이유는
+         *  인증 도중 error 발생 시, 핸들링 해줄 함수가 없기 때문.
+         *  그래서 임시용으로 추가했다 삭제하는 것.
+        */
         socket.on('error', onSocketError);
-
-        const user = authenticate(req);
+        const user = await authenticate(req);
         if (!user)
         {
             socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
@@ -54,33 +63,39 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
 
             return;
         }
-
         socket.removeListener('error', onSocketError);
+
         wss.handleUpgrade(req, socket, head, (ws) =>
         {
+            // 해당 emit은 클라이언트를 향하지 않음. 바로 아래 있는 wss.on('connection')을 향한다.
             wss.emit('connection', ws, req, user);
         });
     });
 
+    /** 연결 이벤트(이 서버가 요청) 핸들 함수 추가 */
     wss.on('connection', (ws: WebSocket, _req: IncomingMessage, user: AuthedUser) => onConnection(wss, ws, user));
+
+    // 재로그인(세션 대체) 알림 구독 — 버전 대조는 핸드셰이크 때뿐이라 이미 연결된 옛 소켓은 여기서 끊는다.
+    const offSuperseded = onSuperseded((userId) => kickThisUserSockets(wss, userId));
 
     // 죽은 연결 감지 — heartbeat 주기마다 pong 못 받은 소켓은 terminate.
     const heartbeat = setInterval(() =>
     {
         for (const client of wss.clients)
         {
-            const aws = client as AuthedWs;
-            if (!aws.isAlive)
+            const newSocket = client as AuthedWs;
+            if (!newSocket.isAlive)
             {
-                aws.terminate();
+                newSocket.terminate();
                 continue;
             }
-            aws.isAlive = false;
-            aws.ping();
+            newSocket.isAlive = false;
+            newSocket.ping();
         }
     }, config.match.heartbeatMs);
     heartbeat.unref();
 
+    // 매치 인터벌 타이머 설정.
     const cycle = setInterval(runMatchCycle, config.match.cycleMs);
     cycle.unref();
 
@@ -89,6 +104,7 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
     return {
         stop()
         {
+            offSuperseded();
             clearInterval(heartbeat);
             clearInterval(cycle);
             ds.shutdownAll();
@@ -101,8 +117,12 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
     };
 }
 
-/** 업그레이드 핸드셰이크의 Authorization 헤더에서 토큰 검증. 실패 시 null. */
-function authenticate(req: IncomingMessage): AuthedUser | null
+/**
+ * 업그레이드 핸드셰이크의 Authorization 헤더에서 토큰 검증. 실패 시 null.
+ * 단일 세션 강제: tokenVersion을 DB 현재값과 대조해 옛(대체된) 토큰의 매칭 접속도 거절.
+ * verify·DB 조회 중 어떤 예외든 null(=401)로 수렴시켜 업그레이드 콜백의 unhandled reject를 막는다.
+ */
+async function authenticate(req: IncomingMessage): Promise<AuthedUser | null>
 {
     const token = extractBearerToken(req.headers.authorization);
     if (!token)
@@ -113,6 +133,12 @@ function authenticate(req: IncomingMessage): AuthedUser | null
     try
     {
         const claims = jwtUtil.verify(token);
+
+        const currentVersion = await getCurrentTokenVersion(claims.userId);
+        if (currentVersion === null || currentVersion !== claims.tokenVersion)
+        {
+            return null;
+        }
 
         return { userId: claims.userId, nickname: claims.nickname };
     }
@@ -125,6 +151,20 @@ function authenticate(req: IncomingMessage): AuthedUser | null
 function onSocketError(err: Error): void
 {
     logger.warn({ err }, 'WS 업그레이드 소켓 에러');
+}
+
+/** 해당 userId의 기존 소켓 정리(중복 탭/재연결) — 한 유저 한 자리 보장. except는 제외(신규 연결 자신). */
+function kickThisUserSockets(wss: WebSocketServer, userId: number, except?: WebSocket): void
+{
+    for (const client of wss.clients)
+    {
+        const socket = client as AuthedWs;
+        if (socket !== except && socket.userId === userId)
+        {
+            service.leave(userId);
+            socket.terminate();
+        }
+    }
 }
 
 function send(ws: WebSocket, msg: ServerMessage): void
@@ -140,9 +180,39 @@ function sendError(ws: WebSocket, type: ServerMessageType, kind: ErrorKind, mess
     send(ws, { type, ok: false, error: { code: kind.code, message } });
 }
 
+/** 연결별 고정 윈도우 rate limit — 초과 메시지는 무시(윈도우당 경고 1회). */
+function allowMessage(ws: AuthedWs): boolean
+{
+    const now = Date.now();
+    if (now - ws.msgWindowStart >= config.rateLimit.windowMs)
+    {
+        ws.msgWindowStart = now;
+        ws.msgCount = 0;
+        ws.limitNotified = false;
+    }
+    ws.msgCount += 1;
+    if (ws.msgCount <= config.rateLimit.wsMax)
+    {
+        return true;
+    }
+    if (!ws.limitNotified)
+    {
+        ws.limitNotified = true;
+        sendError(ws, 'error', Codes.RATE_LIMITED, '메시지가 너무 잦습니다. 잠시 후 다시 시도해주세요.');
+        logger.warn({ userId: ws.userId, count: ws.msgCount }, 'WS 메시지 rate limit 초과');
+    }
+
+    return false;
+}
+
 /** WS 메시지 처리 — queue:join / queue:cancel. */
 async function onMessage(ws: AuthedWs, raw: RawData): Promise<void>
 {
+    if (!allowMessage(ws))
+    {
+        return;
+    }
+
     let msg: ClientMessage;
     try
     {
@@ -155,6 +225,7 @@ async function onMessage(ws: AuthedWs, raw: RawData): Promise<void>
         return;
     }
 
+    /** 메세지 처리 */
     try
     {
         switch (msg.type)
@@ -192,40 +263,39 @@ async function onMessage(ws: AuthedWs, raw: RawData): Promise<void>
 
 function onConnection(wss: WebSocketServer, ws: WebSocket, user: AuthedUser): void
 {
-    const aws = ws as AuthedWs;
-    aws.userId = user.userId;
-    aws.nickname = user.nickname;
-    aws.isAlive = true;
+    const newSocket = ws as AuthedWs;
+    newSocket.userId = user.userId;
+    newSocket.nickname = user.nickname;
+    newSocket.isAlive = true;
+    newSocket.msgWindowStart = Date.now();
+    newSocket.msgCount = 0;
+    newSocket.limitNotified = false;
 
-    // 같은 userId의 기존 소켓 정리(중복 탭/재연결) — 한 유저 한 자리 보장.
-    for (const other of wss.clients)
-    {
-        const o = other as AuthedWs;
-        if (o !== aws && o.userId === user.userId)
-        {
-            service.leave(user.userId);
-            o.terminate();
-        }
-    }
+    // 이전 ws 소켓 Cleanup.
+    kickThisUserSockets(wss, user.userId, newSocket);
 
-    aws.on('pong', () =>
+    newSocket.on('pong', () =>
     {
-        aws.isAlive = true;
+        newSocket.isAlive = true;
     });
 
-    aws.on('message', (raw) =>
+    newSocket.on('message', (raw) =>
     {
-        void onMessage(aws, raw);
+        void onMessage(newSocket, raw);
     });
 
-    aws.on('close', () =>
+    newSocket.on('close', () =>
     {
-        const removed = service.leave(aws.userId);
-        logger.info({ userId: aws.userId, removed }, 'WS 종료 — 큐에서 제거');
+        const removed = service.leave(newSocket.userId);
+        logger.info({ userId: newSocket.userId, removed }, 'WS 종료 — 큐에서 제거');
     });
-    aws.on('error', (err) => logger.warn({ err, userId: aws.userId }, 'WS 에러'));
 
-    logger.info({ userId: aws.userId }, 'WS 연결 수립');
+    newSocket.on('error', (err) =>
+    {
+        logger.warn({ err, userId: newSocket.userId }, 'WS 에러')
+    });
+
+    logger.info({ userId: newSocket.userId }, 'WS 연결 수립');
 }
 
 /** 1초 사이클: 매칭 시도 → 성사 그룹마다 DS 할당+푸시(비동기). */
@@ -239,21 +309,37 @@ function runMatchCycle(): void
     }
 }
 
-/** 한 매치 처리: DS 할당(또는 stub) → match:found 푸시. 할당 실패 시 에러 푸시. */
+/**
+ * 한 매치 처리: 확정 창(끊김/재접속/취소) 방어 → DS 할당 → match:found.
+ * 성사 즉시 큐에서 빠진 그룹을 begin/end/abortFormation으로 추적한다.
+ * 끊김·재접속·취소는 전부 service.leave를 거쳐 inFormation에서 빠지므로 userId 기준으로 포착된다.
+ */
 async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
 {
     const matchId = randomUUID();
-    // DS 결과 보고 인증용 매치별 서버 토큰. DS spawn에 주입되며, 클라엔 보내지 않는다.
+    // DS 인증용 토큰. 커맨드라인으로 넘겨주며, DS -> 백엔드로 매치 결과 전송 시 사용.
     const serverToken = randomBytes(24).toString('base64url');
-
-    // per-player 입장 토큰(권위 신원용). 클라는 본인 토큰만 받고, DS는 roster로 신원 확정. 좌석은 DS가 랜덤 배정.
     const joinPlayers = group.entries.map((e) => ({
         ref: e.ref,
         userId: e.userId,
         nickname: e.nickname,
+        // 각 플레이어 DS 입장 토큰. 클라가 DS 입장시 사용.
         joinToken: randomBytes(16).toString('base64url'),
     }));
+    const userIds = group.entries.map((e) => e.userId);
 
+    service.beginFormation(userIds);
+
+    // 1) 스폰 전: 이미 닫힌 소켓(같은 틱 onClose 미처리 레이스)이 있으면 스폰 없이 생존자만 재큐.
+    if (group.entries.some((e) => e.ref.readyState !== WebSocket.OPEN))
+    {
+        const requeued = service.abortFormation(group.entries);
+        logger.warn({ matchId, requeued }, '확정 전 소켓 종료 — 스폰 취소, 생존자 재큐');
+
+        return;
+    }
+
+    // 2) 매치를 실행할 DS를 spawn(또는 stub). 할당 실패는 복구 불가라 error 전송.
     let server: { host: string; port: number };
     try
     {
@@ -265,6 +351,7 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     catch (err)
     {
         logger.error({ err, matchId }, 'DS 할당 실패 — 매치 취소');
+        service.endFormation(userIds);
         for (const e of group.entries)
         {
             sendError(e.ref, 'error', Codes.INTERNAL_ERROR, '게임 서버 할당에 실패했습니다.');
@@ -273,9 +360,22 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
         return;
     }
 
-    const { data } = service.buildMatchFound(group, matchId, server);
+    // 3) 부팅(≈5s) 사이 끊김/재접속/취소 포착(userId 기준). 하나라도 이탈 시 스폰한 DS 회수 + 생존자 재큐.
+    if (group.entries.some((e) => !service.isInFormation(e.userId) || e.ref.readyState !== WebSocket.OPEN))
+    {
+        if (config.match.ds.enabled)
+        {
+            ds.release(server.port);
+        }
+        const requeued = service.abortFormation(group.entries);
+        logger.warn({ matchId, requeued }, '확정 창 이탈 — DS 회수, 생존자 재큐');
 
-    // 결과 POST 검증용 roster 등록(matchId → 신원 + 서버 토큰 + 입장 토큰).
+        return;
+    }
+
+    // 4) 성사 확정: formation 종료 → roster 등록 → 각 클라에 본인 입장 토큰만 실어 push.
+    service.endFormation(userIds);
+    const { data } = service.buildMatchFound(group, matchId, server);
     roster.register({
         matchId,
         serverToken,
@@ -287,7 +387,6 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
             joinToken: p.joinToken,
         })),
     });
-
     // 각 클라에 본인 입장 토큰만 실어 보낸다.
     for (const p of joinPlayers)
     {
