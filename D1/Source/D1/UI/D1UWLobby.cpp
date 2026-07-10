@@ -11,6 +11,7 @@
 #include "Network/BackendErrorMessages.h"
 #include "Network/D1AuthSubsystem.h"
 #include "Network/D1MatchmakingSubsystem.h"
+#include "TimerManager.h"
 
 // 매치 정원(백엔드 playersPerMatch와 동일). match:found가 개수를 싣지 않아 클라 상수로 표기.
 static constexpr int32 MatchPlayerCount = 4;
@@ -67,6 +68,8 @@ void UD1UWLobby::NativeConstruct()
 
 void UD1UWLobby::NativeDestruct()
 {
+	StopMatchSearchingElapsed();
+
 	// 위젯이 Subsystem보다 먼저 소멸 — 구독 해제로 dangling 방지
 	if (UGameInstance* GameInst = GetGameInstance())
 	{
@@ -139,10 +142,19 @@ void UD1UWLobby::OnStartMatchingClicked()
 	{
 		StartMatchingButton->SetIsEnabled(false);
 	}
+
+	// 준비 중엔 0:00 정지 표시. 실제 카운트는 큐 입장(HandleQueueJoined)부터.
+	MatchSearchingElapsedSec = 0;
+	if (MatchSearchingElapsedLabel)
+	{
+		MatchSearchingElapsedLabel->SetText(FText::FromString(TEXT("0:00")));
+	}
 }
 
 void UD1UWLobby::OnCancelMatchingClicked()
 {
+	StopMatchSearchingElapsed();
+
 	if (UD1MatchmakingSubsystem* Matchmaking = GetGameInstance()->GetSubsystem<UD1MatchmakingSubsystem>())
 	{
 		Matchmaking->CancelMatchmaking();
@@ -164,12 +176,22 @@ void UD1UWLobby::HandleQueueJoined()
 	{
 		MatchStatusLabel->SetText(NSLOCTEXT("Lobby", "MatchSearching", "상대를 찾는 중..."));
 	}
+
+	// 검색 시작 시점부터 경과 시간 1초 간격 갱신.
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			MatchSearchingElapsedTimerHandle, this,
+			&UD1UWLobby::UpdateMatchSearchingElapsed, 1.f, /*bLoop=*/true);
+	}
 }
 
 void UD1UWLobby::HandleMatchFound(const FMatchFoundDTO& Match)
 {
 	UE_LOG(LogD1, Log, TEXT("[Lobby] 매칭 완료 — server=%s:%d"),
 		*Match.ServerHost, Match.ServerPort);
+
+	StopMatchSearchingElapsed();
 
 	if (MatchStatusLabel)
 	{
@@ -189,6 +211,8 @@ void UD1UWLobby::HandleMatchmakingError(const FBackendResponse& Error)
 
 	UE_LOG(LogD1, Warning, TEXT("[Lobby] 매칭 에러: %s"), *Msg);
 
+	StopMatchSearchingElapsed();
+
 	if (MatchStatusLabel)
 	{
 		MatchStatusLabel->SetText(FText::FromString(Msg));
@@ -197,5 +221,25 @@ void UD1UWLobby::HandleMatchmakingError(const FBackendResponse& Error)
 	{
 		// 에러 문구는 패널에 남겨두고 다시 시도 가능하게 Start 재활성
 		StartMatchingButton->SetIsEnabled(true);
+	}
+}
+
+void UD1UWLobby::UpdateMatchSearchingElapsed()
+{
+	++MatchSearchingElapsedSec;
+	if (MatchSearchingElapsedLabel)
+	{
+		const int32 Minutes = MatchSearchingElapsedSec / 60;
+		const int32 Seconds = MatchSearchingElapsedSec % 60;
+		MatchSearchingElapsedLabel->SetText(FText::FromString(
+			FString::Printf(TEXT("%d:%02d"), Minutes, Seconds)));
+	}
+}
+
+void UD1UWLobby::StopMatchSearchingElapsed()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(MatchSearchingElapsedTimerHandle);
 	}
 }

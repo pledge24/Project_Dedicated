@@ -76,6 +76,19 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> MatchStatusLabel;
+	
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> MatchSearchingElapsedLabel;
+
+private:
+	/** 1초 간격 타이머 콜백 — 경과 초 증가·라벨 갱신. */
+	void UpdateMatchSearchingElapsed();
+
+	void StopMatchSearchingElapsed();
+
+	FTimerHandle MatchSearchingElapsedTimerHandle;
+
+	int32 MatchSearchingElapsedSec = 0;
 
 //~ 비로그인 방어
 private:
