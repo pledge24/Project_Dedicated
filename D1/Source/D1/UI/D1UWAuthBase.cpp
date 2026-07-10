@@ -14,7 +14,7 @@ void UD1UWAuthBase::NativeConstruct()
 
 	if (ErrorLabel)
 	{
-		ErrorLabel->SetVisibility(ESlateVisibility::Collapsed);
+		ErrorLabel->SetVisibility(ESlateVisibility::Hidden);
 	}
 }
 
@@ -23,7 +23,7 @@ void UD1UWAuthBase::BeginRequest()
 	if (ErrorLabel)
 	{
 		ErrorLabel->SetText(FText::GetEmpty());
-		ErrorLabel->SetVisibility(ESlateVisibility::Collapsed);
+		ErrorLabel->SetVisibility(ESlateVisibility::Hidden);
 	}
 	OnRequestStarted();
 }
