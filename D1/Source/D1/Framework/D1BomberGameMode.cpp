@@ -9,6 +9,7 @@
 #include "Framework/D1MatchTypes.h"
 #include "Core/D1LogChannels.h"
 #include "EngineUtils.h"
+#include "Misc/Base64.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/GameplayStatics.h"
@@ -92,7 +93,8 @@ void AD1BomberGameMode::BeginPlay()
 	}
 
 	// DS spawn 시 백엔드가 주입한 커맨드라인에서 플레이어 명단 파싱.
-	// ({token}:{userId};…). InitNewPlayer가 ?join= 토큰으로 신원을 확정한다.
+	// ({token}:{userId}:{base64(nickname)};…). InitNewPlayer가 ?join= 토큰으로 신원·이름을 확정한다.
+	// 닉네임은 한글(비-ASCII)이라 백엔드가 표준 base64로 인코딩해 넘김 → UTF-8로 디코드.
 	FString RosterStr;
 	if (FParse::Value(FCommandLine::Get(), TEXT("Roster="), RosterStr) && !RosterStr.IsEmpty())
 	{
@@ -102,10 +104,19 @@ void AD1BomberGameMode::BeginPlay()
 		{
 			TArray<FString> Parts;
 			Entry.ParseIntoArray(Parts, TEXT(":"), /*CullEmpty=*/true);
-			if (Parts.Num() == 2)
+			if (Parts.Num() >= 2)
 			{
 				FD1JoinEntry JE;
 				JE.UserId = FCString::Atoi64(*Parts[1]);
+				if (Parts.Num() >= 3)
+				{
+					TArray<uint8> Bytes;
+					if (FBase64::Decode(Parts[2], Bytes))
+					{
+						Bytes.Add(0); // UTF8→TCHAR 변환용 널 종단
+						JE.Nickname = UTF8_TO_TCHAR(reinterpret_cast<const ANSICHAR*>(Bytes.GetData()));
+					}
+				}
 				JoinRoster.Add(Parts[0], JE);
 			}
 			else
@@ -159,6 +170,12 @@ FString AD1BomberGameMode::InitNewPlayer(APlayerController* NewPlayerController,
 			if (const FD1JoinEntry* Entry = JoinRoster.Find(JoinToken))
 			{
 				PS->SetBackendUserId(Entry->UserId);
+				// Super가 클라 기본 이름(?Name=머신명)을 세팅한 뒤에 권위 닉네임으로 덮어써야 복제가 확정됨.
+				// 너무 이르게(예: PlayerState::BeginPlay) 부르면 엔진이 되덮어 클라에 DESKTOP-… 잔류.
+				if (!Entry->Nickname.IsEmpty())
+				{
+					PS->SetPlayerName(Entry->Nickname);
+				}
 				UE_LOG(LogD1, Log, TEXT("[Match] InitNewPlayer %s userId=%lld (roster)"),
 					*PS->GetPlayerName(), Entry->UserId);
 			}

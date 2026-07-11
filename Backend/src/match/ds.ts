@@ -19,7 +19,7 @@ const ds = config.match.ds;
 const running = new Map<number, DsProcess>(); // port → 프로세스
 
 /** 빈 포트에 DS spawn → bootDelay 후 {host, port}. 포트 고갈/부팅 실패 시 throw. */
-export async function allocate(matchId: string, serverToken: string, expectedPlayers: number, roster: { joinToken: string; userId: number }[]): Promise<{ host: string; port: number }>
+export async function allocate(matchId: string, serverToken: string, expectedPlayers: number, roster: { joinToken: string; userId: number; nickname: string }[]): Promise<{ host: string; port: number }>
 {
     const port = pickFreePort();
     if (port === null)
@@ -30,10 +30,11 @@ export async function allocate(matchId: string, serverToken: string, expectedPla
     /**
      * matchId·serverToken·roster는 커맨드라인 스위치로 주입하면, DS가 FParse로 읽는다.
      * expectedPlayers: DS가 전원 입장까지 매치 시작을 미루는 게이트용(미충족 시 DS 측 타임아웃으로 시작).
-     * Roster:          token:userId;… — DS가 ?join= 토큰으로 권위 신원(userId)을 매핑. 좌석은 DS가 랜덤 배정.
+     * Roster:          token:userId:base64(nickname);… — DS가 ?join= 토큰으로 권위 신원(userId·이름)을 매핑. 좌석은 DS가 랜덤 배정.
+     *                   닉네임은 한글(비-ASCII)이라 Windows 커맨드라인 코드페이지 깨짐 방지 위해 표준 base64로 인코딩(UE FBase64::Decode 호환).
      * stdio 'ignore' — DS는 -log로 자체 콘솔/로그파일에 기록. 파이프 미소비로 막히는 것 방지.
      */
-    const rosterArg = roster.map((r) => `${r.joinToken}:${r.userId}`).join(';');
+    const rosterArg = roster.map((r) => `${r.joinToken}:${r.userId}:${Buffer.from(r.nickname, 'utf8').toString('base64')}`).join(';');
     const args = [ds.map, `-port=${port}`, `-MatchId=${matchId}`, `-MatchToken=${serverToken}`, `-ExpectedPlayers=${expectedPlayers}`, `-Roster=${rosterArg}`, '-log'];
     const child = spawn(ds.exePath, args, { stdio: 'ignore', windowsHide: false });
 

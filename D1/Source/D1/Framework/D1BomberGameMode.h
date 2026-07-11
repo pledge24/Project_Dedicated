@@ -10,10 +10,11 @@ class APlayerController;
 class AD1PowerupPickup;
 class UD1MapData;
 
-/** -Roster= 로 주입된 입장 토큰 → 권위 신원(userId) 매핑. 좌석은 DS가 입장 시 랜덤 배정. */
+/** -Roster= 로 주입된 입장 토큰 → 권위 신원(userId·닉네임) 매핑. 좌석은 DS가 입장 시 랜덤 배정. */
 struct FD1JoinEntry
 {
 	int64 UserId = 0;
+	FString Nickname;
 };
 
 /** 봄버맨 매치 GameMode(서버 전용) — 맵 빌드·접속 신원 검증·슬롯 배정·시작 게이트. */

@@ -345,7 +345,7 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     {
         server = config.match.ds.enabled
             ? await ds.allocate(matchId, serverToken, group.entries.length,
-                joinPlayers.map((p) => ({ joinToken: p.joinToken, userId: p.userId })))
+                joinPlayers.map((p) => ({ joinToken: p.joinToken, userId: p.userId, nickname: p.nickname })))
             : config.match.stubServer;
     }
     catch (err)
