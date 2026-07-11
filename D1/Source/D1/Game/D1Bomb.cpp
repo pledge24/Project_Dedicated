@@ -12,6 +12,7 @@
 #include "Game/D1BomberGridLibrary.h"
 #include "Game/D1ExplosionFX.h"
 #include "Game/D1ExplosionHazard.h"
+#include "Game/D1PowerupPickup.h"
 #include "Game/D1SoftBlock.h"
 
 AD1Bomb::AD1Bomb()
@@ -121,10 +122,11 @@ void AD1Bomb::DoExplode()
 	TArray<FIntPoint> SoftBlockHits;
 	UD1BomberGridLibrary::TraceExplosionCells(GS, Origin, Range, Cells, SoftBlockHits);
 	
-	// 체인 격발 -> 소프트 블럭 파괴(이 Bomb의 폭발에 대해서만) -> 지속 피해 위험 영역 스폰(서버 전용) -> 폭발 이펙트 적용(클라 전용)
+	// 체인 격발 -> 소프트 블럭 파괴(이 Bomb의 폭발에 대해서만) -> 십자 위 파워업 파괴 -> 지속 피해 위험 영역 스폰(서버 전용) -> 폭발 이펙트 적용(클라 전용)
 	{
 		ChainDetonateBombs(Cells);
 		DestroySoftBlocks(SoftBlockHits);
+		DestroyPowerups(Cells);
 		SpawnExplosionHazard(Cells);
 		MulticastOnExploded(Cells);
 	}
@@ -158,6 +160,24 @@ void AD1Bomb::DestroySoftBlocks(const TArray<FIntPoint>& SoftBlockHits)
 		if (SoftBlockHits.Contains(BlockCell))
 		{
 			Block->StartDestroying();
+		}
+	}
+}
+
+void AD1Bomb::DestroyPowerups(const TArray<FIntPoint>& Cells)
+{
+	// 폭발 십자에 걸린 드롭 아이템 파괴. Destroy()는 복제로 클라에서도 사라진다.
+	for (AD1PowerupPickup* Pickup : TActorRange<AD1PowerupPickup>(GetWorld()))
+	{
+		if (!IsValid(Pickup))
+		{
+			continue;
+		}
+
+		const FIntPoint PickupCell = UD1BomberGridLibrary::WorldToCell(Pickup->GetActorLocation());
+		if (Cells.Contains(PickupCell))
+		{
+			Pickup->Destroy();
 		}
 	}
 }

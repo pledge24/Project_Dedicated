@@ -80,6 +80,8 @@ protected:
 
 private:
 	void DestroySoftBlocks(const TArray<FIntPoint>& SoftBlockHits);
+	/** 폭발 십자에 걸린 드롭 파워업 파괴. */
+	void DestroyPowerups(const TArray<FIntPoint>& Cells);
 	/** 서버 전용. */
 	void SpawnExplosionHazard(const TArray<FIntPoint>& Cells);
 
