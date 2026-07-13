@@ -4,6 +4,7 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
+#include "Components/ProgressBar.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Core/D1LogChannels.h"
@@ -122,6 +123,22 @@ void UD1UWLobby::ApplyProfileToLabels()
 	if (ScoreLabel)
 	{
 		ScoreLabel->SetText(FText::AsNumber(User.Score));
+	}
+
+	// EXP 바 = 레벨 내 진행분. 백엔드와 동일하게 레벨당 1000, level은 서버 산출값을 신뢰(Clamp는 방어).
+	const int32 ExpPerLevel = 1000;
+	const int32 ExpInLevel = FMath::Clamp(User.Exp - (User.Level - 1) * ExpPerLevel, 0, ExpPerLevel);
+	if (ExpBar)
+	{
+		ExpBar->SetPercent(static_cast<float>(ExpInLevel) / ExpPerLevel);
+	}
+	if (ExpLabel)
+	{
+		ExpLabel->SetText(FText::Format(
+			NSLOCTEXT("Lobby", "ExpFmt", "{0} / {1} EXP"),
+			FText::AsNumber(ExpInLevel),
+			FText::AsNumber(ExpPerLevel)
+		));
 	}
 }
 

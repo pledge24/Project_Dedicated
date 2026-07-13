@@ -8,6 +8,7 @@
 #include "D1UWLobby.generated.h"
 
 class UButton;
+class UProgressBar;
 class UTextBlock;
 class UUserWidget;
 class UVerticalBox;
@@ -44,8 +45,15 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> ScoreLabel;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UProgressBar> ExpBar;
+
+	/** EXP 바 중앙 텍스트("현재/최대 EXP"). */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> ExpLabel;
+
 private:
-	/** GameInstance 캐시(GetCurrentUser)의 닉네임/레벨/점수를 라벨에 반영. 캐시·갱신 양쪽에서 호출. */
+	/** GameInstance 캐시(GetCurrentUser)의 닉네임/레벨/점수/경험치를 라벨·바에 반영. 캐시·갱신 양쪽에서 호출. */
 	void ApplyProfileToLabels();
 
 //~ WS 매칭
