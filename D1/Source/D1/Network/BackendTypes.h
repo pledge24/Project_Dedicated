@@ -94,6 +94,53 @@ struct FMatchFoundDTO
 	FString JoinToken;
 };
 
+/** 랭킹 한 줄 — GET /api/ranking의 entries[] 한 항목. */
+USTRUCT(BlueprintType)
+struct FD1RankingEntryDTO
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Rank = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 UserId = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	FString Nickname;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Score = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Level = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Wins = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Losses = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 MatchesPlayed = 0;
+};
+
+/** 랭킹 조회 결과 — Top 리스트 + 본인 순위(me.rank). 본인 닉네임/점수는 GameInstance 캐시서 합성. */
+USTRUCT(BlueprintType)
+struct FD1RankingResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	TArray<FD1RankingEntryDTO> Entries;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 MyRank = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Total = 0;
+};
+
 /** DS가 백엔드에 보고할 매치 결과 한 명분 (서버 내부용 — BP 비노출, USTRUCT 아님). */
 struct FMatchResultPlayer
 {
@@ -117,3 +164,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMatchmakingError, const FBackendR
 
 /** 프로필 갱신 완료(/api/auth/me 응답으로 캐시 갱신됨). UI가 라벨 새로고침용으로 구독. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnProfileUpdated);
+
+/** 랭킹 조회 완료 콜백 (1회성 pass-in). */
+DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnRankingCompleted, const FBackendResponse&, Response, const FD1RankingResult&, Result);

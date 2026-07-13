@@ -9,6 +9,7 @@
 
 class UButton;
 class UTextBlock;
+class UUserWidget;
 class UVerticalBox;
 
 /**
@@ -89,6 +90,23 @@ private:
 	FTimerHandle MatchSearchingElapsedTimerHandle;
 
 	int32 MatchSearchingElapsedSec = 0;
+
+//~ 랭킹
+protected:
+	UFUNCTION()
+	void OnRankingClicked();
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UButton> RankingButton;
+
+private:
+	/** 랭킹 팝업 위젯 클래스 — 디테일 패널에서 WBP_Ranking 지정. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UUserWidget> RankingWidgetClass;
+
+	/** 열린 팝업 참조 — 중복 오픈 가드. */
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> RankingWidget;
 
 //~ 비로그인 방어
 private:

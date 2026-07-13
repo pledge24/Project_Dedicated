@@ -2,6 +2,7 @@
 
 #include "UI/D1UWLobby.h"
 
+#include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -43,6 +44,10 @@ void UD1UWLobby::NativeConstruct()
 	if (CancelMatchingButton)
 	{
 		CancelMatchingButton->OnClicked.AddDynamic(this, &UD1UWLobby::OnCancelMatchingClicked);
+	}
+	if (RankingButton)
+	{
+		RankingButton->OnClicked.AddDynamic(this, &UD1UWLobby::OnRankingClicked);
 	}
 	if (MatchStatusPanel)
 	{
@@ -241,5 +246,27 @@ void UD1UWLobby::StopMatchSearchingElapsed()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(MatchSearchingElapsedTimerHandle);
+	}
+}
+
+void UD1UWLobby::OnRankingClicked()
+{
+	if (!RankingWidgetClass)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Lobby] RankingWidgetClass가 비어있음 (디테일 패널에서 WBP_Ranking 지정 필요)"));
+		return;
+	}
+
+	// 이미 떠 있으면 중복 생성 방지.
+	if (RankingWidget && RankingWidget->IsInViewport())
+	{
+		return;
+	}
+
+	// ZOrder 10 → 로비 위, 배경(-1) 위. SwitchToWidget 경유 금지(로비 파괴됨).
+	RankingWidget = CreateWidget<UUserWidget>(GetOwningPlayer(), RankingWidgetClass);
+	if (RankingWidget)
+	{
+		RankingWidget->AddToViewport(10);
 	}
 }
