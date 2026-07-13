@@ -6,7 +6,7 @@ import { randomBytes } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 
 import buildApp from '../src/app.js';
-import { closePool } from '../src/common/db.js';
+import { closePool, getPool } from '../src/common/db.js';
 import * as roster from '../src/match/roster.js';
 
 const PASSWORD = 'resulttest123';
@@ -69,6 +69,9 @@ async function main(): Promise<void>
         results: users.map((u, i) => ({ userId: u.userId, slotIndex: i, placement: i + 1, livesLeft: i === 0 ? 2 : 0 })),
     };
 
+    // 레벨업 검증용 사전 시드: 1위(users[0])의 exp를 경계 근처로 → 1위 획득 +100이면 1000을 넘겨 Lv.2.
+    await getPool().execute('UPDATE player_profiles SET exp = 950 WHERE user_id = ?', [users[0].userId]);
+
     const checks: Array<[string, () => Promise<void>]> = [
         ['Authorization 없음 → 401', async () =>
         {
@@ -128,6 +131,15 @@ async function main(): Promise<void>
             assert.ok(first.scoreDelta > 0, `1위 scoreDelta=${first.scoreDelta} 양수 아님`);
             assert.ok(last.scoreDelta < 0, `4위 scoreDelta=${last.scoreDelta} 음수 아님`);
             assert.equal(first.scoreAfter, 1000 + first.scoreDelta);
+        }],
+
+        ['레벨업 — exp 950 + 1위 100 = 1050 → Lv.2', async () =>
+        {
+            const login = await post('/api/auth/login', { loginId: `rt${suffix}0`, password: PASSWORD });
+            assert.equal(login.body.ok, true, JSON.stringify(login.body));
+            const data = login.body.data as { exp: number; level: number };
+            assert.equal(data.exp, 1050, `exp=${data.exp} (기대 1050)`);
+            assert.equal(data.level, 2, `level=${data.level} (기대 2)`);
         }],
 
         ['중복 제출 → 409', async () =>
