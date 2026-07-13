@@ -118,17 +118,19 @@ async function main(): Promise<void>
             assert.equal(r.body.error?.code, 'INVALID_RESULT');
         }],
 
-        ['정상 제출 → 200 + 제로섬 + 1위>0>4위', async () =>
+        ['정상 제출 → 200 + 인플레(sum>0) + 1·2위>0>4위', async () =>
         {
             const r = await post('/api/match/result', resultBody, serverToken);
             assert.equal(r.status, 200, JSON.stringify(r.body));
             const ps = r.body.data!.participants as Array<{ placement: number; scoreDelta: number; scoreAfter: number }>;
             assert.equal(ps.length, 4);
             const sum = ps.reduce((a, p) => a + p.scoreDelta, 0);
-            assert.ok(Math.abs(sum) <= 4, `제로섬 위반 sum=${sum}`);
+            assert.ok(sum > 0, `인플레 위반 sum=${sum} (매치 후 합이 더 커야 함)`);
             const first = ps.find((p) => p.placement === 1)!;
+            const second = ps.find((p) => p.placement === 2)!;
             const last = ps.find((p) => p.placement === 4)!;
             assert.ok(first.scoreDelta > 0, `1위 scoreDelta=${first.scoreDelta} 양수 아님`);
+            assert.ok(second.scoreDelta > 0, `2위 scoreDelta=${second.scoreDelta} 양수 아님`);
             assert.ok(last.scoreDelta < 0, `4위 scoreDelta=${last.scoreDelta} 음수 아님`);
             assert.equal(first.scoreAfter, 1000 + first.scoreDelta);
         }],

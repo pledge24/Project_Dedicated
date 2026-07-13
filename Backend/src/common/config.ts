@@ -33,7 +33,8 @@ export const config = Object.freeze({
         cycleMs:         asNumber('MATCH_CYCLE_MS', 1000),     // 매칭 사이클 주기
         heartbeatMs:     asNumber('MATCH_HEARTBEAT_MS', 30_000),
         eloK:            asNumber('MATCH_ELO_K', 32),          // ELO K-factor
-        scoreFloor:      asNumber('MATCH_SCORE_FLOOR', 0),     // 점수 하한(음수 방지)
+        scoreFloor:      asNumber('MATCH_SCORE_FLOOR', 100),   // 점수 하한
+        scoreCeiling:    asNumber('MATCH_SCORE_CEILING', 5000), // 점수 상한
         // ds.enabled=false면 아래 stub 주소 사용(봇/알고리즘 테스트 경로 보존).
         stubServer: Object.freeze({
             host: process.env.MATCH_STUB_HOST || '127.0.0.1',
