@@ -25,6 +25,7 @@ void AD1MenuPlayerController::BeginPlay()
 	}
 
 	ShowBackground();
+	ShowQuitButton();
 	// 입력 모드는 SwitchToWidget 끝에서 적용됨 (여기서 중복 호출 안 함)
 	ShowInitialWidgetFromGameMode();
 }
@@ -64,6 +65,21 @@ void AD1MenuPlayerController::ShowBackground()
 	{
 		// ZOrder = -1: 어떤 콘텐츠 위젯보다도 항상 뒤에 그려짐
 		BackgroundWidget->AddToViewport(-1);
+	}
+}
+
+void AD1MenuPlayerController::ShowQuitButton()
+{
+	if (!QuitButtonWidgetClass || QuitButtonWidget)
+	{
+		return;
+	}
+
+	QuitButtonWidget = CreateWidget<UUserWidget>(this, QuitButtonWidgetClass);
+	if (QuitButtonWidget)
+	{
+		// ZOrder 5: 콘텐츠(0)·배경(-1) 위, 랭킹 팝업(10) 아래 — 모달 팝업엔 가려짐
+		QuitButtonWidget->AddToViewport(5);
 	}
 }
 
