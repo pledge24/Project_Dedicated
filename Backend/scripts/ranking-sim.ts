@@ -175,6 +175,23 @@ async function main(): Promise<void>
             assert.equal(meta.limit, 50, '기본 limit=50 아님');
             assert.equal(meta.offset, 0);
         }],
+
+        ['me.rank — 본인 전역 순위(점수 기준 공동 순위)', async () =>
+        {
+            // U0: 최상위(동점 U1과 공동 1위) → rank 1
+            const r0 = await get('/api/ranking?limit=1', token);
+            assert.equal(r0.status, 200, JSON.stringify(r0.body));
+            const me0 = r0.body.data!.me as { rank: number };
+            assert.equal(me0.rank, 1, `U0 me.rank=${me0?.rank} (기대 1)`);
+
+            // U2: 위에 U0·U1(동점 top) 2명 → rank 3. 위치 순위가 아닌 점수 기준 공동 순위 검증.
+            const login2 = await post('/api/auth/login', { loginId: users[2].loginId, password: PASSWORD });
+            assert.equal(login2.body.ok, true, `U2 login 실패: ${JSON.stringify(login2.body)}`);
+            const token2 = login2.body.data!.token as string;
+            const r2 = await get('/api/ranking', token2);
+            const me2 = r2.body.data!.me as { rank: number };
+            assert.equal(me2.rank, 3, `U2 me.rank=${me2?.rank} (기대 3)`);
+        }],
     ];
 
     let failed = 0;

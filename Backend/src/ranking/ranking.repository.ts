@@ -1,7 +1,7 @@
 // 랭킹 도메인의 DB 쿼리만 담당 (repository 레이어)
 import type { RowDataPacket } from 'mysql2';
 
-import { getPool } from '../common/db.js';
+import { getPool, queryOne } from '../common/db.js';
 
 /** DB player_profiles JOIN users 행 (랭킹 페이지 쿼리). */
 export interface RankingRow extends RowDataPacket
@@ -47,4 +47,19 @@ export async function countProfiles(): Promise<number>
     );
 
     return Number(rows[0].total);
+}
+
+/**
+ * 요청자의 전역 순위 = 자기보다 점수 높은 프로필 수 + 1 (동점은 공동 순위). idx_pp_score_desc 활용.
+ * 모든 가입 유저는 등록 트랜잭션에서 player_profiles 행을 갖는다 → 서브쿼리는 NULL이 되지 않는다.
+ */
+export async function findRankByUserId(userId: number): Promise<number>
+{
+    const row = await queryOne<CountRow>(
+        'SELECT COUNT(*) + 1 AS total FROM player_profiles ' +
+        'WHERE score > (SELECT score FROM player_profiles WHERE user_id = ?)',
+        [userId]
+    );
+
+    return row ? Number(row.total) : 1;
 }

@@ -90,9 +90,16 @@ export interface RankingEntry
     matchesPlayed: number;
 }
 
-/** 응답: 페이지 + meta(클라 페이지네이션 렌더용). */
+/** 요청자 본인 정보. rank = 자기보다 점수 높은 인원 + 1 (동점은 공동 순위, 페이지와 무관한 전역 순위). */
+export interface RankingSelf
+{
+    rank: number;
+}
+
+/** 응답: 페이지 + 본인 순위(me) + meta(클라 페이지네이션 렌더용). */
 export interface RankingResponse
 {
     entries: RankingEntry[];
+    me: RankingSelf;
     meta: { total: number; limit: number; offset: number };
 }

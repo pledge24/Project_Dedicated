@@ -19,7 +19,7 @@ interface Pagination
 export async function getRanking(req: Request, res: Response): Promise<void>
 {
     const { limit, offset } = parsePagination(req.query);
-    const data = await service.getRanking(limit, offset);
+    const data = await service.getRanking(req.user!.userId, limit, offset);
     res.json(ok(data));
 }
 
