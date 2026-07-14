@@ -18,6 +18,7 @@
     "migrate:status": "tsx scripts/migrate.ts status",
     "migrate:make": "tsx scripts/migrate.ts make",
     "db:init": "tsx scripts/db-init.ts",
+    "db:wipe": "tsx scripts/db-wipe.ts",
     "match:sim": "tsx scripts/match-sim.ts",
     "match:elo": "tsx scripts/match-elo.ts",
     "match:result-sim": "tsx scripts/match-result-sim.ts",
