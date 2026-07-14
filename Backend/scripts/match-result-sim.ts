@@ -12,7 +12,7 @@ import { closePool, getPool } from '../src/common/db.js';
 import * as roster from '../src/match/roster.js';
 
 const PASSWORD = 'resulttest123';
-const MAP = '/Game/D1/Maps/MP_Ingame';
+const MAP = 'default map'; // DS가 보고하는 논리 맵 이름(레벨 경로 아님)과 동일 형태
 
 interface PostResult
 {

@@ -39,6 +39,10 @@ public:
 	/** Rows를 파싱·검증해 OutLayout을 채운다. 실패 시 false + OutError. */
 	bool BuildLayout(FD1MapLayout& OutLayout, FString& OutError) const;
 
+	/** 이 맵의 논리 이름(레벨/쉘 umap 이름과 무관). 매치 결과의 map_name으로 보고. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Map")
+	FString MapName;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Map")
 	TArray<FString> Rows;
 

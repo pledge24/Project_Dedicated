@@ -284,7 +284,7 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 			{
 				const int32 DurationSec = FMath::Max(0,
 					FMath::RoundToInt(GS->GetServerWorldTimeSeconds() - GS->MatchStartServerTime));
-				ResultClient->ReportMatchResult(CurrentMatchId, CurrentMatchToken, World->GetMapName(),
+				ResultClient->ReportMatchResult(CurrentMatchId, CurrentMatchToken, GS->MapName,
 					DurationSec, EndReasonToString(Reason), ResultPlayers);
 			}
 		}

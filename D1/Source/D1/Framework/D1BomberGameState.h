@@ -67,6 +67,10 @@ public:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
 	TArray<FIntPoint> SoftBlockCells;
 
+	/** 빌드 시 서버가 세팅. 선정된 맵의 논리 이름 → 결과 보고(map_name)용. 클라 불필요라 비복제. */
+	UPROPERTY(BlueprintReadOnly, Category = "Bomber")
+	FString MapName;
+
 //~ 매치 타이머
 public:
 	UFUNCTION(BlueprintPure, Category = "Bomber|Match")
