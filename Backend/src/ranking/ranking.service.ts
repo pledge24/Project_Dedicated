@@ -4,7 +4,7 @@ import * as repo from './ranking.repository.js';
 
 /**
  * 한 페이지 + 전체 수 + 요청자 전역 순위를 병렬 조회해 RankingResponse로 조립.
- * entries[].rank = offset + index + 1 (정렬 순서상 위치). me.rank = 점수 기준 공동 순위(페이지 무관).
+ * entries[].rank = offset + index + 1 (정렬 순서상 위치). me.rank = 총순서 기준 유일 순위(페이지 무관, 리스트 위치와 일치).
  * 빈 페이지도 정상(entries: []).
  */
 export async function getRanking(userId: number, limit: number, offset: number): Promise<RankingResponse>

@@ -1,11 +1,13 @@
 // 매치 결과 엔드포인트 통합 하네스(인프로세스). 앱을 같은 프로세스에 띄워 roster를 직접 시드한다
 // (roster는 인메모리라 별도 프로세스에선 못 건드림). 언리얼 DS 없이 F5a를 끝까지 검증.
 // 실행: npm run match:result-sim   (MySQL 가동 + Backend/.env 필요. 임의 빈 포트로 listen.)
+import type { RowDataPacket } from 'mysql2';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 
 import buildApp from '../src/app.js';
+import { config } from '../src/common/config.js';
 import { closePool, getPool } from '../src/common/db.js';
 import * as roster from '../src/match/roster.js';
 
@@ -150,6 +152,51 @@ async function main(): Promise<void>
             assert.equal(r.status, 409, JSON.stringify(r.body));
             assert.equal(r.body.error?.code, 'RESULT_ALREADY_SUBMITTED');
         }],
+
+        ['±0 점수 매치는 score_updated_at 유지 (실변동은 갱신)', async () =>
+        {
+            // 새 4계정 + 새 매치. zu[3]을 하한 점수로 시드 + 4위 배치 → scoreAfter=floor, scoreDelta=0.
+            const s2 = randomBytes(3).toString('hex');
+            const zu: Array<{ userId: number; nickname: string }> = [];
+            for (let i = 0; i < 4; i++)
+            {
+                const nickname = `Z${s2}${i}`;
+                const reg = await post('/api/auth/register', { loginId: `z${s2}${i}`, password: PASSWORD, nickname });
+                assert.equal(reg.body.ok, true, `register 실패: ${JSON.stringify(reg.body)}`);
+                zu.push({ userId: reg.body.data!.userId as number, nickname });
+            }
+            // zu[3]을 하한 점수로 → 4위(기본배점 -35 + 음수 ELO)라도 clamp되어 delta 0.
+            await getPool().execute('UPDATE player_profiles SET score = ? WHERE user_id = ?', [config.match.scoreFloor, zu[3].userId]);
+
+            const before = await selectScoreUpdatedAt([zu[0].userId, zu[3].userId]);
+
+            const mid = `zsim-${s2}-${randomBytes(4).toString('hex')}`;
+            const stk = randomBytes(24).toString('base64url');
+            roster.register({
+                matchId: mid,
+                serverToken: stk,
+                mapName: MAP,
+                startedAt: Date.now(),
+                players: zu.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `zjoin${i}` })),
+            });
+            const body = {
+                matchId: mid,
+                mapName: MAP,
+                durationSec: 60,
+                endReason: 'winner',
+                results: zu.map((u, i) => ({ userId: u.userId, slotIndex: i, placement: i + 1, livesLeft: i === 0 ? 2 : 0 })),
+            };
+            const r = await post('/api/match/result', body, stk);
+            assert.equal(r.status, 200, JSON.stringify(r.body));
+            const ps = r.body.data!.participants as Array<{ userId: number; scoreDelta: number }>;
+            const zeroP = ps.find((p) => p.userId === zu[3].userId)!;
+            assert.equal(zeroP.scoreDelta, 0, `4위(하한) scoreDelta=${zeroP.scoreDelta} (기대 0)`);
+
+            const after = await selectScoreUpdatedAt([zu[0].userId, zu[3].userId]);
+            // ±0 유저: 시점 유지. 실변동 유저(1위, +점수): input.endedAt로 갱신 → 값이 달라짐.
+            assert.equal(after.get(zu[3].userId), before.get(zu[3].userId), '±0인데 score_updated_at이 바뀜');
+            assert.notEqual(after.get(zu[0].userId), before.get(zu[0].userId), '실변동인데 score_updated_at이 안 바뀜');
+        }],
     ];
 
     let failed = 0;
@@ -177,6 +224,25 @@ async function main(): Promise<void>
     {
         process.exit(1);
     }
+}
+
+/** 여러 유저의 score_updated_at을 문자열(밀리초)로 조회. Date 객체 참조 비교 함정 회피. */
+async function selectScoreUpdatedAt(userIds: number[]): Promise<Map<number, string>>
+{
+    const placeholders = userIds.map(() => '?').join(', ');
+    const [rows] = await getPool().query<RowDataPacket[]>(
+        'SELECT user_id, DATE_FORMAT(score_updated_at, \'%Y-%m-%d %H:%i:%s.%f\') AS sua ' +
+        `FROM player_profiles WHERE user_id IN (${placeholders})`,
+        userIds
+    );
+
+    const result = new Map<number, string>();
+    for (const row of rows)
+    {
+        result.set(Number(row.user_id), String(row.sua));
+    }
+
+    return result;
 }
 
 void main();

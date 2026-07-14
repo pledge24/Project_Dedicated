@@ -108,8 +108,11 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
             await conn.execute(
                 'UPDATE player_profiles SET ' +
                 'score = ?, wins = wins + ?, losses = losses + ?, matches_played = matches_played + 1, ' +
-                'exp = exp + ?, level = ?, last_match_at = ? WHERE user_id = ?',
-                [c.scoreAfter, c.isWin, 1 - c.isWin, c.expGained, c.levelAfter, input.endedAt, p.userId]
+                'exp = exp + ?, level = ?, last_match_at = ?, ' +
+                // 점수가 실제로 바뀐 매치만 갱신 시점 기록 (±0은 유지) → 랭킹 동점 순위 보호.
+                'score_updated_at = CASE WHEN ? <> 0 THEN ? ELSE score_updated_at END ' +
+                'WHERE user_id = ?',
+                [c.scoreAfter, c.isWin, 1 - c.isWin, c.expGained, c.levelAfter, input.endedAt, c.scoreDelta, input.endedAt, p.userId]
             );
 
             saved.push({
