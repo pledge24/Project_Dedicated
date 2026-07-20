@@ -28,6 +28,9 @@ namespace D1BackendHttp
 	TSharedRef<IHttpRequest> BuildPostJson(const UGameInstance* GameInstance, const FString& Path,
 		const TSharedRef<FJsonObject>& Body, bool bAttachAuth);
 
+	/** GET 요청 생성(본문 없음). bAttachAuth면 세션 JWT를 첨부. DS 폴링은 MatchToken을 직접 헤더로 세팅. */
+	TSharedRef<IHttpRequest> BuildGet(const UGameInstance* GameInstance, const FString& Path, bool bAttachAuth);
+
 	/** 서버 응답 error.code 문자열 → enum. */
 	EBackendErrorCode ParseErrorCode(const FString& CodeStr);
 

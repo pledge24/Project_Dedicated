@@ -4,10 +4,12 @@
 
 #include "Core/D1LogChannels.h"
 #include "Dom/JsonObject.h"
+#include "Engine/GameInstance.h"
 #include "Framework/D1GameInstance.h"
 #include "HttpModule.h"
 #include "Interfaces/IHttpResponse.h"
 #include "Network/D1BackendHttp.h"
+#include "Network/D1SessionSubsystem.h"
 
 void UD1AuthSubsystem::Register(const FString& LoginId, const FString& Password, const FString& Nickname, const FOnAuthCompleted& OnCompleted)
 {
@@ -49,6 +51,29 @@ void UD1AuthSubsystem::RefreshMyProfile()
 			if (UD1AuthSubsystem* Self = WeakThis.Get())
 			{
 				Self->HandleProfileResponse(Req, Res, bSucceeded);
+			}
+		});
+	Request->ProcessRequest();
+}
+
+void UD1AuthSubsystem::SendHeartbeat()
+{
+	const FString Jwt = D1BackendHttp::GetSessionJwt(GetGameInstance());
+	if (Jwt.IsEmpty())
+	{
+		// 비로그인 — 확인할 세션 없음.
+		return;
+	}
+
+	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(GetGameInstance(), TEXT("/api/auth/heartbeat"), /*bAttachAuth=*/true);
+
+	TWeakObjectPtr<UD1AuthSubsystem> WeakThis(this);
+	Request->OnProcessRequestComplete().BindLambda(
+		[WeakThis](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded)
+		{
+			if (UD1AuthSubsystem* Self = WeakThis.Get())
+			{
+				Self->HandleHeartbeatResponse(Req, Res, bSucceeded);
 			}
 		});
 	Request->ProcessRequest();
@@ -195,4 +220,38 @@ void UD1AuthSubsystem::HandleProfileResponse(FHttpRequestPtr Req, FHttpResponseP
 
 	OnProfileUpdated.Broadcast();
 	UE_LOG(LogD1, Log, TEXT("[Profile] 갱신 완료 score=%d level=%d"), User.Score, User.Level);
+}
+
+void UD1AuthSubsystem::HandleHeartbeatResponse(FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded)
+{
+	// 네트워크 실패는 무시 — 세션 무효화가 아니라 일시 장애. 다음 주기에 재시도.
+	if (!bSucceeded || !Res.IsValid())
+	{
+		return;
+	}
+
+	if (Res->GetResponseCode() == 200)
+	{
+		return; // 세션 유효.
+	}
+
+	// 401 등 — error.code가 SESSION_SUPERSEDED일 때만 세션 대체로 확정(만료/기타 401은 이 기능 범위 밖).
+	TSharedPtr<FJsonObject> Root;
+	EBackendErrorCode ErrCode = EBackendErrorCode::Unknown;
+	if (D1BackendHttp::DeserializeJson(Res->GetContentAsString(), Root))
+	{
+		const TSharedPtr<FJsonObject>* ErrorObj = nullptr;
+		if (D1BackendHttp::GetObjectField(Root, TEXT("error"), ErrorObj))
+		{
+			ErrCode = D1BackendHttp::ParseErrorCode((*ErrorObj)->GetStringField(TEXT("code")));
+		}
+	}
+
+	if (ErrCode == EBackendErrorCode::SessionSuperseded)
+	{
+		if (UD1SessionSubsystem* Session = GetGameInstance()->GetSubsystem<UD1SessionSubsystem>())
+		{
+			Session->NotifySessionSuperseded();
+		}
+	}
 }

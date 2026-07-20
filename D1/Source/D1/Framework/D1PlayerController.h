@@ -66,4 +66,11 @@ private:
 	TObjectPtr<UUserWidget> ResultWidget;
 
 	FTimerHandle BindRetryTimerHandle;
+
+//~ 세션 무효화 (게임중 다른 기기 로그인 kick)
+public:
+	/** DS(MatchFlow)가 다른 기기 로그인 감지 시 대상 PC에 호출 — 알림 모달 후 로그인 화면 복귀.
+	 *  외부(서버측 컴포넌트)에서 지정 호출하므로 public. */
+	UFUNCTION(Client, Reliable)
+	void ClientNotifySessionSuperseded();
 };

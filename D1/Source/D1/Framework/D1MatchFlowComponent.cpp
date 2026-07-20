@@ -3,15 +3,22 @@
 #include "Framework/D1MatchFlowComponent.h"
 
 #include "Core/D1LogChannels.h"
+#include "Dom/JsonObject.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Framework/D1BomberGameState.h"
 #include "Framework/D1BomberPlayerState.h"
 #include "Framework/D1MatchTypes.h"
+#include "Framework/D1PlayerController.h"
 #include "GameFramework/PlayerController.h"
+#include "HttpModule.h"
+#include "Interfaces/IHttpRequest.h"
+#include "Interfaces/IHttpResponse.h"
 #include "Network/BackendTypes.h"
+#include "Network/D1BackendHttp.h"
 #include "Network/D1DedicatedServerSubsystem.h"
 #include "Network/D1MatchResultSubsystem.h"
+#include "Network/D1OnlineSettings.h"
 #include "TimerManager.h"
 
 namespace
@@ -46,6 +53,9 @@ void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayers, float InWai
 	ShutdownGraceSec         = InShutdownGraceSec;
 	CurrentMatchId           = InMatchId;
 	CurrentMatchToken        = InMatchToken;
+
+	// 게임중 강제 회수(다른 기기 로그인) 폴링 시작 — 토큰 있는 실 DS에서만.
+	StartKickPolling();
 
 	// 시작 게이트: 예상 인원 0/1(PIE·솔로)이면 즉시 시작, 아니면 전원 입장(PostLogin) 또는 타임아웃까지 Waiting.
 	if (ExpectedPlayerCount <= 1)
@@ -203,6 +213,8 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 		return;
 	}
 
+	StopKickPolling();
+
 	if (WinnerPS && WinnerPS->GetPlacement() <= 0)
 	{
 		WinnerPS->SetPlacement(1);
@@ -239,12 +251,19 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 	// 최종 결과 스냅샷(UI 원자 복제) + 백엔드 보고용 수집을 한 번에.
 	TArray<FD1MatchResultEntry> Entries;
 	TArray<FMatchResultPlayer> ResultPlayers;
-	Entries.Reserve(GS->PlayerArray.Num());
-	ResultPlayers.Reserve(GS->PlayerArray.Num());
+	Entries.Reserve(GS->PlayerArray.Num() + AbandonedEntries.Num());
+	ResultPlayers.Reserve(GS->PlayerArray.Num() + AbandonedPlayers.Num());
 	for (APlayerState* PS : GS->PlayerArray)
 	{
 		if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
 		{
+			// 강제 회수(탈주) 유저는 이미 AbandonedPlayers/Entries로 캡처됨 — PlayerArray쪽 중복 방지.
+			// (Logout 지연으로 아직 PlayerArray에 남아있을 수 있다.)
+			if (KickedUserIds.Contains(B->GetBackendUserId()))
+			{
+				continue;
+			}
+
 			// 미배정 생존자(시간 만료/무승부)는 공동 1위로 보정 — 백엔드는 placement 1~N만 허용.
 			if (B->GetPlacement() <= 0)
 			{
@@ -266,6 +285,10 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 			ResultPlayers.Add(RP);
 		}
 	}
+
+	// 탈주자(강제 회수) 병합 — 결과 인원이 roster와 정확히 일치해야 백엔드 검증 통과.
+	Entries.Append(AbandonedEntries);
+	ResultPlayers.Append(AbandonedPlayers);
 
 	// UI 표시용 결정적 순서: 등수 오름차순, 동률은 슬롯 순. (PlayerArray 순서는 비결정)
 	Entries.Sort([](const FD1MatchResultEntry& A, const FD1MatchResultEntry& B)
@@ -297,6 +320,172 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 		{
 			DS->BeginShutdownWatch(ShutdownGraceSec);
 		}
+	}
+}
+
+void UD1MatchFlowComponent::StartKickPolling()
+{
+	// 백엔드가 띄운 DS(토큰 보유)에서만 — PIE/standalone은 폴링 없음.
+	if (CurrentMatchToken.IsEmpty())
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		const float Interval = FMath::Max(1.f, GetDefault<UD1OnlineSettings>()->KickPollIntervalSec);
+		World->GetTimerManager().SetTimer(
+			KickPollTimerHandle, this, &UD1MatchFlowComponent::PollKicks, Interval, /*bLoop=*/true);
+	}
+}
+
+void UD1MatchFlowComponent::StopKickPolling()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(KickPollTimerHandle);
+	}
+}
+
+void UD1MatchFlowComponent::PollKicks()
+{
+	if (CurrentMatchId.IsEmpty() || CurrentMatchToken.IsEmpty())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	UGameInstance* GI = World ? World->GetGameInstance() : nullptr;
+
+	const FString Path = FString::Printf(TEXT("/api/match/%s/kicks"), *CurrentMatchId);
+	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(GI, Path, /*bAttachAuth=*/false);
+	// 매치별 서버 토큰을 Bearer로 — 유저 JWT 아님(결과 POST와 동일 인증 채널).
+	Request->SetHeader(TEXT("Authorization"), D1BackendHttp::MakeBearer(CurrentMatchToken));
+
+	TWeakObjectPtr<UD1MatchFlowComponent> WeakThis(this);
+	Request->OnProcessRequestComplete().BindLambda(
+		[WeakThis](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded)
+		{
+			UD1MatchFlowComponent* Self = WeakThis.Get();
+			if (Self && bSucceeded && Res.IsValid() && Res->GetResponseCode() == 200)
+			{
+				Self->HandleKickResponse(Res->GetContentAsString());
+			}
+		});
+	Request->ProcessRequest();
+}
+
+void UD1MatchFlowComponent::HandleKickResponse(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Root;
+	if (!D1BackendHttp::DeserializeJson(Body, Root))
+	{
+		return;
+	}
+
+	const TSharedPtr<FJsonObject>* DataObj = nullptr;
+	if (!D1BackendHttp::GetObjectField(Root, TEXT("data"), DataObj))
+	{
+		return;
+	}
+
+	const TArray<TSharedPtr<FJsonValue>>* UserIds = nullptr;
+	if (!(*DataObj)->TryGetArrayField(TEXT("userIds"), UserIds))
+	{
+		return;
+	}
+
+	for (const TSharedPtr<FJsonValue>& Value : *UserIds)
+	{
+		if (Value.IsValid())
+		{
+			HandleKickUser(static_cast<int64>(Value->AsNumber()));
+		}
+	}
+}
+
+void UD1MatchFlowComponent::HandleKickUser(int64 UserId)
+{
+	if (!HasServerAuthority() || UserId <= 0 || KickedUserIds.Contains(UserId))
+	{
+		return;
+	}
+
+	AD1BomberGameState* GS = GetBomberGameState();
+	if (!GS)
+	{
+		return;
+	}
+
+	AD1BomberPlayerState* Target = nullptr;
+	for (APlayerState* PS : GS->PlayerArray)
+	{
+		if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
+		{
+			if (B->GetBackendUserId() == UserId)
+			{
+				Target = B;
+				break;
+			}
+		}
+	}
+
+	// 표시(중복·재입장 방어). 미접속 유저면 접속 시 PreLogin이 거절.
+	KickedUserIds.Add(UserId);
+
+	if (!Target)
+	{
+		return;
+	}
+
+	AD1PlayerController* PC = Cast<AD1PlayerController>(Target->GetOwningController());
+
+	// 매치가 이미 끝났으면 결과는 확정 — 통지만(로그인 복귀).
+	if (IsMatchEnded())
+	{
+		if (PC)
+		{
+			PC->ClientNotifySessionSuperseded();
+		}
+		return;
+	}
+
+	// 탈주자 결과 캡처(Logout로 PlayerArray에서 빠지기 전). placement 강제 최하위(정원).
+	EnsureAliveListInitialized();
+	const int32 LastPlacement = FMath::Max(ExpectedPlayerCount, GS->PlayerArray.Num());
+	Target->SetPlacement(LastPlacement);
+	AlivePlayerStates.Remove(Target);
+
+	FMatchResultPlayer RP;
+	RP.UserId    = UserId;
+	RP.SlotIndex = Target->GetPlayerSlotIndex();
+	RP.Placement = LastPlacement;
+	RP.LivesLeft = Target->GetLives();
+	RP.Abandoned = true;
+	AbandonedPlayers.Add(RP);
+
+	FD1MatchResultEntry Entry;
+	Entry.Placement = LastPlacement;
+	Entry.Nickname  = Target->GetPlayerName();
+	Entry.SlotIndex = Target->GetPlayerSlotIndex();
+	Entry.LivesLeft = Target->GetLives();
+	AbandonedEntries.Add(Entry);
+
+	// 클라 통지(팝업 + 로그인 복귀) + 남은 시간 입력 차단.
+	if (PC)
+	{
+		PC->ClientNotifySessionSuperseded();
+		PC->DisableInput(PC);
+	}
+
+	UE_LOG(LogD1, Log, TEXT("[Match] 강제 회수(kick) userId=%lld placement=%d"), UserId, LastPlacement);
+
+	// 생존자 1명 이하면 매치 종료(사망 파이프라인과 동일).
+	if (AlivePlayerStates.Num() <= 1)
+	{
+		const bool bHasSurvivor = AlivePlayerStates.Num() == 1;
+		AD1BomberPlayerState* Winner = bHasSurvivor ? AlivePlayerStates[0].Get() : nullptr;
+		EndMatchWithWinner(Winner, bHasSurvivor ? EBomberEndReason::Winner : EBomberEndReason::Draw);
 	}
 }
 

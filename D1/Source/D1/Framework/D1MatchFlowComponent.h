@@ -5,11 +5,12 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Engine/TimerHandle.h"
+#include "Framework/D1MatchTypes.h"
+#include "Network/BackendTypes.h"
 #include "D1MatchFlowComponent.generated.h"
 
 class AD1BomberGameState;
 class AD1BomberPlayerState;
-enum class EBomberEndReason : uint8;
 
 /**
  *  매치 흐름 담당 컴포넌트 (GameState 부착·서버 전용).
@@ -65,6 +66,29 @@ private:
 	float ShutdownGraceSec = 30.f;
 	FString CurrentMatchId;
 	FString CurrentMatchToken;
+
+//~ 강제 회수(게임중 다른 기기 로그인 kick)
+public:
+	/** GameMode PreLogin 재입장 거절용 — 이미 kick된 유저인지. */
+	bool IsUserKicked(int64 UserId) const { return KickedUserIds.Contains(UserId); }
+
+private:
+	/** 백엔드 kick 대기열을 주기 폴링(DS·토큰 있을 때만). */
+	void StartKickPolling();
+	void StopKickPolling();
+	void PollKicks();
+	void HandleKickResponse(const FString& Body);
+	/** 대상 유저를 탈주 처리(최하위 캡처) + 클라 통지 + 필요 시 매치 종료. */
+	void HandleKickUser(int64 UserId);
+
+	FTimerHandle KickPollTimerHandle;
+
+	/** 이미 kick 처리한 userId(중복 폴링·재입장 방어). */
+	TSet<int64> KickedUserIds;
+
+	/** 탈주자 결과 — Logout로 PlayerArray에서 빠지기 전에 캡처, EndMatch에서 병합(roster 인원 일치). */
+	TArray<FMatchResultPlayer> AbandonedPlayers;
+	TArray<FD1MatchResultEntry> AbandonedEntries;
 
 //~ 상태 질의
 private:

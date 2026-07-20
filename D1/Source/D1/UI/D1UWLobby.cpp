@@ -13,6 +13,7 @@
 #include "Network/BackendErrorMessages.h"
 #include "Network/D1AuthSubsystem.h"
 #include "Network/D1MatchmakingSubsystem.h"
+#include "Network/D1OnlineSettings.h"
 #include "TimerManager.h"
 
 // 매치 정원(백엔드 playersPerMatch와 동일). match:found가 개수를 싣지 않아 클라 상수로 표기.
@@ -70,11 +71,24 @@ void UD1UWLobby::NativeConstruct()
 		// 매치 후 ELO가 바뀌었을 수 있음 — 최신 프로필 재조회(완료 시 HandleProfileUpdated).
 		Auth->RefreshMyProfile();
 	}
+
+	// 로비 상주 동안 세션 유효성 주기 확인 — 다른 기기 로그인 감지(대체 시 로그인 화면 복귀).
+	if (UWorld* World = GetWorld())
+	{
+		const float Interval = FMath::Max(5.f, GetDefault<UD1OnlineSettings>()->HeartbeatIntervalSec);
+		World->GetTimerManager().SetTimer(
+			SessionHeartbeatTimerHandle, this, &UD1UWLobby::SendSessionHeartbeat, Interval, /*bLoop=*/true);
+	}
 }
 
 void UD1UWLobby::NativeDestruct()
 {
 	StopMatchSearchingElapsed();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(SessionHeartbeatTimerHandle);
+	}
 
 	// 위젯이 Subsystem보다 먼저 소멸 — 구독 해제로 dangling 방지
 	if (UGameInstance* GameInst = GetGameInstance())
@@ -285,5 +299,13 @@ void UD1UWLobby::OnRankingClicked()
 	if (RankingWidget)
 	{
 		RankingWidget->AddToViewport(10);
+	}
+}
+
+void UD1UWLobby::SendSessionHeartbeat()
+{
+	if (UD1AuthSubsystem* Auth = GetGameInstance()->GetSubsystem<UD1AuthSubsystem>())
+	{
+		Auth->SendHeartbeat();
 	}
 }

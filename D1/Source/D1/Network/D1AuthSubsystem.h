@@ -32,6 +32,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Backend|Profile")
 	void RefreshMyProfile();
 
+	//~ 외부 API — 세션 heartbeat
+	/** GET /api/auth/heartbeat — 로비가 주기 호출. 401 SESSION_SUPERSEDED면 SessionSubsystem에 통지. */
+	void SendHeartbeat();
+
 	//~ 프로필 이벤트 (갱신 완료 구독용)
 	UPROPERTY(BlueprintAssignable, Category = "Backend|Profile")
 	FOnProfileUpdated OnProfileUpdated;
@@ -41,4 +45,5 @@ private:
 	void SendAuthRequest(const FString& Path, const TSharedRef<FJsonObject>& Body, const FOnAuthCompleted& OnCompleted);
 	void HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded, FOnAuthCompleted Forward);
 	void HandleProfileResponse(FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded);
+	void HandleHeartbeatResponse(FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded);
 };

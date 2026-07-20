@@ -50,6 +50,24 @@ namespace D1BackendHttp
 		return Request;
 	}
 
+	TSharedRef<IHttpRequest> BuildGet(const UGameInstance* GameInstance, const FString& Path, bool bAttachAuth)
+	{
+		const TSharedRef<IHttpRequest> Request = FHttpModule::Get().CreateRequest();
+		Request->SetURL(GetBaseUrl() + Path);
+		Request->SetVerb(TEXT("GET"));
+
+		if (bAttachAuth)
+		{
+			const FString Jwt = GetSessionJwt(GameInstance);
+			if (!Jwt.IsEmpty())
+			{
+				Request->SetHeader(TEXT("Authorization"), MakeBearer(Jwt));
+			}
+		}
+
+		return Request;
+	}
+
 	EBackendErrorCode ParseErrorCode(const FString& CodeStr)
 	{
 		if (CodeStr == TEXT("VALIDATION_FAILED"))    return EBackendErrorCode::ValidationFailed;
@@ -57,6 +75,7 @@ namespace D1BackendHttp
 		if (CodeStr == TEXT("DUPLICATE_LOGIN_ID"))   return EBackendErrorCode::DuplicateLoginId;
 		if (CodeStr == TEXT("DUPLICATE_NICKNAME"))   return EBackendErrorCode::DuplicateNickname;
 		if (CodeStr == TEXT("RATE_LIMITED"))         return EBackendErrorCode::RateLimited;
+		if (CodeStr == TEXT("SESSION_SUPERSEDED"))   return EBackendErrorCode::SessionSuperseded;
 		if (CodeStr == TEXT("INTERNAL_ERROR"))       return EBackendErrorCode::InternalError;
 		return EBackendErrorCode::Unknown;
 	}

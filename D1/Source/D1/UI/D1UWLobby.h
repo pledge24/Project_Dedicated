@@ -116,6 +116,13 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> RankingWidget;
 
+//~ 세션 heartbeat
+private:
+	/** 주기 콜백 — Auth->SendHeartbeat(). 세션이 대체됐으면 SessionSubsystem이 로그인 화면 복귀를 처리. */
+	void SendSessionHeartbeat();
+
+	FTimerHandle SessionHeartbeatTimerHandle;
+
 //~ 비로그인 방어
 private:
 	/** 비로그인 시 복귀할 맵 — 디테일 패널에서 MP_Frontend 지정. */

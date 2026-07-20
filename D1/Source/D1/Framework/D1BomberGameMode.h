@@ -27,6 +27,8 @@ public:
 	AD1BomberGameMode();
 
 	//~ Begin AGameModeBase Interface
+	/** 재입장 거절 — 이미 kick된(다른 기기 로그인) 유저의 연결 거부. */
+	virtual void PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 	/** 예상 인원 다 모이면 매치 시작(시작 게이트). */
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	/** 점유 PlayerStart 해제 — fallback 경로 슬롯 누수 방지. */

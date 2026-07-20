@@ -8,6 +8,7 @@
 #include "GameFramework/PlayerController.h"
 #include "IWebSocket.h"
 #include "Network/D1BackendHttp.h"
+#include "Network/D1SessionSubsystem.h"
 #include "WebSocketsModule.h"
 
 void UD1MatchmakingSubsystem::Deinitialize()
@@ -139,6 +140,18 @@ void UD1MatchmakingSubsystem::HandleSocketMessage(const FString& Message)
 	}
 
 	const FString Type = Root->GetStringField(TEXT("type"));
+
+	if (Type == TEXT("session:invalid"))
+	{
+		// 다른 기기 로그인으로 세션 대체 — 곧 서버가 close(4001). Idle로 만들어 뒤이은 close를 정상 종료로 흡수
+		// (HandleSocketClosed가 NetworkError로 오탐하지 않게). 실제 화면 복귀는 SessionSubsystem이 담당(멱등).
+		MatchmakingState = EMatchmakingState::Idle;
+		if (UD1SessionSubsystem* Session = GetGameInstance()->GetSubsystem<UD1SessionSubsystem>())
+		{
+			Session->NotifySessionSuperseded();
+		}
+		return;
+	}
 
 	if (Type == TEXT("queue:joined"))
 	{

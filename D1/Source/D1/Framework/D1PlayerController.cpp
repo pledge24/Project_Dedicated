@@ -3,11 +3,13 @@
 
 #include "Framework/D1PlayerController.h"
 #include "EnhancedInputSubsystems.h"
+#include "Engine/GameInstance.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "InputMappingContext.h"
 #include "Blueprint/UserWidget.h"
 #include "Framework/D1BomberGameState.h"
+#include "Network/D1SessionSubsystem.h"
 #include "Systems/Map/D1MapCameraManager.h"
 #include "TimerManager.h"
 #include "UI/InGame/D1UWMatchResult.h"
@@ -114,5 +116,14 @@ void AD1PlayerController::TryBindMatchFinished()
 	if (GS->FinalResults.Num() > 0)
 	{
 		HandleMatchFinished();
+	}
+}
+
+void AD1PlayerController::ClientNotifySessionSuperseded_Implementation()
+{
+	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	if (UD1SessionSubsystem* Session = GI ? GI->GetSubsystem<UD1SessionSubsystem>() : nullptr)
+	{
+		Session->NotifySessionSuperseded();
 	}
 }

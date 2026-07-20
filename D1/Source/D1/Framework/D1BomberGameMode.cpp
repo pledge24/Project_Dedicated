@@ -51,6 +51,40 @@ AD1BomberGameMode::AD1BomberGameMode()
 	PlayerStateClass = AD1BomberPlayerState::StaticClass();
 }
 
+void AD1BomberGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
+	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+	if (!ErrorMessage.IsEmpty())
+	{
+		return;
+	}
+
+	// 재입장 거절 — ?join= 토큰이 roster에 있고 그 유저가 이미 kick(다른 기기 로그인)됐으면 연결 거부.
+	const FString JoinToken = UGameplayStatics::ParseOption(Options, TEXT("join"));
+	if (JoinToken.IsEmpty())
+	{
+		return;
+	}
+
+	const FD1JoinEntry* Entry = JoinRoster.Find(JoinToken);
+	if (!Entry)
+	{
+		return;
+	}
+
+	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
+	{
+		if (const UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
+		{
+			if (Flow->IsUserKicked(Entry->UserId))
+			{
+				ErrorMessage = TEXT("세션이 다른 기기 로그인으로 종료되어 재입장할 수 없습니다.");
+				UE_LOG(LogD1, Warning, TEXT("[Match] PreLogin 거절 — kick된 유저 재입장 시도 userId=%lld"), Entry->UserId);
+			}
+		}
+	}
+}
+
 void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
