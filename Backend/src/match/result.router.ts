@@ -6,9 +6,11 @@ import { makeRateLimiter } from '../common/rateLimit.js';
 import * as handler from './result.handler.js';
 
 const resultLimiter = makeRateLimiter(config.rateLimit.resultMax);
+const pollLimiter = makeRateLimiter(config.rateLimit.pollMax);
 
 const router = express.Router();
 
 router.post('/result', resultLimiter, handler.submitResult);
+router.get('/:matchId/kicks', pollLimiter, handler.getKicks);
 
 export default router;

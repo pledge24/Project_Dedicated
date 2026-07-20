@@ -9,6 +9,7 @@ import { WebSocket } from 'ws';
 
 import buildApp from '../src/app.js';
 import { closePool } from '../src/common/db.js';
+import * as roster from '../src/match/roster.js';
 import { attachMatchWebSocket } from '../src/match/ws.js';
 
 const PASSWORD = 'sesstest123';
@@ -148,12 +149,17 @@ async function main(): Promise<void>
 
     async function getMe(token?: string): Promise<ApiResult>
     {
+        return get('/api/auth/me', token);
+    }
+
+    async function get(path: string, token?: string): Promise<ApiResult>
+    {
         const headers: Record<string, string> = {};
         if (token)
         {
             headers.Authorization = `Bearer ${token}`;
         }
-        const res = await fetch(base + '/api/auth/me', { headers });
+        const res = await fetch(base + path, { headers });
 
         return { status: res.status, body: (await res.json()) as ApiResult['body'] };
     }
@@ -201,6 +207,53 @@ async function main(): Promise<void>
             const r = await getMe();
             assert.equal(r.status, 401, JSON.stringify(r.body));
             assert.equal(r.body.error?.code, 'AUTH_REQUIRED');
+        }],
+
+        ['옛 토큰 /heartbeat → 401 SESSION_SUPERSEDED', async () =>
+        {
+            const r = await get('/api/auth/heartbeat', token1);
+            assert.equal(r.status, 401, JSON.stringify(r.body));
+            assert.equal(r.body.error?.code, 'SESSION_SUPERSEDED');
+        }],
+
+        ['새 토큰 /heartbeat → 200 valid', async () =>
+        {
+            const r = await get('/api/auth/heartbeat', token2);
+            assert.equal(r.status, 200, JSON.stringify(r.body));
+            assert.equal(r.body.data?.valid, true);
+        }],
+
+        ['게임중 재로그인 → DS kick 폴링 목록에 등장 + 토큰 검증', async () =>
+        {
+            // 별도 계정을 매치중이라고 가정(roster 시드) → 재로그인 시 emitSuperseded가 markKick 발화.
+            const s2 = randomBytes(3).toString('hex');
+            const kLoginId = `sessk${s2}`;
+            const reg2 = await post('/api/auth/register', { loginId: kLoginId, password: PASSWORD, nickname: `SessK${s2}` });
+            assert.equal(reg2.body.ok, true, JSON.stringify(reg2.body));
+            const uid2 = reg2.body.data!.userId as number;
+            await post('/api/auth/login', { loginId: kLoginId, password: PASSWORD });
+
+            const mid = `ksim-${s2}`;
+            const stk = randomBytes(24).toString('base64url');
+            roster.register({
+                matchId: mid,
+                serverToken: stk,
+                mapName: 'default map',
+                startedAt: Date.now(),
+                players: [{ userId: uid2, nickname: `SessK${s2}`, joinToken: 'kjoin' }],
+            });
+
+            // 재로그인(세션 대체) → markKick(mid, uid2) (동기: 로그인 응답 시점엔 이미 표시됨)
+            const l2 = await post('/api/auth/login', { loginId: kLoginId, password: PASSWORD });
+            assert.equal(l2.body.ok, true, JSON.stringify(l2.body));
+
+            const kres = await get(`/api/match/${mid}/kicks`, stk);
+            assert.equal(kres.status, 200, JSON.stringify(kres.body));
+            assert.deepEqual((kres.body.data as { userIds: number[] }).userIds, [uid2]);
+
+            const kbad = await get(`/api/match/${mid}/kicks`, 'wrong-token');
+            assert.equal(kbad.status, 403, JSON.stringify(kbad.body));
+            assert.equal(kbad.body.error?.code, 'INVALID_SERVER_TOKEN');
         }],
 
         ['옛 토큰 WS 업그레이드 → 401 거절', async () =>

@@ -15,6 +15,7 @@ import { logger } from '../common/logger.js';
 import { getCurrentTokenVersion, onSuperseded } from '../common/session.js';
 import type { AuthedUser } from '../common/types.js';
 import * as ds from './ds.js';
+import * as kicks from './kicks.js';
 import * as service from './matchmaking.service.js';
 import type { ClientMessage, ServerMessage, ServerMessageType } from './protocol.js';
 import type { MatchGroup } from './queue.js';
@@ -76,7 +77,16 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
     wss.on('connection', (ws: WebSocket, _req: IncomingMessage, user: AuthedUser) => onConnection(wss, ws, user));
 
     // 재로그인(세션 대체) 알림 구독 — 버전 대조는 핸드셰이크 때뿐이라 이미 연결된 옛 소켓은 여기서 끊는다.
-    const offSuperseded = onSuperseded((userId) => kickThisUserSockets(wss, userId));
+    // 게임중(DS 접속)인 유저면 별도로 kick 대기열에 표시 → DS가 폴링으로 회수(WS는 이미 끊긴 상태라 여기선 안 잡힘).
+    const offSuperseded = onSuperseded((userId) =>
+    {
+        kickThisUserSockets(wss, userId);
+        const matchId = roster.findMatchByUser(userId);
+        if (matchId)
+        {
+            kicks.markKick(matchId, userId);
+        }
+    });
 
     // 죽은 연결 감지 — heartbeat 주기마다 pong 못 받은 소켓은 terminate.
     const heartbeat = setInterval(() =>
@@ -162,7 +172,9 @@ function kickThisUserSockets(wss: WebSocketServer, userId: number, except?: WebS
         if (socket !== except && socket.userId === userId)
         {
             service.leave(userId);
-            socket.terminate();
+            // 조용한 terminate 대신 사유를 실어 보낸 뒤 graceful close(4001) → 클라가 "다른 기기 로그인"으로 구분.
+            send(socket, { type: 'session:invalid', ok: false });
+            socket.close(4001, 'superseded');
         }
     }
 }

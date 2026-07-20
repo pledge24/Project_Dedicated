@@ -49,6 +49,7 @@ export interface MatchResultEntryInput
     slotIndex: number;   // DS가 배정한 좌석 0~3
     placement: number;   // 1=1등, 동점 허용
     livesLeft: number;
+    abandoned?: boolean; // 게임중 다른 기기 로그인으로 kick된 탈주자(최하위 + 추가 감점). 기본 false.
 }
 
 export interface MatchResultRequest

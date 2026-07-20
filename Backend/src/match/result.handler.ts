@@ -24,6 +24,18 @@ export async function submitResult(req: Request, res: Response): Promise<void>
     res.json(ok(data));
 }
 
+/**
+ * GET /api/match/:matchId/kicks  (DS만 — Authorization: Bearer <serverToken>)
+ * 이 매치에서 강제 회수(다른 기기 로그인)해야 할 userId 목록. DS가 5초 폴링해 해당 플레이어를 kick한다.
+ */
+export function getKicks(req: Request, res: Response): void
+{
+    const serverToken = extractServerToken(req);
+    const matchId = typeof req.params.matchId === 'string' ? req.params.matchId : '';
+    const userIds = service.listPendingKicks(serverToken, matchId);
+    res.json(ok({ userIds }));
+}
+
 /** Authorization 헤더의 Bearer 토큰(=서버 토큰). 없으면 401. */
 function extractServerToken(req: Request): string
 {
@@ -86,6 +98,7 @@ function parseEntry(raw: unknown, n: number): MatchResultEntryInput
     const slotIndex = e.slotIndex;
     const placement = e.placement;
     const livesLeft = e.livesLeft;
+    const abandoned = e.abandoned;
 
     if (!isInt(userId, 1))
     {
@@ -103,6 +116,10 @@ function parseEntry(raw: unknown, n: number): MatchResultEntryInput
     {
         throw new AppError(Codes.INVALID_RESULT, 'livesLeft는 0 이상의 정수여야 합니다.');
     }
+    if (abandoned !== undefined && typeof abandoned !== 'boolean')
+    {
+        throw new AppError(Codes.INVALID_RESULT, 'abandoned는 boolean이어야 합니다.');
+    }
 
-    return { userId, slotIndex, placement, livesLeft };
+    return { userId, slotIndex, placement, livesLeft, abandoned: abandoned === true };
 }

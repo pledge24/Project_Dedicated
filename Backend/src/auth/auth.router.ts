@@ -11,8 +11,9 @@ const registerLimiter = makeRateLimiter(config.rateLimit.registerMax);
 
 const router = express.Router();
 
-router.post('/register', registerLimiter, handler.register);
-router.post('/login',    loginLimiter,    handler.login);
-router.get('/me',        requireAuth,     handler.me);
+router.post('/register',  registerLimiter, handler.register);
+router.post('/login',     loginLimiter,    handler.login);
+router.get('/me',         requireAuth,     handler.me);
+router.get('/heartbeat',  requireAuth,     handler.heartbeat);
 
 export default router;

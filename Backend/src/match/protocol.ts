@@ -16,7 +16,8 @@ export interface MatchFoundData
     joinToken: string;
 }
 
-export type ServerMessageType = 'queue:joined' | 'queue:left' | 'match:found' | 'error';
+// session:invalid — 더 최신 로그인이 세션을 대체함(단일 세션). 이 소켓은 곧 close(4001)된다.
+export type ServerMessageType = 'queue:joined' | 'queue:left' | 'match:found' | 'error' | 'session:invalid';
 
 /** 서버 → 클라 메시지. HTTP 봉투({ok,data,error})에 type 디스크리미네이터를 더한 모양. */
 export interface ServerMessage<T = unknown>

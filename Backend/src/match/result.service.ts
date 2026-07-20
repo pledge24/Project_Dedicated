@@ -3,6 +3,7 @@
 import { isDuplicateKeyError } from '../common/db.js';
 import { AppError, Codes } from '../common/errors.js';
 import type { MatchResultRequest, MatchResultResponse } from '../common/types.js';
+import * as kicks from './kicks.js';
 import * as repo from './result.repository.js';
 import * as rosters from './roster.js';
 
@@ -32,6 +33,7 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
             nicknameSnapshot: rp.nickname,
             placement: r.placement,
             livesLeft: r.livesLeft,
+            abandoned: r.abandoned ?? false,
         };
     });
 
@@ -47,6 +49,9 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
             winnerUserId: soleWinner(req.results),
             participants,
         });
+
+        // 매치 종료 — kick 대기열 정리(누수 방지). 재제출은 멱등(409)이라 빈 목록이어도 무해.
+        kicks.clear(req.matchId);
 
         return {
             matchId: req.matchId,
@@ -66,6 +71,22 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
         }
         throw err;
     }
+}
+
+/** DS 폴링(GET /api/match/:matchId/kicks): 서버 토큰 검증 후 이 매치의 kick 대기 userId 목록 반환. */
+export function listPendingKicks(serverToken: string, matchId: string): number[]
+{
+    const roster = rosters.get(matchId);
+    if (!roster)
+    {
+        throw new AppError(Codes.MATCH_NOT_FOUND, '해당 매치를 찾을 수 없습니다.');
+    }
+    if (serverToken !== roster.serverToken)
+    {
+        throw new AppError(Codes.INVALID_SERVER_TOKEN, '서버 토큰이 유효하지 않습니다.');
+    }
+
+    return kicks.listKicks(matchId);
 }
 
 /** 보고된 userId 집합이 roster와 정확히 일치하는지(누락·외부인·중복 없음) 검증. */

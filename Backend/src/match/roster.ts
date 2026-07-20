@@ -37,6 +37,20 @@ export function get(matchId: string): MatchRoster | undefined
     return rosters.get(matchId);
 }
 
+/** userId가 속한 활성 매치의 matchId. 없으면 undefined. (게임중 kick 표시용 역조회) */
+export function findMatchByUser(userId: number): string | undefined
+{
+    for (const [id, r] of rosters)
+    {
+        if (r.players.some((p) => p.userId === userId))
+        {
+            return id;
+        }
+    }
+
+    return undefined;
+}
+
 export function size(): number
 {
     return rosters.size;

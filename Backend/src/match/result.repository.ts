@@ -16,6 +16,7 @@ export interface SaveResultParticipant
     nicknameSnapshot: string;
     placement: number;
     livesLeft: number;
+    abandoned: boolean;   // 게임중 다른 기기 로그인으로 kick된 탈주자 → 최하위 + 추가 감점
 }
 
 /** saveResult 함수용 - 입력 매개변수 구조 */
@@ -86,17 +87,17 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
         // 참가자별 파생값을 먼저 확정 (순수) — INSERT/UPDATE 값이 모두 여기서 나온다.
         const computed = input.participants.map((p, i) => ({
             p,
-            c: computeParticipantResult(p.placement, ratings[i], deltas[i], config.match.scoreFloor, config.match.scoreCeiling, profileByUser.get(p.userId)!.exp),
+            c: computeParticipantResult(p.placement, ratings[i], deltas[i], config.match.scoreFloor, config.match.scoreCeiling, profileByUser.get(p.userId)!.exp, p.abandoned, config.match.leaverPenalty),
         }));
 
         // match_participants는 multi-row INSERT 1회. VALUES 그룹만 동적 생성 —
         // 사용자 데이터가 아니라 '(?, ...)' 텍스트라 주입 위험 0 (동적 IN 선례와 동일).
-        const rowsSql = computed.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
+        const rowsSql = computed.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
         const insertParams = computed.flatMap(({ p, c }) =>
-            [matchDbId, p.userId, p.nicknameSnapshot, p.slotIndex, p.placement, p.livesLeft, c.expGained, c.scoreDelta]);
+            [matchDbId, p.userId, p.nicknameSnapshot, p.slotIndex, p.placement, p.livesLeft, c.expGained, c.scoreDelta, p.abandoned ? 1 : 0]);
         await conn.execute(
             'INSERT INTO match_participants ' +
-            '(match_id, user_id, nickname_snapshot, slot_index, placement, lives_left, exp_gained, score_delta) ' +
+            '(match_id, user_id, nickname_snapshot, slot_index, placement, lives_left, exp_gained, score_delta, abandoned) ' +
             `VALUES ${rowsSql}`,
             insertParams
         );
@@ -151,17 +152,18 @@ async function lockAndFetchProfiles(conn: PoolConnection, userIds: number[]): Pr
 }
 
 /** 한 참가자의 점수·레벨 파생값(순수). floor·ceiling 적용 후 실제 변화량을 scoreDelta로 반환 → before+delta=after 보장. */
-function computeParticipantResult(placement: number, before: number, delta: number, scoreFloor: number, scoreCeiling: number, expBefore: number)
+function computeParticipantResult(placement: number, before: number, delta: number, scoreFloor: number, scoreCeiling: number, expBefore: number, abandoned: boolean, leaverPenalty: number)
 {
-    // delta는 순수 ELO항. 등수 기본배점을 더한 뒤 상·하한으로 clamp.
-    const after = Math.min(scoreCeiling, Math.max(scoreFloor, before + delta + basePointsForPlacement(placement)));
+    // delta는 순수 ELO항. 등수 기본배점을 더하고, 탈주면 추가 감점(leaverPenalty)까지 뺀 뒤 상·하한으로 clamp.
+    const penalty = abandoned ? leaverPenalty : 0;
+    const after = Math.min(scoreCeiling, Math.max(scoreFloor, before + delta + basePointsForPlacement(placement) - penalty));
     const expGained = expForPlacement(placement);
 
     return {
         scoreBefore: before,
         scoreDelta: after - before,       // A3: 반영된 실변화량(floor 반영)
         scoreAfter: after,
-        isWin: placement === 1 ? 1 : 0,
+        isWin: (!abandoned && placement === 1) ? 1 : 0,
         expGained,
         levelAfter: levelForExp(expBefore + expGained),
     };

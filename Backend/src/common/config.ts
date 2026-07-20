@@ -22,6 +22,7 @@ export const config = Object.freeze({
         loginMax: asNumber('RATE_LIMIT_LOGIN_MAX', 5),
         registerMax: asNumber('RATE_LIMIT_REGISTER_MAX', 10),
         resultMax: asNumber('RATE_LIMIT_RESULT_MAX', 30),    // DS 결과 보고(/api/match/result)
+        pollMax:   asNumber('RATE_LIMIT_POLL_MAX', 300),     // DS kick 폴링(/api/match/:id/kicks) — 매치당 12/분 × 다수 매치가 같은 host IP
         rankingMax: asNumber('RATE_LIMIT_RANKING_MAX', 60),  // 랭킹 조회(/api/ranking)
         wsMax: asNumber('RATE_LIMIT_WS_MAX', 100),           // 매칭 WS 메시지(연결당) — OWASP 시작점
     }),
@@ -35,6 +36,7 @@ export const config = Object.freeze({
         eloK:            asNumber('MATCH_ELO_K', 32),          // ELO K-factor
         scoreFloor:      asNumber('MATCH_SCORE_FLOOR', 100),   // 점수 하한
         scoreCeiling:    asNumber('MATCH_SCORE_CEILING', 5000), // 점수 상한
+        leaverPenalty:   asNumber('MATCH_LEAVER_PENALTY', 30), // 탈주 시 최하위 배점에 더해질 추가 감점(양수=감점폭)
         // ds.enabled=false면 아래 stub 주소 사용(봇/알고리즘 테스트 경로 보존).
         stubServer: Object.freeze({
             host: process.env.MATCH_STUB_HOST || '127.0.0.1',
