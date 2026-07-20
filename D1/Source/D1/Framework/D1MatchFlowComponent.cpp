@@ -251,13 +251,13 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 	// 최종 결과 스냅샷(UI 원자 복제) + 백엔드 보고용 수집을 한 번에.
 	TArray<FD1MatchResultEntry> Entries;
 	TArray<FMatchResultPlayer> ResultPlayers;
-	Entries.Reserve(GS->PlayerArray.Num() + AbandonedEntries.Num());
-	ResultPlayers.Reserve(GS->PlayerArray.Num() + AbandonedPlayers.Num());
+	Entries.Reserve(GS->PlayerArray.Num() + LeftEntries.Num());
+	ResultPlayers.Reserve(GS->PlayerArray.Num() + LeftPlayers.Num());
 	for (APlayerState* PS : GS->PlayerArray)
 	{
 		if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
 		{
-			// 강제 회수(탈주) 유저는 이미 AbandonedPlayers/Entries로 캡처됨 — PlayerArray쪽 중복 방지.
+			// 탈주 유저는 이미 LeftPlayers/Entries로 캡처됨 — PlayerArray쪽 중복 방지.
 			// (Logout 지연으로 아직 PlayerArray에 남아있을 수 있다.)
 			if (KickedUserIds.Contains(B->GetBackendUserId()))
 			{
@@ -286,9 +286,9 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 		}
 	}
 
-	// 탈주자(강제 회수) 병합 — 결과 인원이 roster와 정확히 일치해야 백엔드 검증 통과.
-	Entries.Append(AbandonedEntries);
-	ResultPlayers.Append(AbandonedPlayers);
+	// 탈주자 병합 — 결과 인원이 roster와 정확히 일치해야 백엔드 검증 통과.
+	Entries.Append(LeftEntries);
+	ResultPlayers.Append(LeftPlayers);
 
 	// UI 표시용 결정적 순서: 등수 오름차순, 동률은 슬롯 순. (PlayerArray 순서는 비결정)
 	Entries.Sort([](const FD1MatchResultEntry& A, const FD1MatchResultEntry& B)
@@ -450,10 +450,11 @@ void UD1MatchFlowComponent::HandleKickUser(int64 UserId)
 		return;
 	}
 
-	// 탈주자 결과 캡처(Logout로 PlayerArray에서 빠지기 전). placement 강제 최하위(정원).
+	// 탈주 처리(사망과 별개). 전원 꼴등(정원 고정), 캐릭터 사라짐, 결과 캡처(Logout로 빠지기 전).
 	EnsureAliveListInitialized();
 	const int32 LastPlacement = FMath::Max(ExpectedPlayerCount, GS->PlayerArray.Num());
 	Target->SetPlacement(LastPlacement);
+	Target->SetLeft(); // bLeft 복제 → 캐릭터 사라짐 + 카드 "탈주" 표시
 	AlivePlayerStates.Remove(Target);
 
 	FMatchResultPlayer RP;
@@ -461,15 +462,30 @@ void UD1MatchFlowComponent::HandleKickUser(int64 UserId)
 	RP.SlotIndex = Target->GetPlayerSlotIndex();
 	RP.Placement = LastPlacement;
 	RP.LivesLeft = Target->GetLives();
-	RP.Abandoned = true;
-	AbandonedPlayers.Add(RP);
+	RP.Left      = true;
+	LeftPlayers.Add(RP);
 
 	FD1MatchResultEntry Entry;
 	Entry.Placement = LastPlacement;
 	Entry.Nickname  = Target->GetPlayerName();
 	Entry.SlotIndex = Target->GetPlayerSlotIndex();
 	Entry.LivesLeft = Target->GetLives();
-	AbandonedEntries.Add(Entry);
+	LeftEntries.Add(Entry);
+
+	// 탈주 즉시 정산 — 백엔드가 최하위 확정값을 바로 반영(로비 즉시 반영). 토큰 있는 실 DS만.
+	if (!CurrentMatchToken.IsEmpty())
+	{
+		if (UWorld* World = GetWorld())
+		{
+			if (UGameInstance* GI = World->GetGameInstance())
+			{
+				if (UD1MatchResultSubsystem* ResultClient = GI->GetSubsystem<UD1MatchResultSubsystem>())
+				{
+					ResultClient->ReportLeaver(CurrentMatchId, CurrentMatchToken, UserId);
+				}
+			}
+		}
+	}
 
 	// 클라 통지(팝업 + 로그인 복귀) + 남은 시간 입력 차단.
 	if (PC)
@@ -478,7 +494,7 @@ void UD1MatchFlowComponent::HandleKickUser(int64 UserId)
 		PC->DisableInput(PC);
 	}
 
-	UE_LOG(LogD1, Log, TEXT("[Match] 강제 회수(kick) userId=%lld placement=%d"), UserId, LastPlacement);
+	UE_LOG(LogD1, Log, TEXT("[Match] 탈주 처리 userId=%lld placement=%d"), UserId, LastPlacement);
 
 	// 생존자 1명 이하면 매치 종료(사망 파이프라인과 동일).
 	if (AlivePlayerStates.Num() <= 1)

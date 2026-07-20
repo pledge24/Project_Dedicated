@@ -34,6 +34,10 @@ namespace D1BackendHttp
 	/** 서버 응답 error.code 문자열 → enum. */
 	EBackendErrorCode ParseErrorCode(const FString& CodeStr);
 
+	/** 응답이 401 SESSION_SUPERSEDED면 SessionSubsystem에 통지(로그인 복귀). 처리했으면 true.
+	 *  모든 인증 요청 응답 핸들러가 초입에 호출 → 옛 기기의 어떤 요청이든 즉시 팝업. */
+	bool HandleSupersededIfAny(const UGameInstance* GameInstance, const FHttpResponsePtr& Res);
+
 	//~ JSON 헬퍼
 	bool DeserializeJson(const FString& Content, TSharedPtr<FJsonObject>& OutRoot);
 	bool GetObjectField(const TSharedPtr<FJsonObject>& Obj, const TCHAR* Field, const TSharedPtr<FJsonObject>*& Out);

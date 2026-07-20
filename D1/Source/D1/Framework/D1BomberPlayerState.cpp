@@ -18,6 +18,7 @@ void AD1BomberPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 
 	DOREPLIFETIME(AD1BomberPlayerState, Lives);
 	DOREPLIFETIME(AD1BomberPlayerState, bIsAlive);
+	DOREPLIFETIME(AD1BomberPlayerState, bLeft);
 	DOREPLIFETIME(AD1BomberPlayerState, Placement);
 	DOREPLIFETIME(AD1BomberPlayerState, PlayerSlotIndex);
 	// 화력·폭탄수는 소유자 HUD 표시용 → 소유 클라에만 복제(대역폭↓). 서버 권위 값은 그대로.
@@ -71,6 +72,30 @@ void AD1BomberPlayerState::OnRep_Lives()
 void AD1BomberPlayerState::OnRep_bIsAlive()
 {
 	OnAliveStateChanged.Broadcast();
+}
+
+void AD1BomberPlayerState::SetLeft()
+{
+	if (!HasAuthority() || bLeft)
+	{
+		return;
+	}
+	bLeft = true;
+	OnRep_bLeft(); // Listen Server 대응
+}
+
+void AD1BomberPlayerState::OnRep_bLeft()
+{
+	OnLeftChanged.Broadcast();
+
+	// 카드 컨테이너가 "탈주" 표시로 다시 그리도록 GameState 디스패처도 트리거.
+	if (UWorld* World = GetWorld())
+	{
+		if (AD1BomberGameState* GS = World->GetGameState<AD1BomberGameState>())
+		{
+			GS->MarkPlayerCardsDirty();
+		}
+	}
 }
 
 void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)

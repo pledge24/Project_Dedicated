@@ -21,4 +21,7 @@ public:
 	/** 서버 전용(DS): 매치 종료 시 호출. 매치별 서버 토큰을 Bearer로 첨부. */
 	void ReportMatchResult(const FString& MatchId, const FString& MatchToken, const FString& MapName,
 		int32 DurationSec, const FString& EndReason, const TArray<FMatchResultPlayer>& Players);
+
+	/** 서버 전용(DS): 탈주 발생 즉시 호출. 백엔드가 최하위 확정값으로 점수를 바로 정산(로비 반영). */
+	void ReportLeaver(const FString& MatchId, const FString& MatchToken, int64 UserId);
 };

@@ -190,6 +190,12 @@ void UD1AuthSubsystem::HandleProfileResponse(FHttpRequestPtr Req, FHttpResponseP
 		return;
 	}
 
+	// 옛 기기의 /me 요청도 401 SESSION_SUPERSEDED면 즉시 로그인 복귀.
+	if (D1BackendHttp::HandleSupersededIfAny(GetGameInstance(), Res))
+	{
+		return;
+	}
+
 	const FString Content = Res->GetContentAsString();
 	TSharedPtr<FJsonObject> Root;
 	if (!D1BackendHttp::DeserializeJson(Content, Root)
@@ -235,23 +241,6 @@ void UD1AuthSubsystem::HandleHeartbeatResponse(FHttpRequestPtr Req, FHttpRespons
 		return; // 세션 유효.
 	}
 
-	// 401 등 — error.code가 SESSION_SUPERSEDED일 때만 세션 대체로 확정(만료/기타 401은 이 기능 범위 밖).
-	TSharedPtr<FJsonObject> Root;
-	EBackendErrorCode ErrCode = EBackendErrorCode::Unknown;
-	if (D1BackendHttp::DeserializeJson(Res->GetContentAsString(), Root))
-	{
-		const TSharedPtr<FJsonObject>* ErrorObj = nullptr;
-		if (D1BackendHttp::GetObjectField(Root, TEXT("error"), ErrorObj))
-		{
-			ErrCode = D1BackendHttp::ParseErrorCode((*ErrorObj)->GetStringField(TEXT("code")));
-		}
-	}
-
-	if (ErrCode == EBackendErrorCode::SessionSuperseded)
-	{
-		if (UD1SessionSubsystem* Session = GetGameInstance()->GetSubsystem<UD1SessionSubsystem>())
-		{
-			Session->NotifySessionSuperseded();
-		}
-	}
+	// 401 등 — SESSION_SUPERSEDED만 공용 헬퍼가 처리(만료/기타 401은 이 기능 범위 밖).
+	D1BackendHttp::HandleSupersededIfAny(GetGameInstance(), Res);
 }

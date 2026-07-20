@@ -25,7 +25,7 @@ void UD1MatchResultSubsystem::ReportMatchResult(const FString& MatchId, const FS
 		Entry->SetNumberField(TEXT("slotIndex"), P.SlotIndex);
 		Entry->SetNumberField(TEXT("placement"), P.Placement);
 		Entry->SetNumberField(TEXT("livesLeft"), P.LivesLeft);
-		Entry->SetBoolField(TEXT("abandoned"),   P.Abandoned);
+		Entry->SetBoolField(TEXT("left"),        P.Left);
 		Results.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 	Body->SetArrayField(TEXT("results"), Results);
@@ -51,4 +51,28 @@ void UD1MatchResultSubsystem::ReportMatchResult(const FString& MatchId, const FS
 	Request->ProcessRequest();
 
 	UE_LOG(LogD1, Log, TEXT("[Match] 결과 POST 전송 matchId=%s reason=%s players=%d"), *MatchId, *EndReason, Players.Num());
+}
+
+void UD1MatchResultSubsystem::ReportLeaver(const FString& MatchId, const FString& MatchToken, int64 UserId)
+{
+	const TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
+	Body->SetNumberField(TEXT("userId"), static_cast<double>(UserId));
+
+	const FString Path = FString::Printf(TEXT("/api/match/%s/leaver"), *MatchId);
+	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildPostJson(GetGameInstance(), Path, Body, /*bAttachAuth=*/false);
+	Request->SetHeader(TEXT("Authorization"), D1BackendHttp::MakeBearer(MatchToken));
+
+	Request->OnProcessRequestComplete().BindLambda(
+		[UserId](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded)
+		{
+			const int32 Code = (bSucceeded && Res.IsValid()) ? Res->GetResponseCode() : 0;
+			if (Code != 200)
+			{
+				const FString Content = (bSucceeded && Res.IsValid()) ? Res->GetContentAsString() : TEXT("(no response)");
+				UE_LOG(LogD1, Warning, TEXT("[Match] 탈주 정산 POST 실패 userId=%lld code=%d %s"), UserId, Code, *Content);
+			}
+		});
+	Request->ProcessRequest();
+
+	UE_LOG(LogD1, Log, TEXT("[Match] 탈주 즉시 정산 POST userId=%lld matchId=%s"), UserId, *MatchId);
 }

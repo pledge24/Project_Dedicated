@@ -184,6 +184,19 @@ private:
 	FTimerHandle DeathHideTimerHandle;
 	bool bDeathHandled = false;
 
+//~ 탈주 연출 (게임중 다른 기기 로그인 kick — 사망과 별개, 즉시 사라짐)
+public:
+	/** 탈주 정리. bLeft 복제로 서버·각 클라에서 실행. 몽타주 없이 즉시 메시·이름표 숨김. */
+	void HandleLeft();
+
+protected:
+	/** PS OnLeftChanged 핸들러. */
+	UFUNCTION()
+	void OnPlayerLeftChanged();
+
+private:
+	bool bLeftHandled = false;
+
 //~ PS 바인딩·이름표
 protected:
 	/** PS OnPlayerNameChanged 핸들러. 이름표 재푸시 위해 OnPlayerStateReady 재호출. */

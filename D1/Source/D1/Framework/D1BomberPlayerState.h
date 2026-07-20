@@ -11,6 +11,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAliveStateChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerNameChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSlotIndexChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSpeedLevelChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLeftChanged);
 
 /** 플레이어 복제 상태 — 생명·슬롯·파워업·등수·백엔드 신원. */
 UCLASS()
@@ -54,6 +55,26 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_bIsAlive, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	bool bIsAlive = true;
+
+//~ 탈주 (게임중 다른 기기 로그인 kick — 사망과 별개)
+public:
+	/** 탈주 여부. 카드 BP가 "탈주" 배지 토글에 사용(BlueprintPure). */
+	UFUNCTION(BlueprintPure, Category = "Bomber")
+	bool HasLeft() const { return bLeft; }
+
+	/** 서버 전용. 탈주 확정 → 복제되어 캐릭터 사라짐·카드 "탈주" 표시를 트리거. */
+	void SetLeft();
+
+	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
+	FOnLeftChanged OnLeftChanged;
+
+protected:
+	UFUNCTION()
+	void OnRep_bLeft();
+
+private:
+	UPROPERTY(ReplicatedUsing = OnRep_bLeft, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
+	bool bLeft = false;
 
 //~ 슬롯 배정
 public:

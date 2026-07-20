@@ -87,8 +87,8 @@ private:
 	TSet<int64> KickedUserIds;
 
 	/** 탈주자 결과 — Logout로 PlayerArray에서 빠지기 전에 캡처, EndMatch에서 병합(roster 인원 일치). */
-	TArray<FMatchResultPlayer> AbandonedPlayers;
-	TArray<FD1MatchResultEntry> AbandonedEntries;
+	TArray<FMatchResultPlayer> LeftPlayers;
+	TArray<FD1MatchResultEntry> LeftEntries;
 
 //~ 상태 질의
 private:

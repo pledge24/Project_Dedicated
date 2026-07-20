@@ -60,6 +60,12 @@ void UD1RankingSubsystem::HandleRankingResponse(FHttpRequestPtr Req, FHttpRespon
 		return;
 	}
 
+	// 옛 기기의 랭킹 요청도 401 SESSION_SUPERSEDED면 즉시 로그인 복귀(빈 목록 대신 팝업).
+	if (D1BackendHttp::HandleSupersededIfAny(GetGameInstance(), Res))
+	{
+		return;
+	}
+
 	const FString Content = Res->GetContentAsString();
 	TSharedPtr<FJsonObject> Root;
 	// fail case: content 역직렬화 실패

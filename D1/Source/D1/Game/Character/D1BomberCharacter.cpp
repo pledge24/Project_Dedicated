@@ -533,6 +533,54 @@ void AD1BomberCharacter::FinishDeath()
 	}
 }
 
+void AD1BomberCharacter::HandleLeft()
+{
+	if (bLeftHandled)
+	{
+		return;
+	}
+	bLeftHandled = true;
+
+	// 서버 권위 정리 — 콜리전/이동 차단(사망과 동일 teardown, 단 사망 파이프라인과는 별개 트리거).
+	if (HasAuthority())
+	{
+		if (UCapsuleComponent* Cap = GetCapsuleComponent())
+		{
+			Cap->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		}
+		if (UCharacterMovementComponent* Move = GetCharacterMovement())
+		{
+			Move->DisableMovement();
+		}
+	}
+
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+
+	// 탈주는 몽타주/블링크 없이 즉시 사라짐 — 이름표 + 메시 숨김.
+	TArray<UWidgetComponent*> WidgetComps;
+	GetComponents<UWidgetComponent>(WidgetComps);
+	for (UWidgetComponent* WC : WidgetComps)
+	{
+		WC->SetVisibility(false);
+	}
+	if (USkeletalMeshComponent* SK = GetMesh())
+	{
+		SK->SetVisibility(false);
+	}
+}
+
+void AD1BomberCharacter::OnPlayerLeftChanged()
+{
+	AD1BomberPlayerState* PS = GetPlayerState<AD1BomberPlayerState>();
+	if (PS && PS->HasLeft())
+	{
+		HandleLeft();
+	}
+}
+
 void AD1BomberCharacter::OnPlayerNameRefreshed()
 {
 	// 이름이 늦게 들어오는 케이스(Listen Server 호스트 자기 PS 포함) 대응:
@@ -556,10 +604,12 @@ void AD1BomberCharacter::RefreshPlayerStateBinding()
 		Prev->OnAliveStateChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
 		Prev->OnPlayerNameChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
 		Prev->OnSpeedLevelChanged.RemoveDynamic(this, &AD1BomberCharacter::OnSpeedLevelChanged);
+		Prev->OnLeftChanged.RemoveDynamic(this, &AD1BomberCharacter::OnPlayerLeftChanged);
 	}
 	PS->OnAliveStateChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerAliveStateChanged);
 	PS->OnPlayerNameChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerNameRefreshed);
 	PS->OnSpeedLevelChanged.AddDynamic(this, &AD1BomberCharacter::OnSpeedLevelChanged);
+	PS->OnLeftChanged.AddDynamic(this, &AD1BomberCharacter::OnPlayerLeftChanged);
 	PSWeakPtr = PS;
 
 	// 늦게 합류한 클라가 이미 올라간 SpeedLevel을 받았을 때 즉시 반영.
@@ -576,6 +626,12 @@ void AD1BomberCharacter::RefreshPlayerStateBinding()
 	if (!PS->IsAlive())
 	{
 		OnPlayerAliveStateChanged();
+	}
+
+	// 늦게 합류한 클라가 이미 탈주 상태를 받았을 때 즉시 반영.
+	if (PS->HasLeft())
+	{
+		OnPlayerLeftChanged();
 	}
 }
 

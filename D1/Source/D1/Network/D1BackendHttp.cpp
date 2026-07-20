@@ -5,7 +5,9 @@
 #include "Dom/JsonObject.h"
 #include "Framework/D1GameInstance.h"
 #include "HttpModule.h"
+#include "Interfaces/IHttpResponse.h"
 #include "Network/D1OnlineSettings.h"
+#include "Network/D1SessionSubsystem.h"
 #include "Policies/CondensedJsonPrintPolicy.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
@@ -78,6 +80,41 @@ namespace D1BackendHttp
 		if (CodeStr == TEXT("SESSION_SUPERSEDED"))   return EBackendErrorCode::SessionSuperseded;
 		if (CodeStr == TEXT("INTERNAL_ERROR"))       return EBackendErrorCode::InternalError;
 		return EBackendErrorCode::Unknown;
+	}
+
+	bool HandleSupersededIfAny(const UGameInstance* GameInstance, const FHttpResponsePtr& Res)
+	{
+		if (!Res.IsValid())
+		{
+			return false;
+		}
+
+		TSharedPtr<FJsonObject> Root;
+		if (!DeserializeJson(Res->GetContentAsString(), Root))
+		{
+			return false;
+		}
+		const TSharedPtr<FJsonObject>* ErrorObj = nullptr;
+		if (!GetObjectField(Root, TEXT("error"), ErrorObj))
+		{
+			return false;
+		}
+		if (ParseErrorCode((*ErrorObj)->GetStringField(TEXT("code"))) != EBackendErrorCode::SessionSuperseded)
+		{
+			return false;
+		}
+
+		if (GameInstance)
+		{
+			if (UD1SessionSubsystem* Session = GameInstance->GetSubsystem<UD1SessionSubsystem>())
+			{
+				Session->NotifySessionSuperseded();
+
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	bool DeserializeJson(const FString& Content, TSharedPtr<FJsonObject>& OutRoot)
