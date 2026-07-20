@@ -40,34 +40,6 @@ async function main(): Promise<void>
         return { status: res.status, body: (await res.json()) as PostResult['body'] };
     }
 
-    /** 신규 4계정(모두 시작 1000점) + 새 매치로 결과 제출. abandonLast면 4위(마지막)를 탈주 처리.
-     *  계정은 HTTP register(rate-limit) 대신 DB 직접 시드 — 이 하네스의 register 예산을 소모하지 않는다. */
-    async function runMatch(label: string, abandonLast: boolean): Promise<{ participants: Array<{ userId: number; placement: number; scoreDelta: number; scoreAfter: number }>; userIds: number[] }>
-    {
-        const s = randomBytes(3).toString('hex');
-        const us = await seedUsers(label, s, 4);
-        const mid = `${label}-${s}-${randomBytes(4).toString('hex')}`;
-        const stk = randomBytes(24).toString('base64url');
-        roster.register({
-            matchId: mid,
-            serverToken: stk,
-            mapName: MAP,
-            startedAt: Date.now(),
-            players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `j${i}` })),
-        });
-        const body = {
-            matchId: mid,
-            mapName: MAP,
-            durationSec: 60,
-            endReason: 'winner',
-            results: us.map((u, i) => ({ userId: u.userId, slotIndex: i, placement: i + 1, livesLeft: 0, abandoned: abandonLast && i === 3 })),
-        };
-        const r = await post('/api/match/result', body, stk);
-        assert.equal(r.status, 200, JSON.stringify(r.body));
-
-        return { participants: r.body.data!.participants as Array<{ userId: number; placement: number; scoreDelta: number; scoreAfter: number }>, userIds: us.map((u) => u.userId) };
-    }
-
     // 1. 고유 4계정 등록 → userId 확보
     const suffix = randomBytes(3).toString('hex'); // 영소문자+숫자 6자
     const users: Array<{ userId: number; nickname: string }> = [];
@@ -181,22 +153,48 @@ async function main(): Promise<void>
             assert.equal(r.body.error?.code, 'RESULT_ALREADY_SUBMITTED');
         }],
 
-        ['탈주(abandoned) → 최하위 + 추가 감점(-leaverPenalty) & abandoned=1 저장', async () =>
+        ['탈주 즉시 정산(POST /leaver) → 최하위 확정값·결과시 프로필 skip·완주자끼리 ELO', async () =>
         {
-            // 두 매치 모두 시작 1000·동일 placement 분포 → ELO항 동일. 차이는 정확히 leaverPenalty(하한 미도달).
-            const normal = await runMatch('rn', false);
-            const aband = await runMatch('ra', true);
-            const normalLast = normal.participants.find((p) => p.placement === 4)!;
-            const abandLast = aband.participants.find((p) => p.placement === 4)!;
-            assert.equal(
-                abandLast.scoreDelta,
-                normalLast.scoreDelta - config.match.leaverPenalty,
-                `탈주 delta=${abandLast.scoreDelta}, 일반 4위 delta=${normalLast.scoreDelta}, penalty=${config.match.leaverPenalty}`
-            );
+            const s = randomBytes(3).toString('hex');
+            const us = await seedUsers('lv', s, 4); // 모두 1000점
+            const mid = `lv-${s}-${randomBytes(4).toString('hex')}`;
+            const stk = randomBytes(24).toString('base64url');
+            roster.register({
+                matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
+                players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `lj${i}` })),
+            });
 
-            const flags = await selectAbandoned(aband.userIds);
-            assert.equal(flags.get(aband.userIds[3]), 1, '탈주자 abandoned=1 아님');
-            assert.equal(flags.get(aband.userIds[0]), 0, '비탈주자 abandoned=0 아님');
+            // 1) us[3] 탈주 즉시 정산 → base[꼴등](-35) - leaverPenalty. ELO 무관 확정값.
+            const expectedDelta = -35 - config.match.leaverPenalty;
+            const leave = await post(`/api/match/${mid}/leaver`, { userId: us[3].userId }, stk);
+            assert.equal(leave.status, 200, JSON.stringify(leave.body));
+            assert.equal(leave.body.data!.scoreDelta, expectedDelta, `정산 delta=${leave.body.data!.scoreDelta} 기대 ${expectedDelta}`);
+            const afterSettle = await selectScore([us[3].userId]);
+            assert.equal(afterSettle.get(us[3].userId), 1000 + expectedDelta, '정산 후 프로필 점수 불일치');
+
+            // 2) 재정산 요청은 멱등 — 같은 값 반환, 추가 하락 없음.
+            const again = await post(`/api/match/${mid}/leaver`, { userId: us[3].userId }, stk);
+            assert.equal(again.body.data!.scoreDelta, expectedDelta, '재정산이 멱등 아님');
+            assert.equal((await selectScore([us[3].userId])).get(us[3].userId), 1000 + expectedDelta, '재정산이 점수를 또 깎음');
+
+            // 3) 매치 종료 결과: us[3]=left·꼴등(4), 완주자 us[0..2]=1,2,3
+            const body = {
+                matchId: mid, mapName: MAP, durationSec: 60, endReason: 'winner',
+                results: us.map((u, i) => ({ userId: u.userId, slotIndex: i, placement: i === 3 ? 4 : i + 1, livesLeft: 0, left: i === 3 })),
+            };
+            const r = await post('/api/match/result', body, stk);
+            assert.equal(r.status, 200, JSON.stringify(r.body));
+
+            // 탈주자 프로필 재갱신 안 됨(정산값 유지) + abandoned 컬럼 1, 완주자 0
+            assert.equal((await selectScore([us[3].userId])).get(us[3].userId), 1000 + expectedDelta, '결과 저장이 탈주자 프로필을 재갱신함(중복)');
+            const flags = await selectAbandoned(us.map((u) => u.userId));
+            assert.equal(flags.get(us[3].userId), 1, '탈주자 abandoned=1 아님');
+            assert.equal(flags.get(us[0].userId), 0, '완주자 abandoned=0 아님');
+
+            // 완주자끼리 ELO — 1위(us[0])는 양수, 결과의 탈주자 delta는 정산값과 동일.
+            const ps = r.body.data!.participants as Array<{ userId: number; scoreDelta: number }>;
+            assert.ok(ps.find((p) => p.userId === us[0].userId)!.scoreDelta > 0, '완주 1위 delta 양수 아님');
+            assert.equal(ps.find((p) => p.userId === us[3].userId)!.scoreDelta, expectedDelta, '결과의 탈주자 delta가 정산값 아님');
         }],
 
         ['±0 점수 매치는 score_updated_at 유지 (실변동은 갱신)', async () =>
@@ -310,7 +308,25 @@ async function seedUsers(label: string, s: string, n: number): Promise<Array<{ u
     return out;
 }
 
-/** 여러 유저의 match_participants.abandoned 플래그 조회(각 유저가 매치 1개뿐인 시나리오 전제). */
+/** 여러 유저의 player_profiles.score 조회. */
+async function selectScore(userIds: number[]): Promise<Map<number, number>>
+{
+    const placeholders = userIds.map(() => '?').join(', ');
+    const [rows] = await getPool().query<RowDataPacket[]>(
+        `SELECT user_id, score FROM player_profiles WHERE user_id IN (${placeholders})`,
+        userIds
+    );
+
+    const result = new Map<number, number>();
+    for (const row of rows)
+    {
+        result.set(Number(row.user_id), Number(row.score));
+    }
+
+    return result;
+}
+
+/** 여러 유저의 match_participants.abandoned(=left) 플래그 조회(각 유저가 매치 1개뿐인 시나리오 전제). */
 async function selectAbandoned(userIds: number[]): Promise<Map<number, number>>
 {
     const placeholders = userIds.map(() => '?').join(', ');

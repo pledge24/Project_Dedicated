@@ -6,6 +6,7 @@ import type { PoolConnection } from 'mysql2/promise';
 import { config } from '../common/config.js';
 import { withTransaction } from '../common/db.js';
 import type { MatchEndReason } from '../common/types.js';
+import type { SettledLeaver } from './dsApi.state.js';
 import { computeFfaEloDeltas } from './elo.js';
 
 /** saveResult 함수용 - 종료 매치 각 플레이어 정보 */
@@ -16,7 +17,8 @@ export interface SaveResultParticipant
     nicknameSnapshot: string;
     placement: number;
     livesLeft: number;
-    abandoned: boolean;   // 게임중 다른 기기 로그인으로 kick된 탈주자 → 최하위 + 추가 감점
+    left: boolean;                // 게임중 다른 기기 로그인으로 kick된 탈주자(전원 꼴등, 최하위 확정값)
+    settled?: SettledLeaver;      // kick 시점에 즉시 정산됨 → 프로필 재갱신 skip, 저장값 재사용
 }
 
 /** saveResult 함수용 - 입력 매개변수 구조 */
@@ -76,25 +78,44 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
         );
         const matchDbId = matchRes.insertId;
 
-        // 현재 점수·경험치를 잠그고(FOR UPDATE) 재조회 — roster의 값은 stale일 수 있다.
-        const userIds = input.participants.map((p) => p.userId);
-        const profileByUser = await lockAndFetchProfiles(conn, userIds);
+        // 탈주자(left)와 완주자를 분리. ELO는 완주자끼리만, 탈주자는 이미 확정된 값 재사용(프로필 skip).
+        const finishers = input.participants.filter((p) => !p.left);
+        const leavers = input.participants.filter((p) => p.left);
 
-        const ratings = input.participants.map((p) => profileByUser.get(p.userId)!.score);
-        const placements = input.participants.map((p) => p.placement);
-        const deltas = computeFfaEloDeltas(ratings, placements, config.match.eloK);
+        const rows: ComputedRow[] = [];
 
-        // 참가자별 파생값을 먼저 확정 (순수) — INSERT/UPDATE 값이 모두 여기서 나온다.
-        const computed = input.participants.map((p, i) => ({
-            p,
-            c: computeParticipantResult(p.placement, ratings[i], deltas[i], config.match.scoreFloor, config.match.scoreCeiling, profileByUser.get(p.userId)!.exp, p.abandoned, config.match.leaverPenalty),
-        }));
+        // ── 완주자: 현재 점수 잠그고 완주자끼리 FFA ELO ──
+        if (finishers.length > 0)
+        {
+            const profileByUser = await lockAndFetchProfiles(conn, finishers.map((p) => p.userId));
+            const ratings = finishers.map((p) => profileByUser.get(p.userId)!.score);
+            const placements = finishers.map((p) => p.placement);
+            const deltas = computeFfaEloDeltas(ratings, placements, config.match.eloK);
+            finishers.forEach((p, i) =>
+            {
+                const c = computeParticipantResult(p.placement, ratings[i], deltas[i],
+                    config.match.scoreFloor, config.match.scoreCeiling, profileByUser.get(p.userId)!.exp);
+                rows.push({ p, c, updateProfile: true });
+            });
+        }
 
-        // match_participants는 multi-row INSERT 1회. VALUES 그룹만 동적 생성 —
-        // 사용자 데이터가 아니라 '(?, ...)' 텍스트라 주입 위험 0 (동적 IN 선례와 동일).
-        const rowsSql = computed.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
-        const insertParams = computed.flatMap(({ p, c }) =>
-            [matchDbId, p.userId, p.nicknameSnapshot, p.slotIndex, p.placement, p.livesLeft, c.expGained, c.scoreDelta, p.abandoned ? 1 : 0]);
+        // ── 탈주자: kick 시점에 이미 확정. row는 저장값, 프로필 UPDATE는 skip(중복 방지) ──
+        for (const p of leavers)
+        {
+            const delta = p.settled ? p.settled.scoreDelta : 0; // 정산 유실 시 0(패널티 escape 허용)
+            const after = p.settled ? p.settled.scoreAfter : 0;
+            rows.push({
+                p,
+                c: { scoreBefore: after - delta, scoreDelta: delta, scoreAfter: after, expGained: 0, isWin: 0, levelAfter: 0 },
+                updateProfile: false,
+            });
+        }
+
+        // match_participants는 multi-row INSERT 1회. VALUES 그룹만 동적 생성(주입 위험 0).
+        // DB 컬럼명은 abandoned 유지(마이그레이션 생략) — 값은 left 플래그.
+        const rowsSql = rows.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
+        const insertParams = rows.flatMap(({ p, c }) =>
+            [matchDbId, p.userId, p.nicknameSnapshot, p.slotIndex, p.placement, p.livesLeft, c.expGained, c.scoreDelta, p.left ? 1 : 0]);
         await conn.execute(
             'INSERT INTO match_participants ' +
             '(match_id, user_id, nickname_snapshot, slot_index, placement, lives_left, exp_gained, score_delta, abandoned) ' +
@@ -102,19 +123,22 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
             insertParams
         );
 
-        // player_profiles는 행마다 값이 달라 개별 UPDATE 유지.
+        // player_profiles는 행마다 값이 달라 개별 UPDATE. 정산 완료 탈주자(updateProfile=false)는 skip.
         const saved: ParticipantScoreResult[] = [];
-        for (const { p, c } of computed)
+        for (const { p, c, updateProfile } of rows)
         {
-            await conn.execute(
-                'UPDATE player_profiles SET ' +
-                'score = ?, wins = wins + ?, losses = losses + ?, matches_played = matches_played + 1, ' +
-                'exp = exp + ?, level = ?, last_match_at = ?, ' +
-                // 점수가 실제로 바뀐 매치만 갱신 시점 기록 (±0은 유지) → 랭킹 동점 순위 보호.
-                'score_updated_at = CASE WHEN ? <> 0 THEN ? ELSE score_updated_at END ' +
-                'WHERE user_id = ?',
-                [c.scoreAfter, c.isWin, 1 - c.isWin, c.expGained, c.levelAfter, input.endedAt, c.scoreDelta, input.endedAt, p.userId]
-            );
+            if (updateProfile)
+            {
+                await conn.execute(
+                    'UPDATE player_profiles SET ' +
+                    'score = ?, wins = wins + ?, losses = losses + ?, matches_played = matches_played + 1, ' +
+                    'exp = exp + ?, level = ?, last_match_at = ?, ' +
+                    // 점수가 실제로 바뀐 매치만 갱신 시점 기록 (±0은 유지) → 랭킹 동점 순위 보호.
+                    'score_updated_at = CASE WHEN ? <> 0 THEN ? ELSE score_updated_at END ' +
+                    'WHERE user_id = ?',
+                    [c.scoreAfter, c.isWin, 1 - c.isWin, c.expGained, c.levelAfter, input.endedAt, c.scoreDelta, input.endedAt, p.userId]
+                );
+            }
 
             saved.push({
                 userId: p.userId,
@@ -126,6 +150,40 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
         }
 
         return saved;
+    });
+}
+
+/** 참가자별 파생값 + 프로필 갱신 여부. */
+interface ComputedRow
+{
+    p: SaveResultParticipant;
+    c: { scoreBefore: number; scoreDelta: number; scoreAfter: number; expGained: number; isWin: number; levelAfter: number };
+    updateProfile: boolean;
+}
+
+/**
+ * 탈주자 즉시 정산 — kick 시점(매치 종료 전)에 프로필 점수를 바로 하락시켜 로비에 반영되게 한다.
+ * 최하위 확정값(base[꼴등] + 탈주 감점, ELO 무관)만 적용. 멱등 판단은 호출부(service).
+ */
+export async function settleLeaverProfile(userId: number): Promise<SettledLeaver>
+{
+    return withTransaction(async (conn) =>
+    {
+        const profileByUser = await lockAndFetchProfiles(conn, [userId]);
+        const before = profileByUser.get(userId)!.score;
+        const after = computeLeaverAfter(before, config.match.scoreFloor, config.match.scoreCeiling, config.match.leaverPenalty);
+        const scoreDelta = after - before;
+        const now = new Date();
+
+        await conn.execute(
+            'UPDATE player_profiles SET ' +
+            'score = ?, losses = losses + 1, matches_played = matches_played + 1, last_match_at = ?, ' +
+            'score_updated_at = CASE WHEN ? <> 0 THEN ? ELSE score_updated_at END ' +
+            'WHERE user_id = ?',
+            [after, now, scoreDelta, now, userId]
+        );
+
+        return { scoreDelta, scoreAfter: after };
     });
 }
 
@@ -151,22 +209,29 @@ async function lockAndFetchProfiles(conn: PoolConnection, userIds: number[]): Pr
     return profileByUser;
 }
 
-/** 한 참가자의 점수·레벨 파생값(순수). floor·ceiling 적용 후 실제 변화량을 scoreDelta로 반환 → before+delta=after 보장. */
-function computeParticipantResult(placement: number, before: number, delta: number, scoreFloor: number, scoreCeiling: number, expBefore: number, abandoned: boolean, leaverPenalty: number)
+/** 완주자 한 명의 점수·레벨 파생값(순수). floor·ceiling 적용 후 실제 변화량을 scoreDelta로 반환 → before+delta=after 보장. */
+function computeParticipantResult(placement: number, before: number, delta: number, scoreFloor: number, scoreCeiling: number, expBefore: number)
 {
-    // delta는 순수 ELO항. 등수 기본배점을 더하고, 탈주면 추가 감점(leaverPenalty)까지 뺀 뒤 상·하한으로 clamp.
-    const penalty = abandoned ? leaverPenalty : 0;
-    const after = Math.min(scoreCeiling, Math.max(scoreFloor, before + delta + basePointsForPlacement(placement) - penalty));
+    // delta는 순수 ELO항. 등수 기본배점을 더한 뒤 상·하한으로 clamp.
+    const after = Math.min(scoreCeiling, Math.max(scoreFloor, before + delta + basePointsForPlacement(placement)));
     const expGained = expForPlacement(placement);
 
     return {
         scoreBefore: before,
-        scoreDelta: after - before,       // A3: 반영된 실변화량(floor 반영)
+        scoreDelta: after - before,       // 반영된 실변화량(clamp 반영)
         scoreAfter: after,
-        isWin: (!abandoned && placement === 1) ? 1 : 0,
+        isWin: placement === 1 ? 1 : 0,
         expGained,
         levelAfter: levelForExp(expBefore + expGained),
     };
+}
+
+/** 탈주자 최하위 확정값(순수) — base[꼴등] + 탈주 감점, clamp. 즉시 정산 전용. */
+function computeLeaverAfter(before: number, scoreFloor: number, scoreCeiling: number, leaverPenalty: number): number
+{
+    const lastPlacement = config.match.playersPerMatch;
+
+    return Math.min(scoreCeiling, Math.max(scoreFloor, before + basePointsForPlacement(lastPlacement) - leaverPenalty));
 }
 
 /** 등수별 획득 경험치. 범위를 벗어나면 최저값. */

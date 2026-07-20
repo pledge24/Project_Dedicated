@@ -1,16 +1,16 @@
-// 매치 결과 처리 (service 레이어) — roster 검증 + 서버 토큰 + 무결성 → 트랜잭션 저장.
-// 서버 권위 모델: 결과는 DS만 보고 가능하며 매치당 발급된 serverToken으로만 통과한다.
+// DS→백엔드 요청 처리 (service 레이어) — 결과 보고 + kick 폴링 + 탈주 즉시 정산.
+// 서버 권위 모델: DS만 매치당 serverToken으로 접근한다.
 import { isDuplicateKeyError } from '../common/db.js';
 import { AppError, Codes } from '../common/errors.js';
 import type { MatchResultRequest, MatchResultResponse } from '../common/types.js';
-import * as kicks from './kicks.js';
+import * as state from './dsApi.state.js';
 import * as repo from './result.repository.js';
 import * as rosters from './roster.js';
 
-/** 서버 토큰을 검증하고 결과를 기록한다. 실패 케이스별 AppError를 throw. */
-export async function submitResult(serverToken: string, req: MatchResultRequest): Promise<MatchResultResponse>
+/** serverToken을 검증하고 roster를 반환. 실패 시 AppError. */
+function assertServerToken(serverToken: string, matchId: string): rosters.MatchRoster
 {
-    const roster = rosters.get(req.matchId);
+    const roster = rosters.get(matchId);
     if (!roster)
     {
         throw new AppError(Codes.MATCH_NOT_FOUND, '해당 매치를 찾을 수 없습니다.');
@@ -20,12 +20,21 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
         throw new AppError(Codes.INVALID_SERVER_TOKEN, '서버 토큰이 유효하지 않습니다.');
     }
 
+    return roster;
+}
+
+/** 서버 토큰을 검증하고 결과를 기록한다. 실패 케이스별 AppError를 throw. */
+export async function submitResult(serverToken: string, req: MatchResultRequest): Promise<MatchResultResponse>
+{
+    const roster = assertServerToken(serverToken, req.matchId);
+
     // assert 체크.
     assertResultsMatchRoster(roster.players, req.results);
 
     const participants = req.results.map((r) =>
     {
         const rp = roster.players.find((p) => p.userId === r.userId)!; // 위 검증으로 존재 보장
+        const left = r.left ?? false;
 
         return {
             userId: r.userId,
@@ -33,7 +42,9 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
             nicknameSnapshot: rp.nickname,
             placement: r.placement,
             livesLeft: r.livesLeft,
-            abandoned: r.abandoned ?? false,
+            left,
+            // 이미 즉시 정산된 탈주자면 그 값을 넘겨 결과 저장 시 프로필 중복 갱신을 막는다.
+            settled: left ? state.getSettled(req.matchId, r.userId) : undefined,
         };
     });
 
@@ -50,8 +61,8 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
             participants,
         });
 
-        // 매치 종료 — kick 대기열 정리(누수 방지). 재제출은 멱등(409)이라 빈 목록이어도 무해.
-        kicks.clear(req.matchId);
+        // 매치 종료 — 이탈 채널 상태 정리(kick 대기열 + 정산 기록). 재제출은 멱등(409)이라 무해.
+        state.clear(req.matchId);
 
         return {
             matchId: req.matchId,
@@ -73,20 +84,34 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
     }
 }
 
-/** DS 폴링(GET /api/match/:matchId/kicks): 서버 토큰 검증 후 이 매치의 kick 대기 userId 목록 반환. */
+/** DS 폴링(GET /kicks): 서버 토큰 검증 후 이 매치의 kick 대기 userId 목록. */
 export function listPendingKicks(serverToken: string, matchId: string): number[]
 {
-    const roster = rosters.get(matchId);
-    if (!roster)
+    assertServerToken(serverToken, matchId);
+
+    return state.listKicks(matchId);
+}
+
+/** DS 통지(POST /leaver): 탈주자 점수를 최하위 확정값으로 즉시 정산(멱등). */
+export async function settleLeaver(serverToken: string, matchId: string, userId: number): Promise<state.SettledLeaver>
+{
+    const roster = assertServerToken(serverToken, matchId);
+    if (!roster.players.some((p) => p.userId === userId))
     {
-        throw new AppError(Codes.MATCH_NOT_FOUND, '해당 매치를 찾을 수 없습니다.');
-    }
-    if (serverToken !== roster.serverToken)
-    {
-        throw new AppError(Codes.INVALID_SERVER_TOKEN, '서버 토큰이 유효하지 않습니다.');
+        throw new AppError(Codes.INVALID_RESULT, '매치에 속하지 않은 참가자입니다.');
     }
 
-    return kicks.listKicks(matchId);
+    // 이미 정산됐으면 그 값을 그대로 반환(DS 재시도·중복 폴링 방어).
+    const existing = state.getSettled(matchId, userId);
+    if (existing)
+    {
+        return existing;
+    }
+
+    const info = await repo.settleLeaverProfile(userId);
+    state.markSettled(matchId, userId, info);
+
+    return info;
 }
 
 /** 보고된 userId 집합이 roster와 정확히 일치하는지(누락·외부인·중복 없음) 검증. */

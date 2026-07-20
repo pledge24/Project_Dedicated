@@ -1,4 +1,4 @@
-// 매치 결과 요청/응답 어댑터 (handler 레이어). 본문 형식 검증 + 서버 토큰 추출.
+// DS→백엔드 요청 어댑터 (handler 레이어). DS만 — Authorization: Bearer <serverToken>.
 import type { Request, Response } from 'express';
 
 import { extractBearerToken } from '../common/bearer.js';
@@ -7,12 +7,12 @@ import { ok } from '../common/envelope.js';
 import { AppError, Codes } from '../common/errors.js';
 import type { MatchEndReason, MatchResultEntryInput, MatchResultRequest } from '../common/types.js';
 import { isInt } from '../common/validate.js';
-import * as service from './result.service.js';
+import * as service from './dsApi.service.js';
 
 const END_REASONS: readonly MatchEndReason[] = ['winner', 'draw', 'time_expired', 'abort'];
 
 /**
- * POST /api/match/result  (DS만 — Authorization: Bearer <serverToken>)
+ * POST /api/match/result  (DS만)
  * body: { matchId, mapName, durationSec, endReason, results[] }
  */
 export async function submitResult(req: Request, res: Response): Promise<void>
@@ -25,8 +25,8 @@ export async function submitResult(req: Request, res: Response): Promise<void>
 }
 
 /**
- * GET /api/match/:matchId/kicks  (DS만 — Authorization: Bearer <serverToken>)
- * 이 매치에서 강제 회수(다른 기기 로그인)해야 할 userId 목록. DS가 5초 폴링해 해당 플레이어를 kick한다.
+ * GET /api/match/:matchId/kicks  (DS만)
+ * 이 매치에서 강제 회수(다른 기기 로그인)해야 할 userId 목록. DS가 5초 폴링해 kick한다.
  */
 export function getKicks(req: Request, res: Response): void
 {
@@ -34,6 +34,25 @@ export function getKicks(req: Request, res: Response): void
     const matchId = typeof req.params.matchId === 'string' ? req.params.matchId : '';
     const userIds = service.listPendingKicks(serverToken, matchId);
     res.json(ok({ userIds }));
+}
+
+/**
+ * POST /api/match/:matchId/leaver  (DS만)
+ * body: { userId } — kick 즉시 탈주자 점수를 최하위 확정값으로 정산(하락). 매치 종료 전 로비 반영 경로.
+ */
+export async function submitLeaver(req: Request, res: Response): Promise<void>
+{
+    const serverToken = extractServerToken(req);
+    const matchId = typeof req.params.matchId === 'string' ? req.params.matchId : '';
+
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    if (!isInt(body.userId, 1))
+    {
+        throw new AppError(Codes.INVALID_RESULT, 'userId는 양의 정수여야 합니다.');
+    }
+
+    const settled = await service.settleLeaver(serverToken, matchId, body.userId);
+    res.json(ok({ userId: body.userId, scoreDelta: settled.scoreDelta, scoreAfter: settled.scoreAfter }));
 }
 
 /** Authorization 헤더의 Bearer 토큰(=서버 토큰). 없으면 401. */
@@ -98,7 +117,7 @@ function parseEntry(raw: unknown, n: number): MatchResultEntryInput
     const slotIndex = e.slotIndex;
     const placement = e.placement;
     const livesLeft = e.livesLeft;
-    const abandoned = e.abandoned;
+    const left = e.left;
 
     if (!isInt(userId, 1))
     {
@@ -116,10 +135,10 @@ function parseEntry(raw: unknown, n: number): MatchResultEntryInput
     {
         throw new AppError(Codes.INVALID_RESULT, 'livesLeft는 0 이상의 정수여야 합니다.');
     }
-    if (abandoned !== undefined && typeof abandoned !== 'boolean')
+    if (left !== undefined && typeof left !== 'boolean')
     {
-        throw new AppError(Codes.INVALID_RESULT, 'abandoned는 boolean이어야 합니다.');
+        throw new AppError(Codes.INVALID_RESULT, 'left는 boolean이어야 합니다.');
     }
 
-    return { userId, slotIndex, placement, livesLeft, abandoned: abandoned === true };
+    return { userId, slotIndex, placement, livesLeft, left: left === true };
 }

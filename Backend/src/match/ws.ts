@@ -15,7 +15,7 @@ import { logger } from '../common/logger.js';
 import { getCurrentTokenVersion, onSuperseded } from '../common/session.js';
 import type { AuthedUser } from '../common/types.js';
 import * as ds from './ds.js';
-import * as kicks from './kicks.js';
+import * as dsApiState from './dsApi.state.js';
 import * as service from './matchmaking.service.js';
 import type { ClientMessage, ServerMessage, ServerMessageType } from './protocol.js';
 import type { MatchGroup } from './queue.js';
@@ -84,7 +84,7 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
         const matchId = roster.findMatchByUser(userId);
         if (matchId)
         {
-            kicks.markKick(matchId, userId);
+            dsApiState.markKick(matchId, userId);
         }
     });
 
