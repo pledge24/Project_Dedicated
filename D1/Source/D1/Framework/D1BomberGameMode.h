@@ -6,6 +6,7 @@
 #include "GameFramework/GameModeBase.h"
 #include "D1BomberGameMode.generated.h"
 
+class AController;
 class APlayerController;
 class AD1PowerupPickup;
 class UD1MapData;
@@ -93,6 +94,15 @@ private:
 private:
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> UsedStarts;
+
+//~ 봇 (봇전 서버측 스폰)
+private:
+	/** 봇전: -Bots= 로 주입된 봇 좌석을 서버측 스폰(AI 빙의, 가만히 서 있음). 맵 빌드 후·시작 게이트 전 호출. */
+	void SpawnBots();
+
+	/** 봇 컨트롤러 클래스(기본 AD1BotController, 생성자 지정). PlayerState를 얻어 PlayerArray에 편입. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<AController> BotControllerClass;
 
 //~ 시작 게이트·매치 흐름
 private:

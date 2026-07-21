@@ -3,6 +3,7 @@
 #include "Framework/D1BomberGameMode.h"
 #include "Framework/D1BomberGameState.h"
 #include "Framework/D1BomberPlayerState.h"
+#include "Framework/D1BotController.h"
 #include "Framework/D1MatchFlowComponent.h"
 #include "Systems/Map/D1MapBuilder.h"
 #include "Systems/Map/D1MapData.h"
@@ -49,6 +50,7 @@ AD1BomberGameMode::AD1BomberGameMode()
 {
 	GameStateClass = AD1BomberGameState::StaticClass();
 	PlayerStateClass = AD1BomberPlayerState::StaticClass();
+	BotControllerClass = AD1BotController::StaticClass();
 }
 
 void AD1BomberGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
@@ -177,6 +179,9 @@ void AD1BomberGameMode::BeginPlay()
 		UE_LOG(LogD1, Error, TEXT("[Map] 빌드 실패: %s"), *MapErr);
 	}
 
+	// 봇전: PlayerStart가 준비된(맵 빌드 후) 다음, 시작 게이트 전에 봇을 스폰해 PlayerArray를 채운다.
+	SpawnBots();
+
 	// 매치 흐름은 GameState의 컴포넌트가 소유. 설정을 넘기고 시작 게이트를 위임.
 	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
 	{
@@ -261,4 +266,71 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 
 	UsedStarts.Add(Chosen);
 	return Chosen;
+}
+
+void AD1BomberGameMode::SpawnBots()
+{
+	// -Bots= 미주입이면 일반 매치 → 봇 스폰 없음.
+	FString BotsStr;
+	if (!FParse::Value(FCommandLine::Get(), TEXT("Bots="), BotsStr) || BotsStr.IsEmpty())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World || !BotControllerClass)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Bot] 스폰 생략 — World/BotControllerClass 없음"));
+		return;
+	}
+
+	// -Bots= 형식: userId:base64(nickname);… — 토큰 없음(DS가 서버측 스폰). userId는 음수 sentinel.
+	TArray<FString> Entries;
+	BotsStr.ParseIntoArray(Entries, TEXT(";"), /*CullEmpty=*/true);
+	int32 Spawned = 0;
+	for (const FString& Entry : Entries)
+	{
+		TArray<FString> Parts;
+		Entry.ParseIntoArray(Parts, TEXT(":"), /*CullEmpty=*/true);
+		if (Parts.Num() < 1)
+		{
+			UE_LOG(LogD1, Warning, TEXT("[Bot] 항목 형식 오류(무시): '%s'"), *Entry);
+			continue;
+		}
+
+		const int64 UserId = FCString::Atoi64(*Parts[0]);
+		FString Nickname;
+		if (Parts.Num() >= 2)
+		{
+			TArray<uint8> Bytes;
+			if (FBase64::Decode(Parts[1], Bytes))
+			{
+				Bytes.Add(0); // UTF8→TCHAR 변환용 널 종단
+				Nickname = UTF8_TO_TCHAR(reinterpret_cast<const ANSICHAR*>(Bytes.GetData()));
+			}
+		}
+
+		AController* BotController = World->SpawnActor<AController>(BotControllerClass);
+		if (!BotController)
+		{
+			UE_LOG(LogD1, Warning, TEXT("[Bot] 컨트롤러 스폰 실패 userId=%lld"), UserId);
+			continue;
+		}
+
+		// PlayerState는 컨트롤러 스폰 시 생성(bWantsPlayerState). 신원·이름·봇표시 stamp 후 폰 스폰·빙의.
+		if (AD1BomberPlayerState* PS = BotController->GetPlayerState<AD1BomberPlayerState>())
+		{
+			PS->SetBackendUserId(UserId);
+			if (!Nickname.IsEmpty())
+			{
+				PS->SetPlayerName(Nickname);
+			}
+			PS->SetIsBot(true);
+		}
+
+		// RestartPlayer가 ChoosePlayerStart(미사용 좌석 랜덤)로 슬롯 배정 + DefaultPawnClass 폰 스폰·빙의.
+		RestartPlayer(BotController);
+		Spawned++;
+	}
+	UE_LOG(LogD1, Log, TEXT("[Bot] 봇 %d명 스폰"), Spawned);
 }

@@ -76,6 +76,23 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_bLeft, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	bool bLeft = false;
 
+//~ 봇 (봇전 서버측 스폰 봇 — 카드 BOT 배지)
+public:
+	/** 봇 여부. 카드 BP가 "BOT" 배지 토글에 사용(BlueprintPure). */
+	UFUNCTION(BlueprintPure, Category = "Bomber")
+	bool IsBot() const { return bIsBot; }
+
+	/** 서버 전용. 봇전 봇 좌석 표시(스폰 시 1회). 복제되어 카드 배지를 트리거. */
+	void SetIsBot(bool bInIsBot);
+
+protected:
+	UFUNCTION()
+	void OnRep_bIsBot();
+
+private:
+	UPROPERTY(ReplicatedUsing = OnRep_bIsBot, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
+	bool bIsBot = false;
+
 //~ 슬롯 배정
 public:
 	/** 서버 전용. */
