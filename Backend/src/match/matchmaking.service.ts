@@ -101,10 +101,22 @@ export function abortFormation(entries: QueueEntry<WebSocket>[]): number
     return survivors.length;
 }
 
-/** 1초 사이클이 호출. 성사된 매치 그룹들을 반환. */
-export function runMatching(now: number): MatchGroup<WebSocket>[]
+/** runMatching 결과 — 실 매치 그룹 + 봇전 대상(장기 대기자 1명씩). */
+export interface MatchingResult
 {
-    return queue.runCycle(now);
+    groups: MatchGroup<WebSocket>[];
+    botFills: QueueEntry<WebSocket>[];
+}
+
+/** 1초 사이클이 호출. 실 매치를 먼저 성사시키고, 남은 장기 대기자를 봇전 대상으로 넘긴다. */
+export function runMatching(now: number): MatchingResult
+{
+    const groups = queue.runCycle(now);
+    const botFills = config.match.botFill.enabled
+        ? queue.collectBotFillTimeouts(now, config.match.botFill.waitMs)
+        : [];
+
+    return { groups, botFills };
 }
 
 export function queueSize(): number

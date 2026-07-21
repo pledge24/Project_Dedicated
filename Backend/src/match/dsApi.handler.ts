@@ -119,9 +119,10 @@ function parseEntry(raw: unknown, n: number): MatchResultEntryInput
     const livesLeft = e.livesLeft;
     const left = e.left;
 
-    if (!isInt(userId, 1))
+    // userId: 실제 유저는 양수, 봇전 봇은 음수 sentinel. 위조는 service의 roster 대조로 차단하므로 여기선 0만 거부.
+    if (typeof userId !== 'number' || !Number.isInteger(userId) || userId === 0)
     {
-        throw new AppError(Codes.INVALID_RESULT, 'userId는 양의 정수여야 합니다.');
+        throw new AppError(Codes.INVALID_RESULT, 'userId는 0이 아닌 정수여야 합니다.');
     }
     if (!isInt(slotIndex, 0, n - 1))
     {

@@ -19,7 +19,7 @@ const ds = config.match.ds;
 const running = new Map<number, DsProcess>(); // port → 프로세스
 
 /** 빈 포트에 DS spawn → bootDelay 후 {host, port}. 포트 고갈/부팅 실패 시 throw. */
-export async function allocate(matchId: string, serverToken: string, expectedPlayers: number, roster: { joinToken: string; userId: number; nickname: string }[]): Promise<{ host: string; port: number }>
+export async function allocate(matchId: string, serverToken: string, expectedPlayers: number, roster: { joinToken: string; userId: number; nickname: string }[], bots: { userId: number; nickname: string }[] = []): Promise<{ host: string; port: number }>
 {
     const port = pickFreePort();
     if (port === null)
@@ -32,10 +32,18 @@ export async function allocate(matchId: string, serverToken: string, expectedPla
      * expectedPlayers: DS가 전원 입장까지 매치 시작을 미루는 게이트용(미충족 시 DS 측 타임아웃으로 시작).
      * Roster:          token:userId:base64(nickname);… — DS가 ?join= 토큰으로 권위 신원(userId·이름)을 매핑. 좌석은 DS가 랜덤 배정.
      *                   닉네임은 한글(비-ASCII)이라 Windows 커맨드라인 코드페이지 깨짐 방지 위해 표준 base64로 인코딩(UE FBase64::Decode 호환).
+     * Bots:            userId:base64(nickname);… — 봇전(Bot-Fill) 봇 좌석. 토큰 없음(DS가 서버측 스폰). userId는 음수 sentinel.
+     *                   ExpectedPlayers는 총원(휴먼+봇)이라 봇이 PlayerArray를 채우고 휴먼 입장 시 시작 게이트가 충족된다.
      * stdio 'ignore' — DS는 -log로 자체 콘솔/로그파일에 기록. 파이프 미소비로 막히는 것 방지.
      */
     const rosterArg = roster.map((r) => `${r.joinToken}:${r.userId}:${Buffer.from(r.nickname, 'utf8').toString('base64')}`).join(';');
-    const args = [ds.map, `-port=${port}`, `-MatchId=${matchId}`, `-MatchToken=${serverToken}`, `-ExpectedPlayers=${expectedPlayers}`, `-Roster=${rosterArg}`, '-log'];
+    const args = [ds.map, `-port=${port}`, `-MatchId=${matchId}`, `-MatchToken=${serverToken}`, `-ExpectedPlayers=${expectedPlayers}`, `-Roster=${rosterArg}`];
+    if (bots.length > 0)
+    {
+        const botsArg = bots.map((b) => `${b.userId}:${Buffer.from(b.nickname, 'utf8').toString('base64')}`).join(';');
+        args.push(`-Bots=${botsArg}`);
+    }
+    args.push('-log');
     const child = spawn(ds.exePath, args, { stdio: 'ignore', windowsHide: false });
 
     const killTimer = setTimeout(() =>

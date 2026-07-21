@@ -37,6 +37,12 @@ export const config = Object.freeze({
         scoreFloor:      asNumber('MATCH_SCORE_FLOOR', 100),   // 점수 하한
         scoreCeiling:    asNumber('MATCH_SCORE_CEILING', 5000), // 점수 상한
         leaverPenalty:   asNumber('MATCH_LEAVER_PENALTY', 30), // 탈주 시 최하위 배점에 더해질 추가 감점(양수=감점폭)
+        // 봇전(Bot-Fill): 이 시간 넘게 매치가 안 잡힌 유저를 봇 3명과 즉시 게임에 투입. 봇 점수는 플레이어 ± spread.
+        botFill: Object.freeze({
+            enabled:      process.env.MATCH_BOT_FILL_ENABLED !== 'false', // 기본 on, MATCH_BOT_FILL_ENABLED=false로 차단
+            waitMs:       asNumber('MATCH_BOT_FILL_MS', 30_000),  // 대기 임계(넘으면 봇전)
+            ratingSpread: asNumber('MATCH_BOT_RATING_SPREAD', 100), // 봇 점수 = 플레이어 점수 ± 이 폭(랜덤)
+        }),
         // ds.enabled=false면 아래 stub 주소 사용(봇/알고리즘 테스트 경로 보존).
         stubServer: Object.freeze({
             host: process.env.MATCH_STUB_HOST || '127.0.0.1',

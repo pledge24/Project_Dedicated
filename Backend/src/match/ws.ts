@@ -14,11 +14,12 @@ import * as jwtUtil from '../common/jwt.js';
 import { logger } from '../common/logger.js';
 import { getCurrentTokenVersion, onSuperseded } from '../common/session.js';
 import type { AuthedUser } from '../common/types.js';
+import { makeBotOpponents } from './bots.js';
 import * as ds from './ds.js';
 import * as dsApiState from './dsApi.state.js';
 import * as service from './matchmaking.service.js';
 import type { ClientMessage, ServerMessage, ServerMessageType } from './protocol.js';
-import type { MatchGroup } from './queue.js';
+import type { MatchGroup, QueueEntry } from './queue.js';
 import * as roster from './roster.js';
 
 const WS_PATH = '/ws/match';
@@ -314,10 +315,15 @@ function onConnection(wss: WebSocketServer, ws: WebSocket, user: AuthedUser): vo
 function runMatchCycle(): void
 {
     // runMatching이 매칭 즉시 큐에서 제거하므로, 비동기 할당 중 재매칭 위험은 없다.
-    const groups = service.runMatching(Date.now());
+    const { groups, botFills } = service.runMatching(Date.now());
     for (const group of groups)
     {
         void handleMatch(group);
+    }
+    // 장기 대기자는 봇 3명과 즉시 게임 투입(봇전).
+    for (const entry of botFills)
+    {
+        void handleBotMatch(entry);
     }
 }
 
@@ -405,4 +411,76 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
         send(p.ref, { type: 'match:found', ok: true, data: { ...data, joinToken: p.joinToken } });
     }
     logger.info({ matchId, server, players: joinPlayers.map((p) => p.userId) }, '매치 성사');
+}
+
+/**
+ * 봇전 처리: 장기 대기 유저 1명 + 봇(playersPerMatch-1)명. 봇은 소켓·토큰 없이 DS가 서버측 스폰한다.
+ * 봇은 roster에 sentinel userId·rating으로 등록 → 결과 저장 시 ELO엔 포함되나 DB write는 실제 유저만.
+ * handleMatch의 확정 창 방어(부팅 중 끊김/취소)를 소켓 1개 기준으로 축약해 미러한다.
+ */
+async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
+{
+    const matchId = randomUUID();
+    const serverToken = randomBytes(24).toString('base64url');
+    const joinToken = randomBytes(16).toString('base64url');
+    const bots = makeBotOpponents(entry.score, config.match.playersPerMatch - 1,
+        config.match.botFill.ratingSpread, config.match.scoreFloor, config.match.scoreCeiling);
+
+    service.beginFormation([entry.userId]);
+
+    // 1) 스폰 전: 이미 닫힌 소켓이면 취소.
+    if (entry.ref.readyState !== WebSocket.OPEN)
+    {
+        service.endFormation([entry.userId]);
+        logger.warn({ matchId, userId: entry.userId }, '봇전 확정 전 소켓 종료 — 취소');
+
+        return;
+    }
+
+    // 2) 봇전을 실행할 DS spawn(또는 stub). ExpectedPlayers=총원(휴먼+봇). 봇은 -Bots=로만 전달.
+    let server: { host: string; port: number };
+    try
+    {
+        server = config.match.ds.enabled
+            ? await ds.allocate(matchId, serverToken, config.match.playersPerMatch,
+                [{ joinToken, userId: entry.userId, nickname: entry.nickname }],
+                bots.map((b) => ({ userId: b.userId, nickname: b.nickname })))
+            : config.match.stubServer;
+    }
+    catch (err)
+    {
+        logger.error({ err, matchId }, '봇전 DS 할당 실패 — 취소');
+        service.endFormation([entry.userId]);
+        sendError(entry.ref, 'error', Codes.INTERNAL_ERROR, '게임 서버 할당에 실패했습니다.');
+
+        return;
+    }
+
+    // 3) 부팅(≈5s) 사이 끊김/재접속/취소 포착. 이탈 시 스폰한 DS 회수 + 생존 시 재큐.
+    if (!service.isInFormation(entry.userId) || entry.ref.readyState !== WebSocket.OPEN)
+    {
+        if (config.match.ds.enabled)
+        {
+            ds.release(server.port);
+        }
+        const requeued = service.abortFormation([entry]);
+        logger.warn({ matchId, userId: entry.userId, requeued }, '봇전 확정 창 이탈 — DS 회수');
+
+        return;
+    }
+
+    // 4) 성사 확정: roster 등록(휴먼 + 봇) → 휴먼에 match:found.
+    service.endFormation([entry.userId]);
+    roster.register({
+        matchId,
+        serverToken,
+        mapName: config.match.ds.map,
+        startedAt: Date.now(),
+        players: [
+            { userId: entry.userId, nickname: entry.nickname, joinToken },
+            ...bots.map((b) => ({ userId: b.userId, nickname: b.nickname, joinToken: '', bot: true, rating: b.rating })),
+        ],
+    });
+    send(entry.ref, { type: 'match:found', ok: true, data: { matchId, server: { host: server.host, port: server.port }, joinToken } });
+    logger.info({ matchId, server, userId: entry.userId, bots: bots.length }, '봇전 성사');
 }

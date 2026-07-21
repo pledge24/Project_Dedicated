@@ -9,7 +9,9 @@ export interface RosterPlayer
 {
     userId: number;
     nickname: string;
-    joinToken: string;      // 매치별 1회용 입장 토큰. DS가 ?join= 으로 받은 토큰을 이 신원에 매핑.
+    joinToken: string;      // 매치별 1회용 입장 토큰. DS가 ?join= 으로 받은 토큰을 이 신원에 매핑. 봇은 빈 문자열.
+    bot?: boolean;          // 봇전 봇 좌석(DB 미존재). true면 결과 저장 시 프로필/participants 기록 skip.
+    rating?: number;        // 봇 ELO 입력 점수(백엔드 소유). 봇에만 존재.
 }
 
 /** 매치된 게임의 플레이어 명단(roster) */

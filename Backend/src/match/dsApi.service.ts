@@ -43,6 +43,9 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
             placement: r.placement,
             livesLeft: r.livesLeft,
             left,
+            // 봇전 봇: DB 미존재라 프로필/participants 기록 skip, ELO 입력엔 roster의 rating 사용.
+            bot: rp.bot ?? false,
+            rating: rp.rating,
             // 이미 즉시 정산된 탈주자면 그 값을 넘겨 결과 저장 시 프로필 중복 갱신을 막는다.
             settled: left ? state.getSettled(req.matchId, r.userId) : undefined,
         };
@@ -57,7 +60,7 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
             endedAt: new Date(),
             durationSec: req.durationSec,
             endReason: req.endReason,
-            winnerUserId: soleWinner(req.results),
+            winnerUserId: resolveWinner(roster.players, req.results),
             participants,
         });
 
@@ -152,4 +155,17 @@ function soleWinner(results: MatchResultRequest['results']): number | null
     const firsts = results.filter((r) => r.placement === 1);
 
     return firsts.length === 1 ? firsts[0].userId : null;
+}
+
+/** matches.winner_user_id 값 — 단독 1위 userId. 승자가 봇전 봇이면 null(FK는 실제 유저만 참조). */
+function resolveWinner(players: rosters.RosterPlayer[], results: MatchResultRequest['results']): number | null
+{
+    const winner = soleWinner(results);
+    if (winner === null)
+    {
+        return null;
+    }
+    const rp = players.find((p) => p.userId === winner);
+
+    return rp && rp.bot ? null : winner;
 }

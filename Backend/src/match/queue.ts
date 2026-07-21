@@ -138,6 +138,22 @@ export class MatchQueue<Ref = unknown>
         return matches;
     }
 
+    /**
+     * 봇전(Bot-Fill) 대상 수집 — thresholdMs 넘게 대기한 미매칭 엔트리를 큐에서 빼서 반환.
+     * runCycle(실 매칭) 다음에 호출한다: 실 매칭이 항상 우선, 남은 장기 대기자만 봇전으로 넘긴다.
+     */
+    collectBotFillTimeouts(now: number, thresholdMs: number): QueueEntry<Ref>[]
+    {
+        const timedOut = this.entries.filter((e) => now - e.joinedAt >= thresholdMs);
+        if (timedOut.length > 0)
+        {
+            const ids = new Set(timedOut.map((e) => e.userId));
+            this.entries = this.entries.filter((e) => !ids.has(e.userId));
+        }
+
+        return timedOut;
+    }
+
     /** 디버그/테스트용 스냅샷(읽기 전용). */
     snapshot(): ReadonlyArray<QueueEntry<Ref>>
     {

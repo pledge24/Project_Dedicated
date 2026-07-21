@@ -2,6 +2,7 @@
 // 실행: npm run match:sim  (전부 PASS여야 머지 — CLAUDE.md '알고리즘은 테스트 도구로 검증 후 머지')
 import assert from 'node:assert/strict';
 
+import { makeBotOpponents } from '../src/match/bots.js';
 import { selectRequeue } from '../src/match/formation.js';
 import { MatchQueue } from '../src/match/queue.js';
 import type { MatchQueueParams } from '../src/match/queue.js';
@@ -179,6 +180,47 @@ const scenarios: Array<[string, () => void]> = [
         assert.equal(m.length, 1);
         assert.deepEqual(idsOf(m[0]), [2, 3, 4, 5]); // seq 5,10,20,30 선택
         assert.equal(q.snapshot()[0].userId, 1);      // seq 40 잔류
+    }],
+
+    ['봇전 수집 — 임계 넘은 엔트리만 큐에서 빠지고 반환, 미만은 잔류', () =>
+    {
+        const q = makeQueue();
+        add(q, 1, 1000, 0);      // 대기 30s (t=30000에서 임계 도달)
+        add(q, 2, 1000, 20_000); // 대기 10s (미만)
+        const timedOut = q.collectBotFillTimeouts(30_000, 30_000);
+        assert.deepEqual(timedOut.map((e) => e.userId), [1]);
+        assert.equal(q.size, 1);
+        assert.equal(q.snapshot()[0].userId, 2); // 임계 미만은 큐 잔류
+    }],
+
+    ['봇전 수집 — 실 매칭 우선(runCycle 먼저): 매치된 인원은 봇전 대상서 제외', () =>
+    {
+        const q = makeQueue();
+        for (let i = 1; i <= 4; i++) { add(q, i, 1000, 0); }
+        add(q, 5, 4000, 0); // 고립 아웃라이어(윈도우 밖) — 못 묶임
+        assert.equal(q.runCycle(60_000).length, 1); // 1~4 매치되어 큐에서 제거
+        const timedOut = q.collectBotFillTimeouts(60_000, 30_000);
+        assert.deepEqual(timedOut.map((e) => e.userId), [5]); // 남은 아웃라이어만 봇전
+        assert.equal(q.size, 0);
+    }],
+
+    ['makeBotOpponents — sentinel 음수 userId·닉네임·clamp된 rating(주입 rand로 결정론)', () =>
+    {
+        const seq = [0.0, 0.5, 1.0, 0.0]; // start(name idx 0), offset i0=0, i1=+100, i2=-100
+        let k = 0;
+        const rand = (): number => seq[k++];
+        const bots = makeBotOpponents(1200, 3, 100, 100, 5000, rand);
+        assert.deepEqual(bots.map((b) => b.userId), [-1, -2, -3]);
+        assert.deepEqual(bots.map((b) => b.nickname), ['Bot Arden', 'Bot Luna', 'Bot Milo']);
+        assert.deepEqual(bots.map((b) => b.rating), [1200, 1300, 1100]);
+    }],
+
+    ['makeBotOpponents — floor/ceiling clamp', () =>
+    {
+        const low = makeBotOpponents(120, 1, 100, 100, 5000, () => 0); // offset=-100 → 20 → floor 100
+        assert.equal(low[0].rating, 100);
+        const high = makeBotOpponents(4950, 1, 100, 100, 5000, () => 1); // offset=+100 → 5050 → ceiling 5000
+        assert.equal(high[0].rating, 5000);
     }],
 ];
 

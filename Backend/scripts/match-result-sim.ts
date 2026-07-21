@@ -241,6 +241,71 @@ async function main(): Promise<void>
             assert.equal(after.get(zu[3].userId), before.get(zu[3].userId), '±0인데 score_updated_at이 바뀜');
             assert.notEqual(after.get(zu[0].userId), before.get(zu[0].userId), '실변동인데 score_updated_at이 안 바뀜');
         }],
+
+        ['봇전 — 완주자 4명(휴먼+봇3) ELO로 휴먼 반영, 봇은 DB 미기록', async () =>
+        {
+            const s = randomBytes(3).toString('hex');
+            const hu = (await seedUsers('bf', s, 1))[0]; // 1000점
+            const mid = `bf-${s}-${randomBytes(4).toString('hex')}`;
+            const stk = randomBytes(24).toString('base64url');
+            roster.register({
+                matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
+                players: [
+                    { userId: hu.userId, nickname: hu.nickname, joinToken: 'bfjoin' },
+                    { userId: -1, nickname: 'Bot Arden', joinToken: '', bot: true, rating: 1000 },
+                    { userId: -2, nickname: 'Bot Luna', joinToken: '', bot: true, rating: 1000 },
+                    { userId: -3, nickname: 'Bot Milo', joinToken: '', bot: true, rating: 1000 },
+                ],
+            });
+            const body = {
+                matchId: mid, mapName: MAP, durationSec: 90, endReason: 'winner',
+                results: [
+                    { userId: hu.userId, slotIndex: 0, placement: 1, livesLeft: 2 },
+                    { userId: -1, slotIndex: 1, placement: 2, livesLeft: 0 },
+                    { userId: -2, slotIndex: 2, placement: 3, livesLeft: 0 },
+                    { userId: -3, slotIndex: 3, placement: 4, livesLeft: 0 },
+                ],
+            };
+            const r = await post('/api/match/result', body, stk);
+            assert.equal(r.status, 200, JSON.stringify(r.body));
+
+            // 응답·DB엔 실제 유저만. 봇은 어디에도 기록 안 됨.
+            const ps = r.body.data!.participants as Array<{ userId: number; scoreDelta: number; scoreAfter: number }>;
+            assert.equal(ps.length, 1, `봇전 응답은 실제 유저 1명이어야 함(실제 ${ps.length})`);
+            assert.equal(ps[0].userId, hu.userId);
+            assert.ok(ps[0].scoreDelta > 0, `1위 휴먼 delta=${ps[0].scoreDelta} 양수 아님(봇3 대상 ELO+배점)`);
+            assert.equal(await countParticipants(mid), 1, '봇전 match_participants는 휴먼 1행이어야 함');
+            assert.equal((await selectScore([hu.userId])).get(hu.userId), 1000 + ps[0].scoreDelta, '휴먼 프로필 점수 미반영');
+        }],
+
+        ['봇전 — 봇 단독승이면 winner_user_id NULL(FK 보호)', async () =>
+        {
+            const s = randomBytes(3).toString('hex');
+            const hu = (await seedUsers('bw', s, 1))[0];
+            const mid = `bw-${s}-${randomBytes(4).toString('hex')}`;
+            const stk = randomBytes(24).toString('base64url');
+            roster.register({
+                matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
+                players: [
+                    { userId: hu.userId, nickname: hu.nickname, joinToken: 'bwjoin' },
+                    { userId: -1, nickname: 'Bot Arden', joinToken: '', bot: true, rating: 1000 },
+                    { userId: -2, nickname: 'Bot Luna', joinToken: '', bot: true, rating: 1000 },
+                    { userId: -3, nickname: 'Bot Milo', joinToken: '', bot: true, rating: 1000 },
+                ],
+            });
+            const body = {
+                matchId: mid, mapName: MAP, durationSec: 90, endReason: 'winner',
+                results: [
+                    { userId: hu.userId, slotIndex: 0, placement: 2, livesLeft: 0 },
+                    { userId: -1, slotIndex: 1, placement: 1, livesLeft: 3 }, // 봇 단독 1위
+                    { userId: -2, slotIndex: 2, placement: 3, livesLeft: 0 },
+                    { userId: -3, slotIndex: 3, placement: 4, livesLeft: 0 },
+                ],
+            };
+            const r = await post('/api/match/result', body, stk);
+            assert.equal(r.status, 200, JSON.stringify(r.body));
+            assert.equal(await selectWinner(mid), null, '봇 단독승인데 winner_user_id가 NULL 아님');
+        }],
     ];
 
     let failed = 0;
@@ -324,6 +389,28 @@ async function selectScore(userIds: number[]): Promise<Map<number, number>>
     }
 
     return result;
+}
+
+/** 해당 매치(client_match_id)의 match_participants 행 수 — 봇전에서 봇 미기록 검증용. */
+async function countParticipants(matchId: string): Promise<number>
+{
+    const [rows] = await getPool().query<RowDataPacket[]>(
+        'SELECT COUNT(*) AS n FROM match_participants mp JOIN matches m ON mp.match_id = m.id WHERE m.client_match_id = ?',
+        [matchId]
+    );
+
+    return Number(rows[0].n);
+}
+
+/** 해당 매치의 winner_user_id(NULL이면 null) — 봇 단독승 보정 검증용. */
+async function selectWinner(matchId: string): Promise<number | null>
+{
+    const [rows] = await getPool().query<RowDataPacket[]>(
+        'SELECT winner_user_id FROM matches WHERE client_match_id = ?',
+        [matchId]
+    );
+
+    return rows.length > 0 && rows[0].winner_user_id !== null ? Number(rows[0].winner_user_id) : null;
 }
 
 /** 여러 유저의 match_participants.abandoned(=left) 플래그 조회(각 유저가 매치 1개뿐인 시나리오 전제). */

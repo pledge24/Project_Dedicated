@@ -18,6 +18,8 @@ export interface SaveResultParticipant
     placement: number;
     livesLeft: number;
     left: boolean;                // 게임중 다른 기기 로그인으로 kick된 탈주자(전원 꼴등, 최하위 확정값)
+    bot?: boolean;                // 봇전 봇(DB 미존재). ELO 입력엔 포함, 프로필/participants 기록은 skip.
+    rating?: number;              // 봇 ELO 입력 점수(백엔드 소유). 봇에만 존재.
     settled?: SettledLeaver;      // kick 시점에 즉시 정산됨 → 프로필 재갱신 skip, 저장값 재사용
 }
 
@@ -79,20 +81,28 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
         const matchDbId = matchRes.insertId;
 
         // 탈주자(left)와 완주자를 분리. ELO는 완주자끼리만, 탈주자는 이미 확정된 값 재사용(프로필 skip).
+        // 완주자 중 봇전 봇은 DB에 없어 프로필 잠금·기록에서 제외하되, ELO 입력엔 포함(플레이어 delta가 4인전과 동일).
         const finishers = input.participants.filter((p) => !p.left);
-        const leavers = input.participants.filter((p) => p.left);
+        const realFinishers = finishers.filter((p) => !p.bot);
+        const leavers = input.participants.filter((p) => p.left); // 봇은 탈주 안 함(전부 실제 유저)
 
         const rows: ComputedRow[] = [];
 
-        // ── 완주자: 현재 점수 잠그고 완주자끼리 FFA ELO ──
+        // ── 완주자: 실제 유저 점수는 잠가서 재조회, 봇은 주입 rating. FFA ELO는 완주자 전원으로 계산 ──
         if (finishers.length > 0)
         {
-            const profileByUser = await lockAndFetchProfiles(conn, finishers.map((p) => p.userId));
-            const ratings = finishers.map((p) => profileByUser.get(p.userId)!.score);
+            const profileByUser = realFinishers.length > 0
+                ? await lockAndFetchProfiles(conn, realFinishers.map((p) => p.userId))
+                : new Map<number, { score: number; exp: number }>();
+            const ratings = finishers.map((p) => (p.bot ? p.rating! : profileByUser.get(p.userId)!.score));
             const placements = finishers.map((p) => p.placement);
             const deltas = computeFfaEloDeltas(ratings, placements, config.match.eloK);
             finishers.forEach((p, i) =>
             {
+                if (p.bot)
+                {
+                    return; // 봇: 점수 누적처 없음 → row 생성·프로필 갱신 안 함(delta는 계산에만 기여)
+                }
                 const c = computeParticipantResult(p.placement, ratings[i], deltas[i],
                     config.match.scoreFloor, config.match.scoreCeiling, profileByUser.get(p.userId)!.exp);
                 rows.push({ p, c, updateProfile: true });
