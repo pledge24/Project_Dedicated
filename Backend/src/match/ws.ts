@@ -20,6 +20,7 @@ import * as dsApiState from './dsApi.state.js';
 import * as service from './matchmaking.service.js';
 import type { ClientMessage, ServerMessage, ServerMessageType } from './protocol.js';
 import type { MatchGroup, QueueEntry } from './queue.js';
+import * as readiness from './readiness.js';
 import * as roster from './roster.js';
 
 const WS_PATH = '/ws/match';
@@ -357,12 +358,12 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
         return;
     }
 
-    // 2) 매치를 실행할 DS를 spawn(또는 stub). 할당 실패는 복구 불가라 error 전송.
+    // 2) 매치를 실행할 DS를 spawn(또는 stub). 할당 실패(포트 고갈)는 복구 불가라 error 전송.
     let server: { host: string; port: number };
     try
     {
         server = config.match.ds.enabled
-            ? await ds.allocate(matchId, serverToken, group.entries.length,
+            ? ds.allocate(matchId, serverToken, group.entries.length,
                 joinPlayers.map((p) => ({ joinToken: p.joinToken, userId: p.userId, nickname: p.nickname })))
             : config.match.stubServer;
     }
@@ -378,22 +379,7 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
         return;
     }
 
-    // 3) 부팅(≈5s) 사이 끊김/재접속/취소 포착(userId 기준). 하나라도 이탈 시 스폰한 DS 회수 + 생존자 재큐.
-    if (group.entries.some((e) => !service.isInFormation(e.userId) || e.ref.readyState !== WebSocket.OPEN))
-    {
-        if (config.match.ds.enabled)
-        {
-            ds.release(server.port);
-        }
-        const requeued = service.abortFormation(group.entries);
-        logger.warn({ matchId, requeued }, '확정 창 이탈 — DS 회수, 생존자 재큐');
-
-        return;
-    }
-
-    // 4) 성사 확정: formation 종료 → roster 등록 → 각 클라에 본인 입장 토큰만 실어 push.
-    service.endFormation(userIds);
-    const { data } = service.buildMatchFound(group, matchId, server);
+    // 3) roster 등록을 spawn 직후로 앞당김 — DS의 ready 콜백을 assertServerToken으로 인증하려면 명단이 있어야 함.
     roster.register({
         matchId,
         serverToken,
@@ -405,7 +391,44 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
             joinToken: p.joinToken,
         })),
     });
-    // 각 클라에 본인 입장 토큰만 실어 보낸다.
+
+    // 4) DS가 "플레이어 받을 준비됨"을 통지할 때까지 대기(상한 readyTimeoutMs). 타임아웃/부팅 실패 시 회수 + 생존자 재큐.
+    if (config.match.ds.enabled)
+    {
+        try
+        {
+            await readiness.waitForReady(matchId, config.match.ds.readyTimeoutMs);
+        }
+        catch (err)
+        {
+            ds.release(server.port);
+            roster.remove(matchId);
+            dsApiState.clear(matchId);
+            const requeued = service.abortFormation(group.entries);
+            logger.warn({ err, matchId, requeued }, 'DS 준비 실패/타임아웃 — DS 회수, 생존자 재큐');
+
+            return;
+        }
+    }
+
+    // 5) 준비 대기 사이 끊김/재접속/취소 포착(userId 기준). 하나라도 이탈 시 DS 회수 + roster 제거 + 생존자 재큐.
+    if (group.entries.some((e) => !service.isInFormation(e.userId) || e.ref.readyState !== WebSocket.OPEN))
+    {
+        if (config.match.ds.enabled)
+        {
+            ds.release(server.port);
+        }
+        roster.remove(matchId);
+        dsApiState.clear(matchId);
+        const requeued = service.abortFormation(group.entries);
+        logger.warn({ matchId, requeued }, '확정 창 이탈 — DS 회수, 생존자 재큐');
+
+        return;
+    }
+
+    // 6) 성사 확정: formation 종료 → 각 클라에 본인 입장 토큰만 실어 push(roster는 3)에서 이미 등록).
+    service.endFormation(userIds);
+    const { data } = service.buildMatchFound(group, matchId, server);
     for (const p of joinPlayers)
     {
         send(p.ref, { type: 'match:found', ok: true, data: { ...data, joinToken: p.joinToken } });
@@ -442,7 +465,7 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
     try
     {
         server = config.match.ds.enabled
-            ? await ds.allocate(matchId, serverToken, config.match.playersPerMatch,
+            ? ds.allocate(matchId, serverToken, config.match.playersPerMatch,
                 [{ joinToken, userId: entry.userId, nickname: entry.nickname }],
                 bots.map((b) => ({ userId: b.userId, nickname: b.nickname })))
             : config.match.stubServer;
@@ -456,21 +479,7 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
         return;
     }
 
-    // 3) 부팅(≈5s) 사이 끊김/재접속/취소 포착. 이탈 시 스폰한 DS 회수 + 생존 시 재큐.
-    if (!service.isInFormation(entry.userId) || entry.ref.readyState !== WebSocket.OPEN)
-    {
-        if (config.match.ds.enabled)
-        {
-            ds.release(server.port);
-        }
-        const requeued = service.abortFormation([entry]);
-        logger.warn({ matchId, userId: entry.userId, requeued }, '봇전 확정 창 이탈 — DS 회수');
-
-        return;
-    }
-
-    // 4) 성사 확정: roster 등록(휴먼 + 봇) → 휴먼에 match:found.
-    service.endFormation([entry.userId]);
+    // 3) roster 등록(휴먼 + 봇)을 spawn 직후로 앞당김 — DS의 ready 콜백 인증(assertServerToken)에 명단 필요.
     roster.register({
         matchId,
         serverToken,
@@ -481,6 +490,43 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
             ...bots.map((b) => ({ userId: b.userId, nickname: b.nickname, joinToken: '', bot: true, rating: b.rating })),
         ],
     });
+
+    // 4) DS 준비 통지 대기. 타임아웃/부팅 실패 시 DS 회수 + roster 제거 + 휴먼 재큐.
+    if (config.match.ds.enabled)
+    {
+        try
+        {
+            await readiness.waitForReady(matchId, config.match.ds.readyTimeoutMs);
+        }
+        catch (err)
+        {
+            ds.release(server.port);
+            roster.remove(matchId);
+            dsApiState.clear(matchId);
+            const requeued = service.abortFormation([entry]);
+            logger.warn({ err, matchId, userId: entry.userId, requeued }, '봇전 DS 준비 실패/타임아웃 — DS 회수');
+
+            return;
+        }
+    }
+
+    // 5) 준비 대기 사이 끊김/재접속/취소 포착. 이탈 시 DS 회수 + roster 제거 + 생존 시 재큐.
+    if (!service.isInFormation(entry.userId) || entry.ref.readyState !== WebSocket.OPEN)
+    {
+        if (config.match.ds.enabled)
+        {
+            ds.release(server.port);
+        }
+        roster.remove(matchId);
+        dsApiState.clear(matchId);
+        const requeued = service.abortFormation([entry]);
+        logger.warn({ matchId, userId: entry.userId, requeued }, '봇전 확정 창 이탈 — DS 회수');
+
+        return;
+    }
+
+    // 6) 성사 확정: 휴먼에 match:found(roster는 3)에서 이미 등록).
+    service.endFormation([entry.userId]);
     send(entry.ref, { type: 'match:found', ok: true, data: { matchId, server: { host: server.host, port: server.port }, joinToken } });
     logger.info({ matchId, server, userId: entry.userId, bots: bots.length }, '봇전 성사');
 }

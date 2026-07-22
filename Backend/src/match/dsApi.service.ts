@@ -4,6 +4,7 @@ import { isDuplicateKeyError } from '../common/db.js';
 import { AppError, Codes } from '../common/errors.js';
 import type { MatchResultRequest, MatchResultResponse } from '../common/types.js';
 import * as state from './dsApi.state.js';
+import * as readiness from './readiness.js';
 import * as repo from './result.repository.js';
 import * as rosters from './roster.js';
 
@@ -21,6 +22,16 @@ function assertServerToken(serverToken: string, matchId: string): rosters.MatchR
     }
 
     return roster;
+}
+
+/**
+ * DS 통지(POST /ready): 서버 토큰 검증 후 준비 대기 gate를 resolve(멱등).
+ * 확정 후 재전송은 roster가 남아있어 통과 + signal no-op → 200. 취소/타임아웃 후엔 roster 제거돼 404(늦은 DS에 "이미 늦음").
+ */
+export function markServerReady(serverToken: string, matchId: string): void
+{
+    assertServerToken(serverToken, matchId);
+    readiness.signal(matchId);
 }
 
 /** 서버 토큰을 검증하고 결과를 기록한다. 실패 케이스별 AppError를 throw. */

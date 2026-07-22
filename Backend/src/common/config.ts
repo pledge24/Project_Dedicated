@@ -56,7 +56,7 @@ export const config = Object.freeze({
             host:          process.env.MATCH_DS_HOST || '127.0.0.1',
             portMin:       asNumber('MATCH_DS_PORT_MIN', 7777),
             portMax:       asNumber('MATCH_DS_PORT_MAX', 7787),
-            bootDelayMs:   asNumber('MATCH_DS_BOOT_DELAY_MS', 5000),  // UDP라 TCP 프로브 불가 → 고정 부팅 지연
+            readyTimeoutMs: asNumber('MATCH_DS_READY_TIMEOUT_MS', 30_000),  // DS가 준비 콜백(POST /ready)을 보낼 상한. 최악 콜드부팅보다 넉넉해야 함
             maxLifetimeMs: asNumber('MATCH_DS_MAX_LIFETIME_MS', 900_000), // 15분 후 강제 회수
         }),
     }),

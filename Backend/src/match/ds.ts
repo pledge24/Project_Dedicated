@@ -1,11 +1,12 @@
 // 매치당 Dedicated Server 프로세스 할당자. config.match.ds로 제어.
-// 매치 성사 시 D1Server.exe를 빈 포트로 spawn → 고정 부팅 지연 후 주소 반환. 종료 시 전부 kill.
+// 매치 성사 시 D1Server.exe를 빈 포트로 spawn 후 즉시 주소 반환(준비 완료는 DS의 ready 콜백으로 대기). 종료 시 전부 kill.
 // Windows 전용: 루트 D1Server.exe가 실제 서버를 자식으로 spawn하므로 kill은 taskkill /T(트리)로 한다.
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 
 import { config } from '../common/config.js';
 import { logger } from '../common/logger.js';
+import * as readiness from './readiness.js';
 
 interface DsProcess
 {
@@ -18,8 +19,8 @@ interface DsProcess
 const ds = config.match.ds;
 const running = new Map<number, DsProcess>(); // port → 프로세스
 
-/** 빈 포트에 DS spawn → bootDelay 후 {host, port}. 포트 고갈/부팅 실패 시 throw. */
-export async function allocate(matchId: string, serverToken: string, expectedPlayers: number, roster: { joinToken: string; userId: number; nickname: string }[], bots: { userId: number; nickname: string }[] = []): Promise<{ host: string; port: number }>
+/** 빈 포트에 DS spawn → 즉시 {host, port}. 준비 완료는 호출측이 readiness로 대기. 포트 고갈 시 throw. */
+export function allocate(matchId: string, serverToken: string, expectedPlayers: number, roster: { joinToken: string; userId: number; nickname: string }[], bots: { userId: number; nickname: string }[] = []): { host: string; port: number }
 {
     const port = pickFreePort();
     if (port === null)
@@ -66,24 +67,20 @@ export async function allocate(matchId: string, serverToken: string, expectedPla
             clearTimeout(cur.killTimer);
             running.delete(port);
         }
+        // 준비 콜백 전에 죽었으면(부팅 중 크래시) 대기 중인 매치를 즉시 실패시켜 타임아웃까지 안 기다림.
+        // 확정/정상종료된 매치는 gate가 이미 소비돼 no-op.
+        readiness.fail(matchId, `DS 프로세스 종료(code=${code}, port=${port})`);
         logger.info({ port, matchId, code }, 'DS 프로세스 종료');
     });
 
     child.on('error', (err) =>
     {
         logger.error({ err, port, matchId, exePath: ds.exePath }, 'DS spawn 실패');
+        readiness.fail(matchId, `DS spawn 실패(port=${port})`);
         killProcess(port);
     });
 
-    // 예상 부팅 시간만큼 기다린 다음 클라한테 입장 패킷 전송.
-    logger.info({ port, matchId, map: ds.map }, 'DS spawn — 부팅 대기');
-    await delay(ds.bootDelayMs);
-
-    // 부팅 대기 중 죽었으면(spawn 실패/즉시 크래시) 실패 처리.
-    if (!running.has(port))
-    {
-        throw new Error(`DS가 부팅 중 종료됨 (port=${port})`);
-    }
+    logger.info({ port, matchId, map: ds.map }, 'DS spawn — 준비 콜백 대기');
 
     return { host: ds.host, port };
 }
@@ -112,14 +109,6 @@ export function runningCount(): number
 export function release(port: number): void
 {
     killProcess(port);
-}
-
-function delay(ms: number): Promise<void>
-{
-    return new Promise((resolve) =>
-    {
-        setTimeout(resolve, ms);
-    });
 }
 
 function pickFreePort(): number | null

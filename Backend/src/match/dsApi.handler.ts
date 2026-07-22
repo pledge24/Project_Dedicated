@@ -25,6 +25,18 @@ export async function submitResult(req: Request, res: Response): Promise<void>
 }
 
 /**
+ * POST /api/match/:matchId/ready  (DS만)
+ * DS가 맵 빌드·초기화를 마치고 플레이어를 받을 준비가 됐음을 통지. 백엔드는 이걸 받고 클라에 match:found 전송.
+ */
+export function reportReady(req: Request, res: Response): void
+{
+    const serverToken = extractServerToken(req);
+    const matchId = typeof req.params.matchId === 'string' ? req.params.matchId : '';
+    service.markServerReady(serverToken, matchId);
+    res.json(ok({}));
+}
+
+/**
  * GET /api/match/:matchId/kicks  (DS만)
  * 이 매치에서 강제 회수(다른 기기 로그인)해야 할 userId 목록. DS가 5초 폴링해 kick한다.
  */

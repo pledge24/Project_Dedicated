@@ -12,6 +12,7 @@ const pollLimiter = makeRateLimiter(config.rateLimit.pollMax);
 const router = express.Router();
 
 router.post('/result', resultLimiter, handler.submitResult);
+router.post('/:matchId/ready', pollLimiter, handler.reportReady);
 router.get('/:matchId/kicks', pollLimiter, handler.getKicks);
 router.post('/:matchId/leaver', pollLimiter, handler.submitLeaver);
 

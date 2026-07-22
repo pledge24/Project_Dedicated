@@ -41,6 +41,15 @@ export function get(matchId: string): MatchRoster | undefined
 }
 
 /**
+ * 매치를 명단에서 즉시 제거. 준비 대기 중 취소(DS 준비 실패·확정창 이탈)로 미확정 매치를 버릴 때 사용.
+ * (확정된 매치는 결과 재제출 멱등 위해 sweep 전까지 유지 — 이 함수로 지우지 않는다.)
+ */
+export function remove(matchId: string): void
+{
+    rosters.delete(matchId);
+}
+
+/**
  * userId가 속한 활성 매치의 matchId. 없으면 undefined. (게임중 kick 역조회)
  * roster는 결과 재제출 멱등 위해 종료 후에도 남으므로(sweep 전까지), 삽입순 첫 매치를
  * 쓰면 스테일(끝난) 매치가 잡혀 kick이 죽은 매치로 간다. 단일세션이라 유저의 활성 매치는
