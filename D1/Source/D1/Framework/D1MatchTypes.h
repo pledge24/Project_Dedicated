@@ -35,3 +35,16 @@ struct FD1MatchResultEntry
 	UPROPERTY(BlueprintReadOnly, Category = "Match")
 	int32 LivesLeft = 0;
 };
+
+/** 게임중 탈주한 슬롯의 카드 표시용. GameState가 복제 → PS가 제거돼도 카드가 "탈주"를 매치 끝까지 유지. */
+USTRUCT(BlueprintType)
+struct FD1LeftPlayerCard
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Match")
+	int32 SlotIndex = -1;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Match")
+	FString Nickname;
+};

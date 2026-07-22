@@ -39,18 +39,26 @@ export function get(matchId: string): MatchRoster | undefined
     return rosters.get(matchId);
 }
 
-/** userId가 속한 활성 매치의 matchId. 없으면 undefined. (게임중 kick 표시용 역조회) */
+/**
+ * userId가 속한 활성 매치의 matchId. 없으면 undefined. (게임중 kick 역조회)
+ * roster는 결과 재제출 멱등 위해 종료 후에도 남으므로(sweep 전까지), 삽입순 첫 매치를
+ * 쓰면 스테일(끝난) 매치가 잡혀 kick이 죽은 매치로 간다. 단일세션이라 유저의 활성 매치는
+ * ≤1개 → 가장 최근(startedAt 최대) 성사분이 곧 현재 매치.
+ */
 export function findMatchByUser(userId: number): string | undefined
 {
+    let latestId: string | undefined;
+    let latestStartedAt = -1;
     for (const [id, r] of rosters)
     {
-        if (r.players.some((p) => p.userId === userId))
+        if (r.startedAt > latestStartedAt && r.players.some((p) => p.userId === userId))
         {
-            return id;
+            latestId = id;
+            latestStartedAt = r.startedAt;
         }
     }
 
-    return undefined;
+    return latestId;
 }
 
 export function size(): number

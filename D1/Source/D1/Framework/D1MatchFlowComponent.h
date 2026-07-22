@@ -9,6 +9,7 @@
 #include "Network/BackendTypes.h"
 #include "D1MatchFlowComponent.generated.h"
 
+class AController;
 class AD1BomberGameState;
 class AD1BomberPlayerState;
 
@@ -67,10 +68,13 @@ private:
 	FString CurrentMatchId;
 	FString CurrentMatchToken;
 
-//~ 강제 회수(게임중 다른 기기 로그인 kick)
+//~ 탈주 처리(게임중 kick·접속 끊김)
 public:
 	/** GameMode PreLogin 재입장 거절용 — 이미 kick된 유저인지. */
 	bool IsUserKicked(int64 UserId) const { return KickedUserIds.Contains(UserId); }
+
+	/** 서버 전용: GameMode::Logout이 호출. 매치 진행 중 이탈(끊김/나가기)을 탈주로 처리. */
+	void NotifyPlayerDisconnected(AController* Exiting);
 
 private:
 	/** 백엔드 kick 대기열을 주기 폴링(DS·토큰 있을 때만). */
@@ -78,8 +82,10 @@ private:
 	void StopKickPolling();
 	void PollKicks();
 	void HandleKickResponse(const FString& Body);
-	/** 대상 유저를 탈주 처리(최하위 캡처) + 클라 통지 + 필요 시 매치 종료. */
+	/** 대상 유저를 kick — 온라인이면 탈주 처리·통지, 종료 후면 통지만. */
 	void HandleKickUser(int64 UserId);
+	/** 탈주 공용부(최하위·SetLeft·GameState 슬롯기록·결과 캡처·즉시정산·종료체크). bNotifyClient=false면 클라 통지 생략(끊김). */
+	void ProcessLeaver(AD1BomberPlayerState* Target, bool bNotifyClient);
 
 	FTimerHandle KickPollTimerHandle;
 

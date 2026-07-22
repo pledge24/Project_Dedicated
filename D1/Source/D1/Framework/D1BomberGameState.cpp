@@ -30,6 +30,7 @@ void AD1BomberGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(AD1BomberGameState, MatchStartServerTime);
 	DOREPLIFETIME(AD1BomberGameState, MatchDurationSec);
 	DOREPLIFETIME(AD1BomberGameState, FinalResults);
+	DOREPLIFETIME(AD1BomberGameState, LeftPlayerCards);
 }
 
 void AD1BomberGameState::AddPlayerState(APlayerState* PlayerState)
@@ -106,6 +107,50 @@ TArray<AD1BomberPlayerState*> AD1BomberGameState::GetPlayerStatesBySlot() const
 void AD1BomberGameState::MarkPlayerCardsDirty()
 {
 	OnPlayerCardsDirty.Broadcast();
+}
+
+bool AD1BomberGameState::IsSlotLeft(int32 SlotIndex, FString& OutNickname) const
+{
+	for (const FD1LeftPlayerCard& Card : LeftPlayerCards)
+	{
+		if (Card.SlotIndex == SlotIndex)
+		{
+			OutNickname = Card.Nickname;
+			return true;
+		}
+	}
+
+	OutNickname.Reset();
+	return false;
+}
+
+void AD1BomberGameState::MarkSlotLeft(int32 SlotIndex, const FString& Nickname)
+{
+	if (!HasAuthority() || SlotIndex < 0)
+	{
+		return;
+	}
+
+	// 슬롯당 탈주 1회 — 재기록 방지.
+	const bool bAlready = LeftPlayerCards.ContainsByPredicate(
+		[SlotIndex](const FD1LeftPlayerCard& Card) { return Card.SlotIndex == SlotIndex; });
+	if (bAlready)
+	{
+		return;
+	}
+
+	FD1LeftPlayerCard Card;
+	Card.SlotIndex = SlotIndex;
+	Card.Nickname  = Nickname;
+	LeftPlayerCards.Add(Card);
+
+	// OnRep은 서버 자신에게 안 불림(리슨/DS) → 수동 호출로 카드 갱신.
+	OnRep_LeftPlayerCards();
+}
+
+void AD1BomberGameState::OnRep_LeftPlayerCards()
+{
+	MarkPlayerCardsDirty();
 }
 
 void AD1BomberGameState::SetFinalResults(const TArray<FD1MatchResultEntry>& InResults)

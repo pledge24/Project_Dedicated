@@ -323,6 +323,32 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 	}
 }
 
+void UD1MatchFlowComponent::NotifyPlayerDisconnected(AController* Exiting)
+{
+	if (!HasServerAuthority() || !Exiting)
+	{
+		return;
+	}
+
+	AD1BomberPlayerState* PS = Exiting->GetPlayerState<AD1BomberPlayerState>();
+	if (!PS)
+	{
+		return;
+	}
+
+	const int64 UserId = PS->GetBackendUserId();
+
+	// 봇·이미 탈주·이미 kick 처리·매치 미시작/종료는 제외 — 진행 중 실유저 이탈만 탈주로.
+	if (PS->IsBot() || PS->HasLeft() || UserId <= 0 || KickedUserIds.Contains(UserId)
+		|| !HasMatchStarted() || IsMatchEnded())
+	{
+		return;
+	}
+
+	KickedUserIds.Add(UserId); // 재입장 거절 + 중복 방지
+	ProcessLeaver(PS, /*bNotifyClient=*/false);
+}
+
 void UD1MatchFlowComponent::StartKickPolling()
 {
 	// 백엔드가 띄운 DS(토큰 보유)에서만 — PIE/standalone은 폴링 없음.
@@ -438,23 +464,38 @@ void UD1MatchFlowComponent::HandleKickUser(int64 UserId)
 		return;
 	}
 
-	AD1PlayerController* PC = Cast<AD1PlayerController>(Target->GetOwningController());
-
 	// 매치가 이미 끝났으면 결과는 확정 — 통지만(로그인 복귀).
 	if (IsMatchEnded())
 	{
-		if (PC)
+		if (AD1PlayerController* PC = Cast<AD1PlayerController>(Target->GetOwningController()))
 		{
 			PC->ClientNotifySessionSuperseded();
 		}
 		return;
 	}
 
+	ProcessLeaver(Target, /*bNotifyClient=*/true);
+}
+
+void UD1MatchFlowComponent::ProcessLeaver(AD1BomberPlayerState* Target, bool bNotifyClient)
+{
+	AD1BomberGameState* GS = GetBomberGameState();
+	if (!GS || !Target)
+	{
+		return;
+	}
+
+	const int64 UserId = Target->GetBackendUserId();
+
 	// 탈주 처리(사망과 별개). 전원 꼴등(정원 고정), 캐릭터 사라짐, 결과 캡처(Logout로 빠지기 전).
 	EnsureAliveListInitialized();
 	const int32 LastPlacement = FMath::Max(ExpectedPlayerCount, GS->PlayerArray.Num());
 	Target->SetPlacement(LastPlacement);
-	Target->SetLeft(); // bLeft 복제 → 캐릭터 사라짐 + 카드 "탈주" 표시
+	Target->SetLeft(); // bLeft 복제 → 캐릭터 사라짐 + 카드 "탈주"
+
+	// PS가 제거돼도(끊김/kick 후 disconnect) 카드가 "탈주"를 매치 끝까지 유지하도록 슬롯을 GameState에 복제 기록.
+	GS->MarkSlotLeft(Target->GetPlayerSlotIndex(), Target->GetPlayerName());
+
 	AlivePlayerStates.Remove(Target);
 
 	FMatchResultPlayer RP;
@@ -487,11 +528,14 @@ void UD1MatchFlowComponent::HandleKickUser(int64 UserId)
 		}
 	}
 
-	// 클라 통지(팝업 + 로그인 복귀) + 남은 시간 입력 차단.
-	if (PC)
+	// 클라 통지(팝업 + 로그인 복귀) + 남은 시간 입력 차단. 끊김(disconnect)은 이미 떠나 생략.
+	if (bNotifyClient)
 	{
-		PC->ClientNotifySessionSuperseded();
-		PC->DisableInput(PC);
+		if (AD1PlayerController* PC = Cast<AD1PlayerController>(Target->GetOwningController()))
+		{
+			PC->ClientNotifySessionSuperseded();
+			PC->DisableInput(PC);
+		}
 	}
 
 	UE_LOG(LogD1, Log, TEXT("[Match] 탈주 처리 userId=%lld placement=%d"), UserId, LastPlacement);

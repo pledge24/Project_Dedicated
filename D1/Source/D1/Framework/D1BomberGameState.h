@@ -93,9 +93,25 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Bomber|Events")
 	void MarkPlayerCardsDirty();
 
+	/** 슬롯이 탈주 상태면 true + 닉네임 반환. 카드가 PS 없는 슬롯을 "탈주"로 렌더. */
+	UFUNCTION(BlueprintPure, Category = "Bomber|Match")
+	bool IsSlotLeft(int32 SlotIndex, FString& OutNickname) const;
+
+	/** 서버 전용: 탈주 발생 시 슬롯 기록 → PS 제거 후에도 카드가 "탈주" 유지(복제). */
+	void MarkSlotLeft(int32 SlotIndex, const FString& Nickname);
+
 	/** UI 카드 재바인딩 필요 시점마다 방송. 컨테이너가 1회 구독 후 전체 재스캔. */
 	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
 	FOnPlayerCardsDirty OnPlayerCardsDirty;
+
+protected:
+	UFUNCTION()
+	void OnRep_LeftPlayerCards();
+
+private:
+	/** 탈주 슬롯 기록(복제). PS와 무관하게 카드가 "탈주"를 매치 끝까지 유지. */
+	UPROPERTY(ReplicatedUsing = OnRep_LeftPlayerCards)
+	TArray<FD1LeftPlayerCard> LeftPlayerCards;
 
 //~ 매치 종료·결과
 public:

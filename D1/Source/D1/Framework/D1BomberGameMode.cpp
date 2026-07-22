@@ -103,6 +103,15 @@ void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 
 void AD1BomberGameMode::Logout(AController* Exiting)
 {
+	// 매치 진행 중 이탈(접속 끊김/나가기)은 탈주로 처리 — Super가 PS를 제거하기 전에 캡처.
+	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
+	{
+		if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
+		{
+			Flow->NotifyPlayerDisconnected(Exiting);
+		}
+	}
+
 	// 떠난 플레이어가 점유했던 PlayerStart를 해제 → fallback(순번) 경로 슬롯 누수 방지.
 	// 권위 슬롯 경로에선 슬롯이 고정이라 no-op이어도 무방.
 	if (Exiting && Exiting->StartSpot.IsValid())
