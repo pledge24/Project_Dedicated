@@ -6,6 +6,7 @@
 #include "Animation/AnimSequenceBase.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/WidgetComponent.h"
 #include "EngineUtils.h"
 #include "EnhancedInputComponent.h"
@@ -13,6 +14,7 @@
 #include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 
 #include "Core/D1LogChannels.h"
@@ -72,6 +74,7 @@ void AD1BomberCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
 	RefreshPlayerStateBinding();	// PS -> Pawn 순으로 Replicate 된 경우.
+	RefreshLocalHighlight();		// 리슨 호스트 본인 폰 강조(서버 전용 경로).
 }
 
 void AD1BomberCharacter::BeginPlay()
@@ -84,6 +87,8 @@ void AD1BomberCharacter::BeginPlay()
 	{
 		OnPlayerStateReady();
 	}
+
+	RefreshLocalHighlight();	// 컨트롤러가 이미 세팅된 경우(스탠드얼론/PIE) 안전망.
 }
 
 void AD1BomberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -107,6 +112,12 @@ void AD1BomberCharacter::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
 	RefreshPlayerStateBinding();	// Pawn -> PS 순으로 Replicate 된 경우.
+}
+
+void AD1BomberCharacter::OnRep_Controller()
+{
+	Super::OnRep_Controller();
+	RefreshLocalHighlight();	// 소유 클라에 컨트롤러 복제 도착 시 강조 갱신.
 }
 
 void AD1BomberCharacter::DoMove(float Right, float Forward)
@@ -632,6 +643,25 @@ void AD1BomberCharacter::RefreshPlayerStateBinding()
 	if (PS->HasLeft())
 	{
 		OnPlayerLeftChanged();
+	}
+}
+
+void AD1BomberCharacter::RefreshLocalHighlight()
+{
+	// 렌더 없는 데디 서버는 스킵.
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+
+	// '내 캐릭터' = 로컬 PlayerController가 빙의한 폰. 봇(AIController)·원격 폰은 로컬 PC가 아니라 제외.
+	const APlayerController* PC = Cast<APlayerController>(GetController());
+	const bool bIsLocalPlayerPawn = PC && PC->IsLocalController();
+
+	UMaterialInterface* Overlay = bIsLocalPlayerPawn ? LocalHighlightMaterial.Get() : nullptr;
+	if (USkeletalMeshComponent* SK = GetMesh())
+	{
+		SK->SetOverlayMaterial(Overlay);
 	}
 }
 

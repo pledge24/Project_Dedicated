@@ -12,6 +12,7 @@ class UAnimMontage;
 class UAnimSequenceBase;
 class UInputAction;
 class UInputComponent;
+class UMaterialInterface;
 struct FInputActionValue;
 
 /** 봄버 캐릭터 — 이동·폭탄 설치·피격/무적/스턴·사망 연출. */
@@ -40,6 +41,7 @@ protected:
 	//~ Begin APawn Interface
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 	virtual void OnRep_PlayerState() override;
+	virtual void OnRep_Controller() override;
 	//~ End APawn Interface
 
 //~ 이동·입력
@@ -213,6 +215,15 @@ private:
 
 	/** 재바인딩 시 중복 방지·이전 핸들러 제거용. */
 	TWeakObjectPtr<AD1BomberPlayerState> PSWeakPtr;
+
+//~ 로컬 하이라이트 (내 캐릭터만 파란 테두리)
+private:
+	/** 로컬 플레이어 폰이면 오버레이 머티리얼 적용, 아니면 해제. 컨트롤러 확정마다 호출(멱등). */
+	void RefreshLocalHighlight();
+
+	/** 내 캐릭터 강조용 오버레이 머티리얼. BP에서 지정. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
+	TObjectPtr<UMaterialInterface> LocalHighlightMaterial;
 
 //~ 공용 헬퍼
 public:
