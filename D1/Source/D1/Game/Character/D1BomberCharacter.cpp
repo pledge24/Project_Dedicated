@@ -134,6 +134,13 @@ void AD1BomberCharacter::DoMove(float Right, float Forward)
 		return;
 	}
 
+	// 카운트다운 시작(Playing) 전·종료 후엔 이동 불가 → "이동 가능 == 게임 시작" 일치(폭탄 게이트와 동일).
+	const AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
+	if (GS && GS->MatchPhase != EBomberMatchPhase::Playing)
+	{
+		return;
+	}
+
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (PC && PC->PlayerCameraManager)
 	{

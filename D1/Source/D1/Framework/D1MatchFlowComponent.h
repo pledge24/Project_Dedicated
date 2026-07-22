@@ -53,6 +53,9 @@ public:
 private:
 	void EnsureAliveListInitialized();
 
+	/** 생존 중인 비봇(실제) 플레이어 수. 봇전에서 실유저 전원 이탈/사망 시 즉시 종료 판정용. */
+	int32 CountAliveRealPlayers() const;
+
 	UPROPERTY()
 	TArray<TObjectPtr<AD1BomberPlayerState>> AlivePlayerStates;
 

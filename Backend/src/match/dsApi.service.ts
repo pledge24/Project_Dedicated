@@ -66,6 +66,8 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
 
         // 매치 종료 — 이탈 채널 상태 정리(kick 대기열 + 정산 기록). 재제출은 멱등(409)이라 무해.
         state.clear(req.matchId);
+        // 결과 확정 표시 → 이후 도착한 /leaver 정산을 거부(이중 패널티 차단). roster는 sweep 전까지 유지.
+        roster.resultSubmitted = true;
 
         return {
             matchId: req.matchId,
@@ -102,6 +104,12 @@ export async function settleLeaver(serverToken: string, matchId: string, userId:
     if (!roster.players.some((p) => p.userId === userId))
     {
         throw new AppError(Codes.INVALID_RESULT, '매치에 속하지 않은 참가자입니다.');
+    }
+
+    // 결과 확정 후 도착한 탈주 정산은 무시(순서 역전·재시도 시 이중 패널티 차단).
+    if (roster.resultSubmitted)
+    {
+        return { scoreDelta: 0, scoreAfter: 0 };
     }
 
     // 이미 정산됐으면 그 값을 그대로 반환(DS 재시도·중복 폴링 방어).

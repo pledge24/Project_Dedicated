@@ -22,6 +22,7 @@ export interface MatchRoster
     mapName: string;
     startedAt: number;      // epoch ms
     players: RosterPlayer[];
+    resultSubmitted?: boolean; // 결과 저장 완료 표시. 이후 도착한 /leaver 정산을 거부(이중 패널티 차단). sweep로 회수.
 }
 
 /** 명단 모음 - 모든 매치의 명단이 이 곳에 저장된다(중요!) */
