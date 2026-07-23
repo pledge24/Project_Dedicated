@@ -47,14 +47,27 @@ private:
 
 //~ 사망·등수
 public:
-	/** 서버 전용: 사망 등록·등수 부여, 1명 남으면 매치 종료. PlayerState::ApplyHit이 GameState 경유로 호출. */
+	/** 서버 전용: 사망 기록. 등수·종료 판정은 다음 틱 배치 평가로 미룸. PlayerState::ApplyHit이 GameState 경유로 호출. */
 	void NotifyPlayerDied(AD1BomberPlayerState* DeadPS);
 
 private:
 	void EnsureAliveListInitialized();
+	/** 다음 틱 종료 평가 예약(중복 예약 방지). */
+	void RequestEndEvaluation();
+	/** 다음 틱 1회 실행: 배치 등수 확정 후 생존자 수로 종료 판정. */
+	void EvaluateEndCondition();
+	/** 대기 배치 전원에 공동 등수 부여 후 비움. 동시 사망 = 공동 등수. */
+	void FlushPendingDeaths();
 
 	UPROPERTY()
 	TArray<TObjectPtr<AD1BomberPlayerState>> AlivePlayerStates;
+
+	/** 이번 프레임에 사망 기록된 배치 — 다음 틱 평가에서 공동 등수 부여 후 비움. */
+	UPROPERTY()
+	TArray<TObjectPtr<AD1BomberPlayerState>> PendingDeadBatch;
+
+	/** 다음 틱 종료 평가 예약됨(프레임 내 다중 사망 → 평가 1회). */
+	bool bEndEvalPending = false;
 
 //~ 매치 종료·셧다운
 private:

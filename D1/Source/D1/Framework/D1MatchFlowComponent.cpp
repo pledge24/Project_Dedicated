@@ -167,21 +167,16 @@ void UD1MatchFlowComponent::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 
 	EnsureAliveListInitialized();
 
-	if (DeadPS->GetPlacement() <= 0)
+	// 기록만: 등수는 다음 틱 Flush에서 배치 단위로 부여(동시 사망 공동 등수).
+	if (DeadPS->GetPlacement() <= 0 && !PendingDeadBatch.Contains(DeadPS))
 	{
-		// 등수 = 죽는 시점의 생존자 수(자기 포함).
-		DeadPS->SetPlacement(AlivePlayerStates.Num());
 		AlivePlayerStates.Remove(DeadPS);
-		UE_LOG(LogD1, Log, TEXT("Player died: %s Placement=%d Remaining=%d"),
-			*DeadPS->GetPlayerName(), DeadPS->GetPlacement(), AlivePlayerStates.Num());
+		PendingDeadBatch.Add(DeadPS);
+		UE_LOG(LogD1, Log, TEXT("Player died (pending): %s Remaining=%d Batch=%d"),
+			*DeadPS->GetPlayerName(), AlivePlayerStates.Num(), PendingDeadBatch.Num());
 	}
 
-	if (AlivePlayerStates.Num() <= 1)
-	{
-		const bool bHasSurvivor = AlivePlayerStates.Num() == 1;
-		AD1BomberPlayerState* Winner = bHasSurvivor ? AlivePlayerStates[0].Get() : DeadPS;
-		EndMatchWithWinner(Winner, bHasSurvivor ? EBomberEndReason::Winner : EBomberEndReason::Draw);
-	}
+	RequestEndEvaluation();
 }
 
 void UD1MatchFlowComponent::EnsureAliveListInitialized()
@@ -203,12 +198,68 @@ void UD1MatchFlowComponent::EnsureAliveListInitialized()
 		{
 			// ApplyHit가 NotifyPlayerDied보다 먼저 bIsAlive를 꺼서, 첫 사망자가
 			// 누락되면 등수가 1 모자람. 미랭크(Placement<=0) 기준으로 전원 포함.
-			if (BPS->GetPlacement() <= 0)
+			// 단, 이미 대기 배치에 든 사망자는 등수 부여 전(Placement<=0)이라도 재추가 금지.
+			if (BPS->GetPlacement() <= 0 && !PendingDeadBatch.Contains(BPS))
 			{
 				AlivePlayerStates.Add(BPS);
 			}
 		}
 	}
+}
+
+void UD1MatchFlowComponent::RequestEndEvaluation()
+{
+	if (bEndEvalPending)
+	{
+		return; // 프레임 내 다중 사망 → 타이머 1개만
+	}
+	if (UWorld* World = GetWorld())
+	{
+		bEndEvalPending = true;
+		World->GetTimerManager().SetTimerForNextTick(
+			this, &UD1MatchFlowComponent::EvaluateEndCondition);
+	}
+}
+
+void UD1MatchFlowComponent::EvaluateEndCondition()
+{
+	bEndEvalPending = false;
+
+	if (!HasServerAuthority() || IsMatchEnded())
+	{
+		PendingDeadBatch.Reset(); // 다른 경로가 이미 종료 → 배치 폐기
+		return;
+	}
+
+	FlushPendingDeaths(); // 이번 프레임 배치에 공동 등수 부여
+
+	if (AlivePlayerStates.Num() <= 1)
+	{
+		const bool bHasSurvivor = AlivePlayerStates.Num() == 1;
+		AD1BomberPlayerState* Winner = bHasSurvivor ? AlivePlayerStates[0].Get() : nullptr;
+		EndMatchWithWinner(Winner, bHasSurvivor ? EBomberEndReason::Winner : EBomberEndReason::Draw);
+	}
+}
+
+void UD1MatchFlowComponent::FlushPendingDeaths()
+{
+	if (PendingDeadBatch.Num() == 0)
+	{
+		return;
+	}
+
+	// 동률 등수 = 배치 시작 시점 생존자 수 = (배치 후 생존자) + (배치 인원).
+	// 단일 사망이면 배치=1 → 죽는 시점 생존자 수(자기 포함), 기존 순차 등수와 동일.
+	// 동반 폭사(P2)면 전원이 이 값을 공유하고 상위 등수(예: 1위)는 공석.
+	const int32 TiePlacement = AlivePlayerStates.Num() + PendingDeadBatch.Num();
+	for (AD1BomberPlayerState* PS : PendingDeadBatch)
+	{
+		if (PS && PS->GetPlacement() <= 0)
+		{
+			PS->SetPlacement(TiePlacement);
+		}
+	}
+	PendingDeadBatch.Reset();
 }
 
 void UD1MatchFlowComponent::OnMatchTimeExpired()
@@ -228,6 +279,8 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 	{
 		return;
 	}
+
+	FlushPendingDeaths(); // 시간만료/탈주 등 다른 경로 종료 시에도 대기 사망자 등수 확정
 
 	StopKickPolling();
 
