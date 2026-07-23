@@ -79,10 +79,13 @@ void AD1BotController::Tick(float DeltaSeconds)
 
 void AD1BotController::Think(AD1BomberCharacter* Bot, const AD1BomberGameState* GS, const AD1BomberPlayerState* PS)
 {
+	EnsureSeeded(PS);
 	BuildDangerMap(Bot, GS);
 
 	const FIntPoint Cur = UD1BomberGridLibrary::WorldToCell(Bot->GetActorLocation());
+	// 도주만 위험셀 통과 허용(폭발 예정 복도를 달려 나감). 그 외 이동은 위험셀 통과 금지 → 들락날락·자멸 방지.
 	auto Passable = [this, GS](FIntPoint C) { return IsCellPassable(GS, C); };
+	auto SafePassable = [this, GS](FIntPoint C) { return IsCellPassable(GS, C) && !DangerCells.Contains(C); };
 
 	// (a) 현재 셀이 위험 → 회피 최우선(다른 행동 금지).
 	if (DangerCells.Contains(Cur))
@@ -98,9 +101,8 @@ void AD1BotController::Think(AD1BomberCharacter* Bot, const AD1BomberGameState* 
 		return;
 	}
 
-	// (b) 안전 + 소프트블록 인접 + 용량 여유 → 탈출 검증 후 설치.
-	const int32 Capacity = PS ? PS->GetBombCapacity() : 1;
-	if (OwnActiveBombCount < Capacity && IsAdjacentToSoftBlock(GS, Cur))
+	// (b) 안전 + (소프트블록 또는 적) 인접 + 자기 폭탄 없음 → 탈출 검증 후 설치.
+	if (OwnActiveBombCount == 0 && (IsAdjacentToSoftBlock(GS, Cur) || IsAdjacentToEnemy(Cur)))
 	{
 		const int32 Range = PS ? PS->GetFirePower() : 2;
 		TArray<FIntPoint> Escape;
@@ -114,10 +116,25 @@ void AD1BotController::Think(AD1BomberCharacter* Bot, const AD1BomberGameState* 
 		}
 	}
 
-	// (c) 가장 가까운 소프트블록 인접 자유셀로 접근.
+	// (c) 이동: 소프트블록/적 인접 자유셀로 접근(위험셀 통과 금지). 확률적 goal 수락으로 경로 다양화.
+	auto SoftGoal = [this, GS](FIntPoint C)
+	{
+		return IsCellPassable(GS, C) && !DangerCells.Contains(C) && IsAdjacentToSoftBlock(GS, C) && Rng.FRand() < GoalAcceptProb;
+	};
+	auto EnemyGoal = [this, GS](FIntPoint C)
+	{
+		return IsCellPassable(GS, C) && !DangerCells.Contains(C) && IsAdjacentToEnemy(C) && Rng.FRand() < GoalAcceptProb;
+	};
+
+	// aggression 높은 봇은 블록이 남아도 hunt를 먼저 시도 → 결판 가속 + 봇별 성향 차이.
 	TArray<FIntPoint> Path;
-	auto NextToSoft = [this, GS](FIntPoint C) { return IsCellPassable(GS, C) && IsAdjacentToSoftBlock(GS, C); };
-	if (UD1BomberGridLibrary::FindNearestReachable(GS, Cur, NextToSoft, Passable, Path))
+	const bool bHuntFirst = Rng.FRand() < AggressionBias;
+	const bool bFound = bHuntFirst
+		? (UD1BomberGridLibrary::FindNearestReachable(GS, Cur, EnemyGoal, SafePassable, Path)
+			|| UD1BomberGridLibrary::FindNearestReachable(GS, Cur, SoftGoal, SafePassable, Path))
+		: (UD1BomberGridLibrary::FindNearestReachable(GS, Cur, SoftGoal, SafePassable, Path)
+			|| UD1BomberGridLibrary::FindNearestReachable(GS, Cur, EnemyGoal, SafePassable, Path));
+	if (bFound)
 	{
 		State = EBotState::Seek;
 		CurrentPath = MoveTemp(Path);
@@ -157,6 +174,7 @@ void AD1BotController::BuildDangerMap(const AD1BomberCharacter* Bot, const AD1Bo
 {
 	DangerCells.Reset();
 	BombCells.Reset();
+	EnemyCells.Reset();
 	OwnActiveBombCount = 0;
 
 	for (AD1Bomb* Bomb : TActorRange<AD1Bomb>(GetWorld()))
@@ -194,6 +212,21 @@ void AD1BotController::BuildDangerMap(const AD1BomberCharacter* Bot, const AD1Bo
 			DangerCells.Add(C);
 		}
 	}
+
+	// 생존한 적 봇 위치(HUNT 타겟). 동적이라 통과 판정엔 넣지 않음 — 막으면 경로 jitter.
+	for (AD1BomberCharacter* Char : TActorRange<AD1BomberCharacter>(GetWorld()))
+	{
+		if (!IsValid(Char) || Char == Bot)
+		{
+			continue;
+		}
+		const AD1BomberPlayerState* EPS = Char->GetPlayerState<AD1BomberPlayerState>();
+		if (!EPS || !EPS->IsAlive())
+		{
+			continue;
+		}
+		EnemyCells.Add(UD1BomberGridLibrary::WorldToCell(Char->GetActorLocation()));
+	}
 }
 
 bool AD1BotController::WouldSurviveBombAt(const AD1BomberGameState* GS, const FIntPoint& Cell, int32 Range, TArray<FIntPoint>& OutEscape) const
@@ -210,7 +243,12 @@ bool AD1BotController::WouldSurviveBombAt(const AD1BomberGameState* GS, const FI
 	auto EscPassable = [this, GS, &Cell](FIntPoint C) { return IsCellPassable(GS, C) && C != Cell; };
 	// 목표: 기존 위험에도 새 십자에도 안 걸리는 안전 셀(모퉁이 밖).
 	auto EscGoal = [&Danger](FIntPoint C) { return !Danger.Contains(C); };
-	return UD1BomberGridLibrary::FindNearestReachable(GS, Cell, EscGoal, EscPassable, OutEscape);
+	if (!UD1BomberGridLibrary::FindNearestReachable(GS, Cell, EscGoal, EscPassable, OutEscape))
+	{
+		return false;
+	}
+	// 탈출이 너무 길면 도화선(체인격발로 단축 가능) 내 못 빠져나갈 수 있음 → 설치 포기.
+	return OutEscape.Num() <= MaxEscapePathCells;
 }
 
 bool AD1BotController::IsCellPassable(const AD1BomberGameState* GS, const FIntPoint& Cell) const
@@ -234,6 +272,35 @@ bool AD1BotController::IsAdjacentToSoftBlock(const AD1BomberGameState* GS, const
 		}
 	}
 	return false;
+}
+
+bool AD1BotController::IsAdjacentToEnemy(const FIntPoint& Cell) const
+{
+	for (const FIntPoint& Dir : BotNeighborDirs)
+	{
+		if (EnemyCells.Contains(Cell + Dir))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void AD1BotController::EnsureSeeded(const AD1BomberPlayerState* PS)
+{
+	if (bSeeded)
+	{
+		return;
+	}
+	bSeeded = true;
+
+	// 슬롯(0~3)로 봇별 안정 시드; 소수 곱으로 인접 시드 상관 완화. 슬롯 미배정이면 오브젝트 ID.
+	const int32 Slot = PS ? PS->GetPlayerSlotIndex() : -1;
+	const int32 Seed = (Slot >= 0) ? (7919 * (Slot + 1)) : static_cast<int32>(GetUniqueID());
+	Rng.Initialize(Seed);
+
+	ThinkIntervalSec *= Rng.FRandRange(1.f - ThinkIntervalJitter, 1.f + ThinkIntervalJitter);
+	AggressionBias = Rng.FRandRange(0.3f, 0.9f);
 }
 
 void AD1BotController::DrawDebug(const AD1BomberCharacter* Bot) const
