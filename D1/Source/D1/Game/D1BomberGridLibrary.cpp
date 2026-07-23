@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Game/D1BomberGridLibrary.h"
+#include "Algo/Reverse.h"
 #include "Framework/D1BomberGameState.h"
 
 FIntPoint UD1BomberGridLibrary::WorldToCell(const FVector& WorldLocation)
@@ -66,4 +67,81 @@ void UD1BomberGridLibrary::TraceExplosionCells(
 			OutCells.Add(Cell);
 		}
 	}
+}
+
+bool UD1BomberGridLibrary::FindNearestReachable(
+	const AD1BomberGameState* GameState,
+	const FIntPoint& Start,
+	TFunctionRef<bool(FIntPoint)> IsGoal,
+	TFunctionRef<bool(FIntPoint)> IsPassable,
+	TArray<FIntPoint>& OutPath)
+{
+	OutPath.Reset();
+
+	if (!GameState)
+	{
+		return false;
+	}
+
+	static const FIntPoint Directions[4] = {
+		FIntPoint( 1,  0),
+		FIntPoint(-1,  0),
+		FIntPoint( 0,  1),
+		FIntPoint( 0, -1)
+	};
+
+	// TArray + Head 인덱스로 FIFO 큐 대용(거리순 확장 → 첫 goal이 최근접).
+	TArray<FIntPoint> Frontier;
+	Frontier.Add(Start);
+	TSet<FIntPoint> Visited;
+	Visited.Add(Start);
+	TMap<FIntPoint, FIntPoint> CameFrom;
+
+	int32 Head = 0;
+	FIntPoint GoalCell = Start;
+	bool bFound = false;
+
+	while (Head < Frontier.Num())
+	{
+		const FIntPoint Cur = Frontier[Head++];
+		if (IsGoal(Cur))
+		{
+			GoalCell = Cur;
+			bFound = true;
+			break;
+		}
+
+		for (const FIntPoint& Dir : Directions)
+		{
+			const FIntPoint Next = Cur + Dir;
+			if (Visited.Contains(Next))
+			{
+				continue;
+			}
+			// Start는 무조건 확장하되(위 초기화), 이웃은 통과 가능성으로 필터.
+			if (!IsPassable(Next))
+			{
+				continue;
+			}
+			Visited.Add(Next);
+			CameFrom.Add(Next, Cur);
+			Frontier.Add(Next);
+		}
+	}
+
+	if (!bFound)
+	{
+		return false;
+	}
+
+	// Goal → Start 역추적 후 뒤집어 Start 포함 정방향 경로로.
+	FIntPoint Node = GoalCell;
+	OutPath.Add(Node);
+	while (Node != Start)
+	{
+		Node = CameFrom[Node];
+		OutPath.Add(Node);
+	}
+	Algo::Reverse(OutPath);
+	return true;
 }

@@ -80,6 +80,8 @@ public:
 	/** 폭탄이 터지면서 호출 — 소유자 슬롯 회수. */
 	void NotifyBombDestroyed(AD1Bomb* Bomb);
 	void AddIgnoredBomb(AD1Bomb* Bomb);
+	/** 서버 전용: 봇 AI의 폭탄 설치 요청. RPC 우회 — ServerTryPlaceBomb과 동일 검증 재사용. */
+	void ServerPlaceBombForAI();
 
 protected:
 	UFUNCTION(Server, Reliable)

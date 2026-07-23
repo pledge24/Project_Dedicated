@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
+#include "Templates/Function.h"
 #include "D1BomberGridLibrary.generated.h"
 
 class AD1BomberGameState;
@@ -34,6 +35,15 @@ public:
 		int32 Range,
 		TArray<FIntPoint>& OutCells,
 		TArray<FIntPoint>& OutSoftBlockHits);
+
+	/** Start에서 4-이웃 BFS로 IsGoal을 처음 만족하는 최근접 셀까지 최단경로.
+	 *  Start는 항상 확장(자기 폭탄 위 가능), 이웃만 IsPassable로 필터. 성공 시 OutPath(Start 포함) 채우고 true. */
+	static bool FindNearestReachable(
+		const AD1BomberGameState* GameState,
+		const FIntPoint& Start,
+		TFunctionRef<bool(FIntPoint)> IsGoal,
+		TFunctionRef<bool(FIntPoint)> IsPassable,
+		TArray<FIntPoint>& OutPath);
 
 	static constexpr float CellSize = 100.f;
 	/** 셀 중심 높이·블록 반폭·폭탄칸 풋프린트 공용(=50). */

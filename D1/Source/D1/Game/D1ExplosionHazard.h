@@ -18,6 +18,8 @@ public:
 	AD1ExplosionHazard();
 
 	void Initialize(const TArray<FIntPoint>& InCells, float InDurationSec);
+	/** 잔류 위험 셀(폭발 후 지속 피해 구간). 봇이 방금 터진 셀을 피하는 데 사용. */
+	const TArray<FIntPoint>& GetHazardCells() const { return HazardCells; }
 
 protected:
 	//~ Begin AActor Interface

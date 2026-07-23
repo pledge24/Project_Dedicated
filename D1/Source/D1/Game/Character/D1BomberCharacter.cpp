@@ -209,6 +209,16 @@ void AD1BomberCharacter::AddIgnoredBomb(AD1Bomb* Bomb)
 	}
 }
 
+void AD1BomberCharacter::ServerPlaceBombForAI()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	// 봇 컨트롤러는 서버에만 존재 → RPC 왕복 없이 impl 직접 호출. 검증은 impl 내부 CanPlaceBombAt 재사용.
+	ServerTryPlaceBomb_Implementation();
+}
+
 void AD1BomberCharacter::ServerTryPlaceBomb_Implementation()
 {
 	if (!HasAuthority())

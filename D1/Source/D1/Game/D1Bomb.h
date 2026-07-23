@@ -50,6 +50,10 @@ protected:
 	TObjectPtr<UStaticMeshComponent> MeshComp;
 
 //~ 격발 타이밍
+public:
+	/** 서버 로컬 시각 기준 폭발 예정 시각. 봇 위험 회피의 잔여 도화선 계산용. */
+	float GetDetonationServerTime() const { return DetonationServerTime; }
+
 protected:
 	UFUNCTION()
 	void OnRep_DetonationServerTime();
@@ -69,6 +73,8 @@ private:
 public:
 	/** 서버 전용: 설치자 화력으로 폭발 범위 덮어쓰기(스폰 직후). */
 	void SetRange(int32 InRange);
+	/** 폭발 반경(칸). 봇 위험셀 계산용. */
+	int32 GetRange() const { return Range; }
 
 protected:
 	/** 폭발 이펙트 스폰 Multicast */
