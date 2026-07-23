@@ -5,11 +5,11 @@
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
 
-#include "Core/D1LogChannels.h"
 #include "Game/Character/D1BomberCharacter.h"
 #include "Game/D1Bomb.h"
 #include "Game/D1ExplosionHazard.h"
 #include "Game/D1BomberGridLibrary.h"
+#include "Game/D1PowerupPickup.h"
 #include "Framework/D1BomberGameState.h"
 #include "Framework/D1BomberPlayerState.h"
 
@@ -83,11 +83,11 @@ void AD1BotController::Think(AD1BomberCharacter* Bot, const AD1BomberGameState* 
 	BuildDangerMap(Bot, GS);
 
 	const FIntPoint Cur = UD1BomberGridLibrary::WorldToCell(Bot->GetActorLocation());
-	// 도주만 위험셀 통과 허용(폭발 예정 복도를 달려 나감). 그 외 이동은 위험셀 통과 금지 → 들락날락·자멸 방지.
-	auto Passable = [this, GS](FIntPoint C) { return IsCellPassable(GS, C); };
+	// 도주는 아직 안 터진 폭탄 십자만 달려 통과 가능, 이미 터진 hazard는 통과 금지. SEEK/HUNT는 모든 위험 회피.
+	auto Passable = [this, GS](FIntPoint C) { return IsCellPassable(GS, C) && !HazardCells.Contains(C); };
 	auto SafePassable = [this, GS](FIntPoint C) { return IsCellPassable(GS, C) && !DangerCells.Contains(C); };
 
-	// (a) 현재 셀이 위험 → 회피 최우선(다른 행동 금지).
+	// (a) 현재 셀이 위험 → 가장 가까운 안전셀로 도주(다른 행동 금지).
 	if (DangerCells.Contains(Cur))
 	{
 		TArray<FIntPoint> Path;
@@ -101,8 +101,24 @@ void AD1BotController::Think(AD1BomberCharacter* Bot, const AD1BomberGameState* 
 		return;
 	}
 
-	// (b) 안전 + (소프트블록 또는 적) 인접 + 자기 폭탄 없음 → 탈출 검증 후 설치.
-	if (OwnActiveBombCount == 0 && (IsAdjacentToSoftBlock(GS, Cur) || IsAdjacentToEnemy(Cur)))
+	// (a-2) 도주 완주: 이미 안전셀이지만 중심에 아직 못 붙었으면 마저 중심까지 이동.
+	//       위험 판정이 floored 셀 기준이라 경계를 넘는 순간 풀려, 봇이 폭발셀 경계(~50cm)에 걸친 채
+	//       멈춰 있다 폭탄에 맞던 문제 방지. 중심까지 붙으면(다음 틱) 정상 행동으로 복귀.
+	if (State == EBotState::Flee)
+	{
+		const FVector Loc = Bot->GetActorLocation();
+		const FVector CurCenter = UD1BomberGridLibrary::CellToWorldCenter(Cur, Loc.Z);
+		if (FVector::Dist2D(Loc, CurCenter) > FinalArrivalToleranceCm)
+		{
+			CurrentPath = { Cur, Cur };
+			PathIndex = 1;
+			return;
+		}
+	}
+
+	// (b) 안전 + (소프트블록 또는 적) 인접 + 용량 여유 → 탈출 검증 후 설치.
+	const int32 Capacity = PS ? PS->GetBombCapacity() : 1;
+	if (OwnActiveBombCount < Capacity && (IsAdjacentToSoftBlock(GS, Cur) || IsAdjacentToEnemy(Cur)))
 	{
 		const int32 Range = PS ? PS->GetFirePower() : 2;
 		TArray<FIntPoint> Escape;
@@ -114,6 +130,21 @@ void AD1BotController::Think(AD1BomberCharacter* Bot, const AD1BomberGameState* 
 			PathIndex = 1;
 			return;
 		}
+	}
+
+	// (b-2) 근거리 안전 아이템이 있으면 우선 획득(확률 스킵 없이 확정 — 강한 의지). 안전 경로·근거리 한정.
+	auto ItemGoal = [this, GS](FIntPoint C)
+	{
+		return IsCellPassable(GS, C) && !DangerCells.Contains(C) && ItemCells.Contains(C);
+	};
+	TArray<FIntPoint> ItemPath;
+	if (UD1BomberGridLibrary::FindNearestReachable(GS, Cur, ItemGoal, SafePassable, ItemPath)
+		&& ItemPath.Num() <= MaxItemSeekCells)
+	{
+		State = EBotState::Seek;
+		CurrentPath = MoveTemp(ItemPath);
+		PathIndex = 1;
+		return;
 	}
 
 	// (c) 이동: 소프트블록/적 인접 자유셀로 접근(위험셀 통과 금지). 확률적 goal 수락으로 경로 다양화.
@@ -159,7 +190,9 @@ void AD1BotController::SteerAlongPath(AD1BomberCharacter* Bot)
 	FVector Delta = Center - Loc;
 	Delta.Z = 0.f;
 
-	if (Delta.SizeSquared() <= ArrivalToleranceCm * ArrivalToleranceCm)
+	// 마지막 웨이포인트는 작은 판정으로 셀 중앙에 붙임(안전셀 경계 걸침 사망 방지). 중간은 넉넉히(부드러운 이동).
+	const float Tol = (PathIndex == CurrentPath.Num() - 1) ? FinalArrivalToleranceCm : ArrivalToleranceCm;
+	if (Delta.SizeSquared() <= Tol * Tol)
 	{
 		++PathIndex;
 		return;
@@ -175,6 +208,8 @@ void AD1BotController::BuildDangerMap(const AD1BomberCharacter* Bot, const AD1Bo
 	DangerCells.Reset();
 	BombCells.Reset();
 	EnemyCells.Reset();
+	HazardCells.Reset();
+	ItemCells.Reset();
 	OwnActiveBombCount = 0;
 
 	for (AD1Bomb* Bomb : TActorRange<AD1Bomb>(GetWorld()))
@@ -210,6 +245,7 @@ void AD1BotController::BuildDangerMap(const AD1BomberCharacter* Bot, const AD1Bo
 		for (const FIntPoint& C : Hazard->GetHazardCells())
 		{
 			DangerCells.Add(C);
+			HazardCells.Add(C);   // 이미 터져 데미지 중 — 도주 중에도 통과 금지.
 		}
 	}
 
@@ -227,6 +263,16 @@ void AD1BotController::BuildDangerMap(const AD1BomberCharacter* Bot, const AD1Bo
 		}
 		EnemyCells.Add(UD1BomberGridLibrary::WorldToCell(Char->GetActorLocation()));
 	}
+
+	// 드롭된 파워업 위치(근거리·안전할 때만 획득 대상).
+	for (AD1PowerupPickup* Pickup : TActorRange<AD1PowerupPickup>(GetWorld()))
+	{
+		if (!IsValid(Pickup))
+		{
+			continue;
+		}
+		ItemCells.Add(UD1BomberGridLibrary::WorldToCell(Pickup->GetActorLocation()));
+	}
 }
 
 bool AD1BotController::WouldSurviveBombAt(const AD1BomberGameState* GS, const FIntPoint& Cell, int32 Range, TArray<FIntPoint>& OutEscape) const
@@ -239,8 +285,8 @@ bool AD1BotController::WouldSurviveBombAt(const AD1BomberGameState* GS, const FI
 	Danger.Append(Hazard);
 	Danger.Add(Cell);
 
-	// 탈출 이동: 폭발 예정 셀은 "아직 안 터진" 통로라 달려서 통과 가능 — 지형(벽/블록/기존폭탄)과 새 폭탄 셀만 막는다.
-	auto EscPassable = [this, GS, &Cell](FIntPoint C) { return IsCellPassable(GS, C) && C != Cell; };
+	// 탈출 이동: 아직 안 터진 폭탄 십자는 달려서 통과 가능 — 지형·새 폭탄 셀·이미 터진 hazard만 막는다.
+	auto EscPassable = [this, GS, &Cell](FIntPoint C) { return IsCellPassable(GS, C) && C != Cell && !HazardCells.Contains(C); };
 	// 목표: 기존 위험에도 새 십자에도 안 걸리는 안전 셀(모퉁이 밖).
 	auto EscGoal = [&Danger](FIntPoint C) { return !Danger.Contains(C); };
 	if (!UD1BomberGridLibrary::FindNearestReachable(GS, Cell, EscGoal, EscPassable, OutEscape))
