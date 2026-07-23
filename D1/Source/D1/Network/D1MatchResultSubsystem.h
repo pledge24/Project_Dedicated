@@ -19,7 +19,7 @@ class UD1MatchResultSubsystem : public UGameInstanceSubsystem
 
 public:
 	/** 서버 전용(DS): 맵 빌드·초기화 완료 시 호출. 백엔드가 이 콜백을 받고 클라에 match:found 전송. 전송 실패 시 소폭 재시도. */
-	void ReportServerReady(const FString& MatchId, const FString& MatchToken);
+	void ReportDSReady(const FString& MatchId, const FString& MatchToken);
 
 	/** 서버 전용(DS): 매치 종료 시 호출. 매치별 서버 토큰을 Bearer로 첨부. */
 	void ReportMatchResult(const FString& MatchId, const FString& MatchToken, const FString& MapName,

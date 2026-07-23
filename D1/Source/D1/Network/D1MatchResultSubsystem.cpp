@@ -11,7 +11,7 @@
 #include "Network/D1BackendHttp.h"
 #include "TimerManager.h"
 
-void UD1MatchResultSubsystem::ReportServerReady(const FString& MatchId, const FString& MatchToken)
+void UD1MatchResultSubsystem::ReportDSReady(const FString& MatchId, const FString& MatchToken)
 {
 	SendServerReady(MatchId, MatchToken, /*Attempt=*/0);
 }

@@ -18,7 +18,7 @@
 namespace
 {
 	// 이름순 정렬 — 슬롯 인덱스 일관성 확보.
-	void GatherSortedPlayerStarts(const UObject* WorldContext, TArray<AActor*>& OutStarts)
+	void GetSortedPlayerStarts(const UObject* WorldContext, TArray<AActor*>& OutStarts)
 	{
 		UGameplayStatics::GetAllActorsOfClass(WorldContext, APlayerStart::StaticClass(), OutStarts);
 		OutStarts.Sort([](const AActor& A, const AActor& B)
@@ -27,18 +27,18 @@ namespace
 		});
 	}
 
-	// PlayerStartTag가 "0"~"3"이면 그 슬롯, 아니면 DefaultSlot 유지.
+	// PlayerStart의 Slot 반환. 태그가 0~3이 아니라면 DefaultSlot 반환
 	int32 ResolveSlotFromTag(const AActor* Start, int32 DefaultSlot)
 	{
-		if (const APlayerStart* PS = Cast<APlayerStart>(Start))
+		if (const APlayerStart* PlayerStart = Cast<APlayerStart>(Start))
 		{
-			const FString TagStr = PS->PlayerStartTag.ToString();
+			const FString TagStr = PlayerStart->PlayerStartTag.ToString();
 			if (TagStr.IsNumeric())
 			{
-				const int32 Parsed = FCString::Atoi(*TagStr);
-				if (Parsed >= 0 && Parsed <= 3)
+				const int32 TagNum = FCString::Atoi(*TagStr);
+				if (0 <= TagNum && TagNum <= 3)
 				{
-					return Parsed;
+					return TagNum;
 				}
 			}
 		}
@@ -91,7 +91,7 @@ void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 
-	// 시작 게이트 카운트는 매치 흐름 컴포넌트가 담당.
+	// 플레이어 입장 후속 처리는 매치 흐름 컴포넌트가 담당.
 	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
 	{
 		if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
@@ -137,7 +137,7 @@ void AD1BomberGameMode::BeginPlay()
 			*CurrentMatchId, CurrentMatchToken.IsEmpty() ? TEXT("(none)") : TEXT("(set)"), ExpectedPlayerCount);
 	}
 
-	// DS spawn 시 백엔드가 주입한 커맨드라인에서 플레이어 명단 파싱.
+	// 커맨드라인으로 주입된 roster 파싱. GM의 JoinRoster에 채우는 것이 목표.
 	// ({token}:{userId}:{base64(nickname)};…). InitNewPlayer가 ?join= 토큰으로 신원·이름을 확정한다.
 	// 닉네임은 한글(비-ASCII)이라 백엔드가 표준 base64로 인코딩해 넘김 → UTF-8로 디코드.
 	FString RosterStr;
@@ -147,7 +147,7 @@ void AD1BomberGameMode::BeginPlay()
 		RosterStr.ParseIntoArray(Entries, TEXT(";"), /*CullEmpty=*/true);
 		for (const FString& Entry : Entries)
 		{
-			TArray<FString> Parts;
+			TArray<FString> Parts; // {token}:{userId}:{base64(nickname)};
 			Entry.ParseIntoArray(Parts, TEXT(":"), /*CullEmpty=*/true);
 			if (Parts.Num() >= 2)
 			{
@@ -245,7 +245,7 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 	});
 
 	TArray<AActor*> AllStarts;
-	GatherSortedPlayerStarts(this, AllStarts);
+	GetSortedPlayerStarts(this, AllStarts);
 
 	TArray<AActor*> FreeStarts;
 	FreeStarts.Reserve(AllStarts.Num());
@@ -319,6 +319,7 @@ void AD1BomberGameMode::SpawnBots()
 			}
 		}
 
+		// 봇 생성 시작.
 		AController* BotController = World->SpawnActor<AController>(BotControllerClass);
 		if (!BotController)
 		{

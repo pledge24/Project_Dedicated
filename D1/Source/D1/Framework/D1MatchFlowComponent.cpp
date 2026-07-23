@@ -67,7 +67,7 @@ void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayers, float InWai
 			{
 				if (UD1MatchResultSubsystem* ResultClient = GI->GetSubsystem<UD1MatchResultSubsystem>())
 				{
-					ResultClient->ReportServerReady(CurrentMatchId, CurrentMatchToken);
+					ResultClient->ReportDSReady(CurrentMatchId, CurrentMatchToken);
 				}
 			}
 		}
