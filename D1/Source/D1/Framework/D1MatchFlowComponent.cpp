@@ -609,13 +609,10 @@ void UD1MatchFlowComponent::ProcessLeaver(AD1BomberPlayerState* Target, bool bNo
 
 	UE_LOG(LogD1, Log, TEXT("[Match] 탈주 처리 userId=%lld placement=%d"), UserId, LastPlacement);
 
-	// 생존자 1명 이하면 매치 종료(사망 파이프라인과 동일).
-	if (AlivePlayerStates.Num() <= 1)
-	{
-		const bool bHasSurvivor = AlivePlayerStates.Num() == 1;
-		AD1BomberPlayerState* Winner = bHasSurvivor ? AlivePlayerStates[0].Get() : nullptr;
-		EndMatchWithWinner(Winner, bHasSurvivor ? EBomberEndReason::Winner : EBomberEndReason::Draw);
-	}
+	// 종료 판정은 다음 틱으로 미룬다(사망 파이프라인과 동일). 한 배치(kick 폴링 응답)·한 프레임의
+	// 탈주자를 모두 캡처한 뒤 EvaluateEndCondition이 한 번만 판정 → 앞 탈주가 매치를 끝내
+	// 뒤 탈주가 IsMatchEnded 가드에 스킵되던 순서 의존 제거. 전원 탈주는 생존 0 → Draw로 정확 판정.
+	RequestEndEvaluation();
 }
 
 bool UD1MatchFlowComponent::HasMatchStarted() const

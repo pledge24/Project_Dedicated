@@ -5,6 +5,7 @@ import { AppError, Codes } from '../common/errors.js';
 import type { MatchResultRequest, MatchResultResponse } from '../common/types.js';
 import * as state from './dsApi.state.js';
 import * as readiness from './readiness.js';
+import type { SettledLeaver } from './result.repository.js';
 import * as repo from './result.repository.js';
 import * as rosters from './roster.js';
 
@@ -57,8 +58,6 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
             // 봇전 봇: DB 미존재라 프로필/participants 기록 skip, ELO 입력엔 roster의 rating 사용.
             bot: rp.bot ?? false,
             rating: rp.rating,
-            // 이미 즉시 정산된 탈주자면 그 값을 넘겨 결과 저장 시 프로필 중복 갱신을 막는다.
-            settled: left ? state.getSettled(req.matchId, r.userId) : undefined,
         };
     });
 
@@ -75,10 +74,9 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
             participants,
         });
 
-        // 매치 종료 — 이탈 채널 상태 정리(kick 대기열 + 정산 기록). 재제출은 멱등(409)이라 무해.
+        // 매치 종료 — kick 대기열 정리. 재제출은 client_match_id UNIQUE로 멱등(409)이라 무해.
+        // (탈주 이중 정산은 원장 match_leaver_settlements가 막으므로 resultSubmitted 플래그 불필요.)
         state.clear(req.matchId);
-        // 결과 확정 표시 → 이후 도착한 /leaver 정산을 거부(이중 패널티 차단). roster는 sweep 전까지 유지.
-        roster.resultSubmitted = true;
 
         return {
             matchId: req.matchId,
@@ -109,7 +107,7 @@ export function listPendingKicks(serverToken: string, matchId: string): number[]
 }
 
 /** DS 통지(POST /leaver): 탈주자 점수를 최하위 확정값으로 즉시 정산(멱등). */
-export async function settleLeaver(serverToken: string, matchId: string, userId: number): Promise<state.SettledLeaver>
+export async function settleLeaver(serverToken: string, matchId: string, userId: number): Promise<SettledLeaver>
 {
     const roster = assertServerToken(serverToken, matchId);
     if (!roster.players.some((p) => p.userId === userId))
@@ -117,23 +115,9 @@ export async function settleLeaver(serverToken: string, matchId: string, userId:
         throw new AppError(Codes.INVALID_RESULT, '매치에 속하지 않은 참가자입니다.');
     }
 
-    // 결과 확정 후 도착한 탈주 정산은 무시(순서 역전·재시도 시 이중 패널티 차단).
-    if (roster.resultSubmitted)
-    {
-        return { scoreDelta: 0, scoreAfter: 0 };
-    }
-
-    // 이미 정산됐으면 그 값을 그대로 반환(DS 재시도·중복 폴링 방어).
-    const existing = state.getSettled(matchId, userId);
-    if (existing)
-    {
-        return existing;
-    }
-
-    const info = await repo.settleLeaverProfile(userId);
-    state.markSettled(matchId, userId, info);
-
-    return info;
+    // 멱등·경합 안전(재시도·순서역전·결과보다 늦게 도착 포함)은 원장 match_leaver_settlements +
+    // 프로필 FOR UPDATE가 보장한다 → 여기선 그대로 위임. 이미 정산됐으면 저장값을 그대로 돌려준다.
+    return repo.settleLeaverProfile(matchId, userId);
 }
 
 /** 보고된 userId 집합이 roster와 정확히 일치하는지(누락·외부인·중복 없음) 검증. */

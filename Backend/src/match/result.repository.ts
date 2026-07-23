@@ -6,7 +6,6 @@ import type { PoolConnection } from 'mysql2/promise';
 import { config } from '../common/config.js';
 import { withTransaction } from '../common/db.js';
 import type { MatchEndReason } from '../common/types.js';
-import type { SettledLeaver } from './dsApi.state.js';
 import { computeFfaEloDeltas } from './elo.js';
 
 /** saveResult 함수용 - 종료 매치 각 플레이어 정보 */
@@ -20,7 +19,6 @@ export interface SaveResultParticipant
     left: boolean;                // 게임중 다른 기기 로그인으로 kick된 탈주자(전원 꼴등, 최하위 확정값)
     bot?: boolean;                // 봇전 봇(DB 미존재). ELO 입력엔 포함, 프로필/participants 기록은 skip.
     rating?: number;              // 봇 ELO 입력 점수(백엔드 소유). 봇에만 존재.
-    settled?: SettledLeaver;      // kick 시점에 즉시 정산됨 → 프로필 재갱신 skip, 저장값 재사용
 }
 
 /** saveResult 함수용 - 입력 매개변수 구조 */
@@ -53,6 +51,20 @@ interface ProfileRow extends RowDataPacket
     exp: number;
 }
 
+/** 탈주 정산 원장(match_leaver_settlements) 조회 행. */
+interface SettlementRow extends RowDataPacket
+{
+    score_delta: number;
+    score_after: number;
+}
+
+/** 즉시 정산 결과 — 프로필 하락값. /leaver 응답 + /result 참가자 row에 실린다. */
+export interface SettledLeaver
+{
+    scoreDelta: number;
+    scoreAfter: number;
+}
+
 // 등수별 경험치(1~4등). placement 범위를 벗어나면 최저값.
 const PLACEMENT_EXP = [100, 70, 40, 20];
 
@@ -80,20 +92,25 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
         );
         const matchDbId = matchRes.insertId;
 
-        // 탈주자(left)와 완주자를 분리. ELO는 완주자끼리만, 탈주자는 이미 확정된 값 재사용(프로필 skip).
+        // 탈주자(left)와 완주자를 분리. ELO는 완주자끼리만, 탈주자는 최하위 확정값(원장 정산).
         // 완주자 중 봇전 봇은 DB에 없어 프로필 잠금·기록에서 제외하되, ELO 입력엔 포함(플레이어 delta가 4인전과 동일).
         const finishers = input.participants.filter((p) => !p.left);
         const realFinishers = finishers.filter((p) => !p.bot);
         const leavers = input.participants.filter((p) => p.left); // 봇은 탈주 안 함(전부 실제 유저)
 
+        // 완주자(실유저)+탈주자 프로필을 한 번에 FOR UPDATE로 잠근다(정렬 순서라 데드락 없음).
+        // 잠근 뒤에야 원장을 읽어야 경쟁 /leaver 트랜잭션의 커밋된 정산을 관측한다
+        // (불변식: 프로필 잠금 → 원장 조회 순서. 원장 조회 전에 다른 평문 SELECT 금지).
+        const lockUserIds = [...realFinishers, ...leavers].map((p) => p.userId);
+        const profileByUser = lockUserIds.length > 0
+            ? await lockAndFetchProfiles(conn, lockUserIds)
+            : new Map<number, { score: number; exp: number }>();
+
         const rows: ComputedRow[] = [];
 
-        // ── 완주자: 실제 유저 점수는 잠가서 재조회, 봇은 주입 rating. FFA ELO는 완주자 전원으로 계산 ──
+        // ── 완주자: 실제 유저는 잠근 점수로, 봇은 주입 rating. FFA ELO는 완주자 전원으로 계산 ──
         if (finishers.length > 0)
         {
-            const profileByUser = realFinishers.length > 0
-                ? await lockAndFetchProfiles(conn, realFinishers.map((p) => p.userId))
-                : new Map<number, { score: number; exp: number }>();
             const ratings = finishers.map((p) => (p.bot ? p.rating! : profileByUser.get(p.userId)!.score));
             const placements = finishers.map((p) => p.placement);
             const deltas = computeFfaEloDeltas(ratings, placements, config.match.eloK);
@@ -109,14 +126,16 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
             });
         }
 
-        // ── 탈주자: kick 시점에 이미 확정. row는 저장값, 프로필 UPDATE는 skip(중복 방지) ──
+        // ── 탈주자: 원장에 이미 정산됐으면(/leaver 즉시정산) 그 값 재사용, 없으면 지금 정산(escape 방지) ──
         for (const p of leavers)
         {
-            const delta = p.settled ? p.settled.scoreDelta : 0; // 정산 유실 시 0(패널티 escape 허용)
-            const after = p.settled ? p.settled.scoreAfter : 0;
+            const existing = await selectSettlement(conn, input.matchId, p.userId);
+            const info = existing
+                ?? await applyLeaverPenalty(conn, input.matchId, p.userId, profileByUser.get(p.userId)!.score, input.endedAt);
             rows.push({
                 p,
-                c: { scoreBefore: after - delta, scoreDelta: delta, scoreAfter: after, expGained: 0, isWin: 0, levelAfter: 0 },
+                // 프로필은 /leaver 또는 위 applyLeaverPenalty가 이미 기록 → 여기선 재갱신 skip.
+                c: { scoreBefore: info.scoreAfter - info.scoreDelta, scoreDelta: info.scoreDelta, scoreAfter: info.scoreAfter, expGained: 0, isWin: 0, levelAfter: 0 },
                 updateProfile: false,
             });
         }
@@ -172,29 +191,66 @@ interface ComputedRow
 }
 
 /**
- * 탈주자 즉시 정산 — kick 시점(매치 종료 전)에 프로필 점수를 바로 하락시켜 로비에 반영되게 한다.
- * 최하위 확정값(base[꼴등] + 탈주 감점, ELO 무관)만 적용. 멱등 판단은 호출부(service).
+ * 탈주자 즉시 정산(/leaver) — kick/이탈 시점(매치 종료 전)에 프로필 점수를 바로 하락시켜 로비에 반영.
+ * 프로필을 FOR UPDATE로 잠근 뒤 원장을 확인 → 이미 정산됐으면 그대로 반환(멱등),
+ * 아니면 applyLeaverPenalty. /result(saveResult)와 같은 원장·잠금을 공유해 정확히 1회만 적용된다.
  */
-export async function settleLeaverProfile(userId: number): Promise<SettledLeaver>
+export async function settleLeaverProfile(clientMatchId: string, userId: number): Promise<SettledLeaver>
 {
     return withTransaction(async (conn) =>
     {
         const profileByUser = await lockAndFetchProfiles(conn, [userId]);
-        const before = profileByUser.get(userId)!.score;
-        const after = computeLeaverAfter(before, config.match.scoreFloor, config.match.scoreCeiling, config.match.leaverPenalty);
-        const scoreDelta = after - before;
-        const now = new Date();
+        const existing = await selectSettlement(conn, clientMatchId, userId);
+        if (existing)
+        {
+            return existing;
+        }
 
-        await conn.execute(
-            'UPDATE player_profiles SET ' +
-            'score = ?, losses = losses + 1, matches_played = matches_played + 1, last_match_at = ?, ' +
-            'score_updated_at = CASE WHEN ? <> 0 THEN ? ELSE score_updated_at END ' +
-            'WHERE user_id = ?',
-            [after, now, scoreDelta, now, userId]
-        );
-
-        return { scoreDelta, scoreAfter: after };
+        return applyLeaverPenalty(conn, clientMatchId, userId, profileByUser.get(userId)!.score, new Date());
     });
+}
+
+/**
+ * 탈주 패널티(최하위 확정값 = base[꼴등] + 탈주 감점, ELO 무관)를 적용하고 멱등 원장에 기록.
+ * 호출부가 해당 프로필 행을 FOR UPDATE로 잠근 상태여야 한다. /leaver·/result 두 경로가 공유.
+ * 프로필 UPDATE는 점수·패배·판수·시각만 — level/exp/wins는 손대지 않는다(완주자 UPDATE와 다름).
+ */
+async function applyLeaverPenalty(conn: PoolConnection, clientMatchId: string, userId: number, currentScore: number, now: Date): Promise<SettledLeaver>
+{
+    const after = computeLeaverAfter(currentScore, config.match.scoreFloor, config.match.scoreCeiling, config.match.leaverPenalty);
+    const scoreDelta = after - currentScore;
+
+    await conn.execute(
+        'UPDATE player_profiles SET ' +
+        'score = ?, losses = losses + 1, matches_played = matches_played + 1, last_match_at = ?, ' +
+        'score_updated_at = CASE WHEN ? <> 0 THEN ? ELSE score_updated_at END ' +
+        'WHERE user_id = ?',
+        [after, now, scoreDelta, now, userId]
+    );
+
+    await conn.execute(
+        'INSERT INTO match_leaver_settlements (client_match_id, user_id, score_delta, score_after, settled_at) ' +
+        'VALUES (?, ?, ?, ?, ?)',
+        [clientMatchId, userId, scoreDelta, after, now]
+    );
+
+    return { scoreDelta, scoreAfter: after };
+}
+
+/**
+ * 탈주 정산 원장 단건 조회. **반드시 비잠금 평문 SELECT** — FOR UPDATE로 바꾸면 서로 다른
+ * 탈주자의 /leaver가 같은 매치 빈 범위에 gap-lock을 잡고 INSERT 시 insert-intention 충돌 →
+ * 다중 동시 탈주에서 데드락. 호출부의 프로필 FOR UPDATE가 선행하므로, 이 평문 SELECT의 read-view는
+ * 잠금 획득 후 형성되어 경쟁 트랜잭션의 커밋된 정산을 관측한다(원장 조회 앞에 다른 SELECT 금지).
+ */
+async function selectSettlement(conn: PoolConnection, clientMatchId: string, userId: number): Promise<SettledLeaver | null>
+{
+    const [rows] = await conn.query<SettlementRow[]>(
+        'SELECT score_delta, score_after FROM match_leaver_settlements WHERE client_match_id = ? AND user_id = ?',
+        [clientMatchId, userId]
+    );
+
+    return rows.length > 0 ? { scoreDelta: rows[0].score_delta, scoreAfter: rows[0].score_after } : null;
 }
 
 /** 참가자 점수·경험치를 FOR UPDATE로 잠그고 재조회. 잠근 행 수가 요청과 다르면 즉시 throw(침묵 오염 방지). */

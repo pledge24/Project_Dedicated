@@ -197,6 +197,71 @@ async function main(): Promise<void>
             assert.equal(ps.find((p) => p.userId === us[3].userId)!.scoreDelta, expectedDelta, '결과의 탈주자 delta가 정산값 아님');
         }],
 
+        ['탈주 정산 유실 — /leaver 없이 /result만 와도 결과가 패널티 적용(0 escape 아님)', async () =>
+        {
+            const s = randomBytes(3).toString('hex');
+            const us = await seedUsers('esc', s, 4); // 모두 1000점
+            const mid = `esc-${s}-${randomBytes(4).toString('hex')}`;
+            const stk = randomBytes(24).toString('base64url');
+            roster.register({
+                matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
+                players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `ej${i}` })),
+            });
+
+            // /leaver를 전혀 안 보내고 곧장 /result — us[2],us[3] 탈주(left). DS 셧다운으로 /leaver 유실된 케이스.
+            const expectedDelta = -35 - config.match.leaverPenalty;
+            const body = {
+                matchId: mid, mapName: MAP, durationSec: 60, endReason: 'winner',
+                results: us.map((u, i) => ({ userId: u.userId, slotIndex: i, placement: i <= 1 ? i + 1 : 4, livesLeft: 0, left: i >= 2 })),
+            };
+            const r = await post('/api/match/result', body, stk);
+            assert.equal(r.status, 200, JSON.stringify(r.body));
+
+            // 두 탈주자 모두 프로필·결과에 패널티 반영(escape 0 아님) + abandoned=1.
+            const scores = await selectScore([us[2].userId, us[3].userId]);
+            assert.equal(scores.get(us[2].userId), 1000 + expectedDelta, '탈주자1 프로필 패널티 미반영(escape)');
+            assert.equal(scores.get(us[3].userId), 1000 + expectedDelta, '탈주자2 프로필 패널티 미반영(escape)');
+            const ps = r.body.data!.participants as Array<{ userId: number; scoreDelta: number }>;
+            assert.equal(ps.find((p) => p.userId === us[2].userId)!.scoreDelta, expectedDelta, '결과 탈주자1 delta escape');
+            assert.equal(ps.find((p) => p.userId === us[3].userId)!.scoreDelta, expectedDelta, '결과 탈주자2 delta escape');
+            const flags = await selectAbandoned([us[2].userId, us[3].userId]);
+            assert.equal(flags.get(us[2].userId), 1, '탈주자1 abandoned=1 아님');
+            assert.equal(flags.get(us[3].userId), 1, '탈주자2 abandoned=1 아님');
+        }],
+
+        ['탈주 경합 — /leaver 다수와 /result 동시 발사해도 각 탈주자 정확히 1회 정산', async () =>
+        {
+            const s = randomBytes(3).toString('hex');
+            const us = await seedUsers('rc', s, 4); // 모두 1000점
+            const mid = `rc-${s}-${randomBytes(4).toString('hex')}`;
+            const stk = randomBytes(24).toString('base64url');
+            roster.register({
+                matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
+                players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `rj${i}` })),
+            });
+
+            // 신고 시나리오: 3명 탈주 + 1명 승. 마지막 탈주의 /leaver가 /result와 경합하던 지점.
+            const expectedDelta = -35 - config.match.leaverPenalty;
+            const body = {
+                matchId: mid, mapName: MAP, durationSec: 60, endReason: 'winner',
+                results: us.map((u, i) => ({ userId: u.userId, slotIndex: i, placement: i === 0 ? 1 : 4, livesLeft: 0, left: i >= 1 })),
+            };
+            const [, , , res] = await Promise.all([
+                post(`/api/match/${mid}/leaver`, { userId: us[1].userId }, stk),
+                post(`/api/match/${mid}/leaver`, { userId: us[2].userId }, stk),
+                post(`/api/match/${mid}/leaver`, { userId: us[3].userId }, stk),
+                post('/api/match/result', body, stk),
+            ]);
+            assert.equal(res.status, 200, `result: ${JSON.stringify(res.body)}`);
+
+            // 세 탈주자 모두 정확히 1회(=expectedDelta). 0(escape)도 -130(이중)도 아님.
+            const scores = await selectScore([us[1].userId, us[2].userId, us[3].userId]);
+            for (const u of [us[1], us[2], us[3]])
+            {
+                assert.equal(scores.get(u.userId), 1000 + expectedDelta, `탈주자 ${u.userId} 정산 1회 아님(=${scores.get(u.userId)})`);
+            }
+        }],
+
         ['±0 점수 매치는 score_updated_at 유지 (실변동은 갱신)', async () =>
         {
             // 새 4계정 + 새 매치. zu[3]을 하한 점수로 시드 + 4위 배치 → scoreAfter=floor, scoreDelta=0.
