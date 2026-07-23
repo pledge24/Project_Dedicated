@@ -182,11 +182,6 @@ void UD1MatchFlowComponent::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 		AD1BomberPlayerState* Winner = bHasSurvivor ? AlivePlayerStates[0].Get() : DeadPS;
 		EndMatchWithWinner(Winner, bHasSurvivor ? EBomberEndReason::Winner : EBomberEndReason::Draw);
 	}
-	else if (CountAliveRealPlayers() == 0)
-	{
-		// 실유저 전원 사망·봇(무행동)만 잔존 → 매치 타이머(300초)를 안 기다리고 즉시 종료.
-		EndMatchWithWinner(nullptr, EBomberEndReason::Draw);
-	}
 }
 
 void UD1MatchFlowComponent::EnsureAliveListInitialized()
@@ -214,19 +209,6 @@ void UD1MatchFlowComponent::EnsureAliveListInitialized()
 			}
 		}
 	}
-}
-
-int32 UD1MatchFlowComponent::CountAliveRealPlayers() const
-{
-	int32 Count = 0;
-	for (const TObjectPtr<AD1BomberPlayerState>& PS : AlivePlayerStates)
-	{
-		if (PS && !PS->IsBot())
-		{
-			++Count;
-		}
-	}
-	return Count;
 }
 
 void UD1MatchFlowComponent::OnMatchTimeExpired()
@@ -580,11 +562,6 @@ void UD1MatchFlowComponent::ProcessLeaver(AD1BomberPlayerState* Target, bool bNo
 		const bool bHasSurvivor = AlivePlayerStates.Num() == 1;
 		AD1BomberPlayerState* Winner = bHasSurvivor ? AlivePlayerStates[0].Get() : nullptr;
 		EndMatchWithWinner(Winner, bHasSurvivor ? EBomberEndReason::Winner : EBomberEndReason::Draw);
-	}
-	else if (CountAliveRealPlayers() == 0)
-	{
-		// 실유저 전원 이탈·봇(무행동)만 잔존 → 매치 타이머(300초)를 안 기다리고 즉시 종료.
-		EndMatchWithWinner(nullptr, EBomberEndReason::Draw);
 	}
 }
 
