@@ -236,11 +236,15 @@ void UD1UWLobby::HandleMatchFound(const FMatchFoundDTO& Match)
 			FText::AsNumber(MatchPlayerCount)
 		));
 	}
-	// 매칭 완료 → 검색 패널을 즉시 접어 타이머/상태 UI를 숨긴다(취소 경로와 동일).
-	// travel 지연/실패와 무관하게 UI가 잔존하지 않게 함. 실제 DS 입장(ClientTravel)은 Matchmaking Subsystem이 처리.
-	if (MatchStatusPanel)
+	// 매칭 완료 → 타이머·취소 버튼만 숨기고 상태 라벨('입장 중')은 남긴다.
+	// 실제 DS 입장(ClientTravel)은 Matchmaking Subsystem이 처리.
+	if (MatchSearchingElapsedLabel)
 	{
-		MatchStatusPanel->SetVisibility(ESlateVisibility::Collapsed);
+		MatchSearchingElapsedLabel->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	if (CancelMatchingButton)
+	{
+		CancelMatchingButton->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 
