@@ -236,7 +236,12 @@ void UD1UWLobby::HandleMatchFound(const FMatchFoundDTO& Match)
 			FText::AsNumber(MatchPlayerCount)
 		));
 	}
-	// 실제 DS 입장(ClientTravel)은 Matchmaking Subsystem이 처리. 위젯은 곧 travel로 소멸.
+	// 매칭 완료 → 검색 패널을 즉시 접어 타이머/상태 UI를 숨긴다(취소 경로와 동일).
+	// travel 지연/실패와 무관하게 UI가 잔존하지 않게 함. 실제 DS 입장(ClientTravel)은 Matchmaking Subsystem이 처리.
+	if (MatchStatusPanel)
+	{
+		MatchStatusPanel->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }
 
 void UD1UWLobby::HandleMatchmakingError(const FBackendResponse& Error)
