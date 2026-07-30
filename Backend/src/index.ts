@@ -84,7 +84,9 @@ async function shutdown(signal: string): Promise<void>
  * shutdown()을 재사용하지 않는 이유: 그건 server.close 콜백에서 await closePool() 후 exit(0)하는
  * 정상 종료 경로다. Node 문서는 uncaughtException 시점을 "정의되지 않은 상태"로 규정하고
  * "할당된 리소스의 동기 정리만 하고 종료"를 권고하므로, 여기서 async를 기다리면 안 된다.
- * DS 정리는 matchWs.stop() → ds.shutdownAll() 한 줄로 끝난다(둘 다 동기).
+ * 단 "할당된 리소스"에 라이브 DS는 포함되지 않는다 — 플레이 중인 게임 서버는 이 프로세스의
+ * 자원이 아니라 독립 워크로드다. matchWs.stop() → ds.shutdownUncommitted()가 확정 전 DS만 회수하고,
+ * 진행 중인 경기는 살아남아 재시작한 백엔드에 결과를 보고한다(roster가 DB에 있으므로 인증된다).
  * killProcess()는 taskkill을 spawn만 하고 기다리지 않지만, Windows 자식 프로세스는
  * 부모가 exit해도 살아남으므로 taskkill은 완주한다.
  */

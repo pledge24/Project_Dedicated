@@ -30,10 +30,15 @@ export interface DsAllocator
     allocate(matchId: string, serverToken: string, expectedPlayers: number, roster: DsRosterEntry[], bots?: DsBotEntry[]): Promise<DsServer>;
     /** 서버가 플레이어를 받을 준비될 때까지 대기. 타임아웃·부팅 실패 시 throw. */
     waitUntilReady(matchId: string): Promise<void>;
+    /**
+     * 매치 성사 확정 — 이 서버를 독립 워크로드로 승격시킨다(백엔드 종료가 죽이지 않음).
+     * Agones의 SDK.Allocate()에 대응하는 경계: "플레이어가 붙었다"를 오케스트레이터에 알리는 지점.
+     */
+    commit(matchId: string): void;
     /** 확보한 서버를 즉시 회수(확정 창에서 매치가 깨졌을 때). */
     release(port: number): void;
-    /** 프로세스 종료 시 확보한 서버 전부 정리. */
-    shutdownAll(): void;
+    /** 프로세스 종료 시 정리 — 확정 전 서버만 회수하고 라이브 매치는 살려 둔다. */
+    shutdownUncommitted(): void;
     /** 부팅 시 이전 실행이 남긴 잔재 점검. */
     reapOrphans(): Promise<void>;
 }
@@ -44,8 +49,9 @@ const localAllocator: DsAllocator = {
         ds.allocate(matchId, serverToken, expectedPlayers, roster, bots),
     // 준비 판정은 DS의 POST /ready → readiness.signal. 상한은 config의 readyTimeoutMs.
     waitUntilReady: (matchId) => readiness.waitForReady(matchId, config.match.ds.readyTimeoutMs),
+    commit: (matchId) => ds.commit(matchId),
     release: (port) => ds.release(port),
-    shutdownAll: () => ds.shutdownAll(),
+    shutdownUncommitted: () => ds.shutdownUncommitted(),
     reapOrphans: () => ds.reapOrphans(),
 };
 
@@ -56,11 +62,15 @@ const localAllocator: DsAllocator = {
 const stubAllocator: DsAllocator = {
     allocate: () => Promise.resolve(config.match.stubServer),
     waitUntilReady: () => Promise.resolve(),
+    commit: () =>
+    {
+        // 프로세스가 없으니 수명을 분리할 대상도 없다.
+    },
     release: () =>
     {
         // 띄운 프로세스가 없으니 회수할 것도 없다.
     },
-    shutdownAll: () =>
+    shutdownUncommitted: () =>
     {
         // 상동.
     },

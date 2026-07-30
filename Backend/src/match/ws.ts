@@ -105,7 +105,8 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
             offSuperseded();
             clearInterval(heartbeat);
             clearInterval(cycle);
-            allocator.shutdownAll();
+            // 확정 전 DS만 회수한다 — 진행 중인 경기는 백엔드 종료와 무관하게 끝나야 한다.
+            allocator.shutdownUncommitted();
             for (const client of wss.clients)
             {
                 client.terminate();
@@ -454,6 +455,8 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
 
     // 6) 성사 확정: formation 종료 → 각 클라에 본인 입장 토큰만 실어 push(roster는 3)에서 이미 등록).
     service.endFormation(userIds);
+    // 여기서부터 이 DS는 독립 워크로드다 — 백엔드가 죽어도 경기는 끝까지 간다.
+    allocator.commit(matchId);
     const { data } = service.buildMatchFound(group, matchId, server);
     for (const p of joinPlayers)
     {
@@ -545,6 +548,7 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
 
     // 6) 성사 확정: 휴먼에 match:found(roster는 3)에서 이미 등록).
     service.endFormation([entry.userId]);
+    allocator.commit(matchId);
     send(entry.ref, { type: 'match:found', ok: true, data: { matchId, server: { host: server.host, port: server.port }, joinToken } });
     logger.info({ matchId, server, userId: entry.userId, bots: bots.length }, '봇전 성사');
 }

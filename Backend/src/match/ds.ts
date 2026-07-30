@@ -1,5 +1,6 @@
 // 매치당 Dedicated Server 프로세스 할당자. config.match.ds로 제어.
-// 매치 성사 시 D1Server.exe를 빈 포트로 spawn 후 즉시 주소 반환(준비 완료는 DS의 ready 콜백으로 대기). 종료 시 전부 kill.
+// 매치 성사 시 D1Server.exe를 빈 포트로 spawn 후 즉시 주소 반환(준비 완료는 DS의 ready 콜백으로 대기).
+// DS 수명은 commit 시점부터 백엔드 수명과 분리된다 — 종료 시 회수 대상은 확정 전 DS뿐(shutdownUncommitted).
 // Windows 전용: 루트 D1Server.exe가 실제 서버를 자식으로 spawn하므로 kill은 taskkill /T(트리)로 한다.
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
@@ -15,6 +16,8 @@ interface DsProcess
     matchId: string;
     port: number;
     killTimer: NodeJS.Timeout;
+    /** 매치 성사가 확정돼 플레이어가 붙은 서버인가. true면 백엔드 종료가 이 프로세스를 죽이지 않는다. */
+    committed: boolean;
 }
 
 const ds = config.match.ds;
@@ -77,7 +80,7 @@ function spawnOnPort(port: number, matchId: string, serverToken: string, expecte
         killTimer.unref();
     }
 
-    running.set(port, { child, matchId, port, killTimer });
+    running.set(port, { child, matchId, port, killTimer, committed: false });
 
     child.on('exit', (code) =>
     {
@@ -103,18 +106,57 @@ function spawnOnPort(port: number, matchId: string, serverToken: string, expecte
     logger.info({ port, matchId, map: ds.map }, 'DS spawn — 준비 콜백 대기');
 }
 
-/** graceful shutdown — 가동 중인 DS 전부 종료. */
-export function shutdownAll(): void
+/**
+ * 매치 성사 확정 — 이 DS는 백엔드가 소유한 자원이 아니라 독립 워크로드가 된다.
+ * 이후 백엔드가 어떻게 죽든(정상 종료·크래시) 이 프로세스는 건드리지 않는다.
+ * 4명이 플레이 중인 게임 서버를 파일 디스크립터처럼 "종료 시 정리할 자원"으로 취급하면
+ * 무관한 코드의 예외 하나가 진행 중인 경기 전부를 끝내버린다.
+ */
+export function commit(matchId: string): void
 {
-    const ports = [...running.keys()];
-    for (const port of ports)
+    for (const proc of running.values())
     {
-        killProcess(port);
+        if (proc.matchId === matchId)
+        {
+            proc.committed = true;
+
+            return;
+        }
     }
 
-    if (ports.length)
+    // 이미 종료된 DS 등. 확정 자체는 진행돼야 하므로 throw하지 않고 기록만 한다.
+    logger.warn({ matchId }, 'DS 확정 대상 없음 — 이미 종료됐거나 프로세스 미보유');
+}
+
+/**
+ * 프로세스 종료 시 정리 — 확정 전 DS만 회수하고 라이브 매치는 살려 둔다.
+ * 살려둔 DS는 자체 로직으로 종료된다(매치 시간 + 종료 grace → RequestExit).
+ * 남은 포트는 다음 기동의 reapOrphans/UDP 프로브가 점유로 감지해 할당에서 제외하므로,
+ * "죽이지 않고 드러낸다"는 기존 고아 처리 방침과 일관된다.
+ */
+export function shutdownUncommitted(): void
+{
+    let reaped = 0;
+    let live = 0;
+
+    for (const proc of [...running.values()])
     {
-        logger.info({ count: ports.length }, 'DS 전부 종료');
+        if (proc.committed)
+        {
+            // kill하지 않고 핸들만 놓아준다(killTimer는 이 프로세스와 함께 사라진다).
+            clearTimeout(proc.killTimer);
+            running.delete(proc.port);
+            live += 1;
+            continue;
+        }
+
+        killProcess(proc.port);
+        reaped += 1;
+    }
+
+    if (reaped || live)
+    {
+        logger.info({ reaped, live }, '확정 전 DS 회수 — 라이브 DS는 자체 수명으로 종료됨');
     }
 }
 
