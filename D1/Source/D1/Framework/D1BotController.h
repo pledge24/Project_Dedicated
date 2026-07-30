@@ -79,10 +79,15 @@ private:
 	/** 아이템 추적 최대 거리(셀). 이보다 멀면 무시 — 멀리 있는 아이템 추격 방지. */
 	int32 MaxItemSeekCells = 5;
 
+	/** 도주 정착 재시도 한도. 넘으면 Flee를 풀어 (b)·(c)로 내려보낸다 — 무한 래치 방지. */
+	int32 MaxFleeSettleAttempts = 6;
+
 	EBotState State = EBotState::Idle;
 	TArray<FIntPoint> CurrentPath;
 	int32 PathIndex = 0;
 	float ThinkAccumulatorSec = 0.f;
+	/** 연속 도주 정착 시도 횟수(MaxFleeSettleAttempts 대조용). */
+	int32 FleeSettleAttempts = 0;
 	TSet<FIntPoint> DangerCells;
 	TSet<FIntPoint> BombCells;
 	TSet<FIntPoint> EnemyCells;

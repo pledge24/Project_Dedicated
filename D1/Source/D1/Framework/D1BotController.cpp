@@ -2,7 +2,9 @@
 
 #include "Framework/D1BotController.h"
 #include "EngineUtils.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
+#include "Core/D1LogChannels.h"
 #include "Game/Character/D1BomberCharacter.h"
 #include "Game/D1Bomb.h"
 #include "Game/D1ExplosionHazard.h"
@@ -88,6 +90,7 @@ void AD1BotController::Think(AD1BomberCharacter* Bot, const AD1BomberGameState* 
 			State = EBotState::Flee;
 			CurrentPath = MoveTemp(Path);
 			PathIndex = 1;
+			FleeSettleAttempts = 0;
 		}
 		return;
 	}
@@ -101,10 +104,19 @@ void AD1BotController::Think(AD1BomberCharacter* Bot, const AD1BomberGameState* 
 		const FVector CurCenter = UD1BomberGridLibrary::CellToWorldCenter(Cur, Loc.Z);
 		if (FVector::Dist2D(Loc, CurCenter) > FinalArrivalToleranceCm)
 		{
-			CurrentPath = { Cur, Cur };
-			PathIndex = 1;
-			return;
+			// 아래 (b)·(c)·(d)가 전부 이 return 밑이라, 정착에 계속 실패하면 봇이 Flee에 영구히 갇혀
+			// 폭탄을 다시 못 놓는다. 한도를 두어 그 경우 Flee를 풀고 정상 판단으로 내려보낸다.
+			if (++FleeSettleAttempts <= MaxFleeSettleAttempts)
+			{
+				CurrentPath = { Cur, Cur };
+				PathIndex = 1;
+				return;
+			}
+			UE_LOG(LogD1, Warning, TEXT("[Bot] 셀 중심 정착 %d회 실패 — Flee 해제 cell=(%d,%d) dist=%.1fcm"),
+				MaxFleeSettleAttempts, Cur.X, Cur.Y, FVector::Dist2D(Loc, CurCenter));
+			State = EBotState::Idle;
 		}
+		FleeSettleAttempts = 0;
 	}
 
 	// (b) 안전 + (소프트블록 또는 적) 인접 + 용량 여유 → 탈출 검증 후 설치.
@@ -119,6 +131,7 @@ void AD1BotController::Think(AD1BomberCharacter* Bot, const AD1BomberGameState* 
 			State = EBotState::Flee;
 			CurrentPath = MoveTemp(Escape);
 			PathIndex = 1;
+			FleeSettleAttempts = 0;
 			return;
 		}
 	}
@@ -182,9 +195,20 @@ void AD1BotController::SteerAlongPath(AD1BomberCharacter* Bot)
 	Delta.Z = 0.f;
 
 	// 마지막 웨이포인트는 작은 판정으로 셀 중앙에 붙임(안전셀 경계 걸침 사망 방지). 중간은 넉넉히(부드러운 이동).
-	const float Tol = (PathIndex == CurrentPath.Num() - 1) ? FinalArrivalToleranceCm : ArrivalToleranceCm;
+	const bool bFinal = (PathIndex == CurrentPath.Num() - 1);
+	const float Tol = bFinal ? FinalArrivalToleranceCm : ArrivalToleranceCm;
 	if (Delta.SizeSquared() <= Tol * Tol)
 	{
+		// 조향만 끊으면 관성으로 20~30cm를 더 미끄러져 판정 반경(8cm)을 벗어난다 → Think의 (a-2)가
+		// 다시 걸려 봇이 셀 중심을 왕복만 하며 Flee에 갇힌다. 최종 웨이포인트에선 명시적으로 정지.
+		// 중간 웨이포인트는 관성을 남겨 이동이 끊기지 않게 한다.
+		if (bFinal)
+		{
+			if (UCharacterMovementComponent* Move = Bot->GetCharacterMovement())
+			{
+				Move->StopMovementImmediately();
+			}
+		}
 		++PathIndex;
 		return;
 	}
