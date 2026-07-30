@@ -167,6 +167,16 @@ export function release(port: number): void
 }
 
 /**
+ * 진단용 — 해당 포트를 쥔 DS의 PID. 보유하지 않으면 undefined.
+ * 고아 추적(어느 프로세스가 포트를 잡고 있나)과 수명 분리 검증에 쓴다.
+ * 확정 후 shutdownUncommitted를 지난 DS는 running에서 빠지므로 여기서도 조회되지 않는다.
+ */
+export function findPid(port: number): number | undefined
+{
+    return running.get(port)?.child.pid;
+}
+
+/**
  * 부팅 시 포트 풀 점검 — 이전 실행이 크래시로 남긴 고아 DS를 로그로 드러낸다.
  * 죽이지는 않는다: exe 이름 기준 일괄 taskkill은 개발자가 디버깅용으로 직접 띄운 DS까지 죽인다.
  * 점유된 포트는 reserveFreePort의 프로브가 매번 걸러내므로, 여기서는 원인 추적용 기록만 남기면 충분하다.
