@@ -41,7 +41,7 @@ UD1MatchFlowComponent::UD1MatchFlowComponent()
 }
 
 void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayers, float InWaitTimeoutSec, float InShutdownGraceSec,
-	const FString& InMatchId, const FString& InMatchToken)
+	const FString& InMatchId, const FString& InMatchToken, const TArray<FD1JoinEntry>& InExpectedRoster)
 {
 	if (!HasServerAuthority())
 	{
@@ -53,6 +53,7 @@ void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayers, float InWai
 	ShutdownGraceSec         = InShutdownGraceSec;
 	CurrentMatchId           = InMatchId;
 	CurrentMatchToken        = InMatchToken;
+	ExpectedRoster           = InExpectedRoster;
 
 	// 게임중 강제 회수(다른 기기 로그인) 폴링 시작 — 토큰 있는 실 DS에서만.
 	StartKickPolling();
@@ -359,6 +360,9 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 	Entries.Append(LeftEntries);
 	ResultPlayers.Append(LeftPlayers);
 
+	// 한 번도 입장하지 않은 인원까지 채워야 그 "정확히 일치"가 성립한다.
+	AppendNoShowResults(Entries, ResultPlayers);
+
 	// UI 표시용 결정적 순서: 등수 오름차순, 동률은 슬롯 순. (PlayerArray 순서는 비결정)
 	Entries.Sort([](const FD1MatchResultEntry& A, const FD1MatchResultEntry& B)
 	{
@@ -405,6 +409,67 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 			BeginShutdownAfterReport();
 		}),
 		ResultReportHardCapSec, /*bLoop=*/false);
+}
+
+void UD1MatchFlowComponent::AppendNoShowResults(TArray<FD1MatchResultEntry>& InOutEntries,
+	TArray<FMatchResultPlayer>& InOutPlayers) const
+{
+	// PIE/standalone은 백엔드가 준 명단이 없어 보정할 기준 자체가 없다.
+	if (ExpectedRoster.Num() == 0)
+	{
+		return;
+	}
+
+	const AD1BomberGameState* GS = GetBomberGameState();
+	const int32 SeatCount = FMath::Max3(ExpectedPlayerCount,
+		GS ? GS->PlayerArray.Num() : 0, ExpectedRoster.Num());
+
+	// 이미 결과에 오른 신원과 좌석(봇이 쓴 좌석도 여기 포함되므로 그대로 피하면 된다).
+	TSet<int64> ReportedUsers;
+	TSet<int32> UsedSlots;
+	for (const FMatchResultPlayer& RP : InOutPlayers)
+	{
+		ReportedUsers.Add(RP.UserId);
+		UsedSlots.Add(RP.SlotIndex);
+	}
+
+	int32 NextFreeSlot = 0;
+	for (const FD1JoinEntry& Expected : ExpectedRoster)
+	{
+		if (ReportedUsers.Contains(Expected.UserId))
+		{
+			continue;
+		}
+
+		// 좌석이 배정된 적이 없다(ChoosePlayerStart는 PostLogin에서 돈다) → 빈 자리를 하나 준다.
+		// 백엔드가 slotIndex 유일성을 검증하고 DB에도 UNIQUE가 걸려 있다.
+		while (UsedSlots.Contains(NextFreeSlot))
+		{
+			++NextFreeSlot;
+		}
+		UsedSlots.Add(NextFreeSlot);
+
+		// Left=true로 보고하는 이유: 완주자 ELO 계산에서 빠져 정상 플레이한 사람들끼리만 점수가 오간다.
+		// (Left=false면 미입장자가 실참가자로 ELO에 섞인다.) 입장 직후 나간 탈주자와 동일 취급이라
+		// "안 들어오는 편이 이득"인 비대칭도 생기지 않는다.
+		FMatchResultPlayer RP;
+		RP.UserId    = Expected.UserId;
+		RP.SlotIndex = NextFreeSlot;
+		RP.Placement = SeatCount;
+		RP.LivesLeft = 0;
+		RP.Left      = true;
+		InOutPlayers.Add(RP);
+
+		FD1MatchResultEntry Entry;
+		Entry.Placement = SeatCount;
+		Entry.Nickname  = Expected.Nickname;
+		Entry.SlotIndex = NextFreeSlot;
+		Entry.LivesLeft = 0;
+		InOutEntries.Add(Entry);
+
+		UE_LOG(LogD1, Warning, TEXT("[Match] 미입장자 결과 보정 userId=%lld nickname=%s slot=%d placement=%d"),
+			Expected.UserId, *Expected.Nickname, NextFreeSlot, SeatCount);
+	}
 }
 
 void UD1MatchFlowComponent::BeginShutdownAfterReport()

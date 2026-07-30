@@ -30,7 +30,7 @@ public:
 public:
 	/** 서버 전용: GameMode::BeginPlay가 cmdline 파싱·맵빌드 후 호출. 설정을 받고 시작 게이트를 arm. */
 	void InitializeMatch(int32 InExpectedPlayers, float InWaitTimeoutSec, float InShutdownGraceSec,
-		const FString& InMatchId, const FString& InMatchToken);
+		const FString& InMatchId, const FString& InMatchToken, const TArray<FD1JoinEntry>& InExpectedRoster);
 
 	/** 서버 전용: GameMode::PostLogin이 호출. 예상 인원 도달 시 매치 시작. */
 	void HandlePlayerJoined();
@@ -44,6 +44,13 @@ private:
 	/** GameMode가 InitializeMatch로 주입. 시작 정원(0/1=즉시)과 게이트 타임아웃. */
 	int32 ExpectedPlayerCount = 0;
 	float WaitForPlayersTimeoutSec = 20.f;
+
+	/**
+	 * -Roster= 로 온 휴먼 명단(GameMode가 주입). 결과 보고 시 한 번도 입장하지 않은 유저를
+	 * 찾아내는 기준 — 백엔드 roster와 인원이 어긋나면 매치 전체 결과가 거부된다.
+	 * 봇전 봇은 -Bots= 로 따로 오고 PlayerArray에 편입되므로 여기 없다.
+	 */
+	TArray<FD1JoinEntry> ExpectedRoster;
 
 //~ 사망·등수
 public:
@@ -73,6 +80,12 @@ private:
 private:
 	void OnMatchTimeExpired();
 	void EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason);
+	/**
+	 * 한 번도 입장하지 않은 roster 인원을 최하위 미입장자로 결과에 채운다.
+	 * 이들은 PlayerState가 생긴 적이 없어 PlayerArray에도 LeftPlayers에도 없다 — 보정하지 않으면
+	 * 백엔드 roster와 인원이 어긋나 정상 플레이한 나머지 인원의 결과까지 통째로 거부된다.
+	 */
+	void AppendNoShowResults(TArray<FD1MatchResultEntry>& InOutEntries, TArray<FMatchResultPlayer>& InOutPlayers) const;
 	/** 결과 보고가 확정됐거나 하드캡에 걸렸을 때 DS 셧다운 감시 시작. 선착순 1회만 유효(감시가 멱등). */
 	void BeginShutdownAfterReport();
 

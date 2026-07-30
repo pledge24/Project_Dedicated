@@ -192,12 +192,15 @@ void AD1BomberGameMode::BeginPlay()
 	SpawnBots();
 
 	// 매치 흐름은 GameState의 컴포넌트가 소유. 설정을 넘기고 시작 게이트를 위임.
+	// 명단도 함께 넘긴다 — 끝까지 입장하지 않은 유저를 결과에 채우려면 "와야 할 사람"을 알아야 한다.
 	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
 	{
 		if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
 		{
+			TArray<FD1JoinEntry> ExpectedRoster;
+			JoinRoster.GenerateValueArray(ExpectedRoster);
 			Flow->InitializeMatch(ExpectedPlayerCount, WaitForPlayersTimeoutSec, ShutdownGraceSec,
-				CurrentMatchId, CurrentMatchToken);
+				CurrentMatchId, CurrentMatchToken, ExpectedRoster);
 		}
 	}
 }

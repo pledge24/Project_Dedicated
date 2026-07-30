@@ -17,6 +17,17 @@ enum class EBomberEndReason : uint8
 	TimeExpired
 };
 
+/**
+ *  -Roster= 로 주입된 입장 토큰 → 권위 신원(userId·닉네임) 매핑. 좌석은 DS가 입장 시 랜덤 배정.
+ *  GameMode(파싱)와 MatchFlow(미입장자 보정)가 공유하므로 여기 둔다 — MatchFlow가 GameMode 헤더를
+ *  include하면 역방향 의존이 된다.
+ */
+struct FD1JoinEntry
+{
+	int64 UserId = 0;
+	FString Nickname;
+};
+
 /** 매치 종료 시 한 플레이어의 최종 결과. GameState가 배열로 원자 복제 → UI 표시 + (추후) 백엔드 전송 공용. */
 USTRUCT(BlueprintType)
 struct FD1MatchResultEntry
