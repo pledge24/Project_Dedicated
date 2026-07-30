@@ -50,6 +50,21 @@ void UD1MatchmakingSubsystem::StartMatchmaking()
 	const FString Url = BuildMatchWsUrl();
 	MatchSocket = FWebSocketsModule::Get().CreateWebSocket(Url, TArray<FString>(), UpgradeHeaders);
 
+	// CreateWebSocket은 스킴 미지원 URL(BaseUrl 오설정 등)에 null을 반환한다 — 바로 역참조하면
+	// 매칭 버튼 한 번으로 클라가 죽는다. 상태를 되돌리고 에러로 표면화한다.
+	if (!MatchSocket.IsValid())
+	{
+		FBackendResponse Err;
+		Err.bOk = false;
+		Err.ErrorCode = EBackendErrorCode::NetworkError;
+		Err.ErrorMessage = TEXT("매칭 서버 주소가 올바르지 않습니다.");
+		MatchmakingState = EMatchmakingState::Idle;
+		UE_LOG(LogD1, Error, TEXT("[Match] WS 생성 실패 — URL 확인 필요: %s"), *Url);
+		OnMatchmakingError.Broadcast(Err);
+
+		return;
+	}
+
 	// Connect() 전에 바인딩 (엔진 StompClient 관용구). UObject라 AddUObject 사용.
 	MatchSocket->OnConnected().AddUObject(this, &UD1MatchmakingSubsystem::HandleSocketConnected);
 	MatchSocket->OnConnectionError().AddUObject(this, &UD1MatchmakingSubsystem::HandleSocketConnectionError);
