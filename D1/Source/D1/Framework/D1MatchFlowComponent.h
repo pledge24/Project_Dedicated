@@ -73,13 +73,19 @@ private:
 private:
 	void OnMatchTimeExpired();
 	void EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason);
+	/** 결과 보고가 확정됐거나 하드캡에 걸렸을 때 DS 셧다운 감시 시작. 선착순 1회만 유효(감시가 멱등). */
+	void BeginShutdownAfterReport();
 
 	FTimerHandle MatchTimerHandle;
+	FTimerHandle ResultReportHardCapTimerHandle;
 
 	/** GameMode가 InitializeMatch로 주입. 셧다운 유예와 결과 POST 인증값. */
 	float ShutdownGraceSec = 30.f;
 	FString CurrentMatchId;
 	FString CurrentMatchToken;
+
+	/** 결과 보고 확정을 기다리는 상한. 재시도 누적(30초)보다 넉넉해야 하고, 넘으면 보고를 포기하고 종료한다. */
+	float ResultReportHardCapSec = 60.f;
 
 //~ 탈주 처리(게임중 kick·접속 끊김)
 public:

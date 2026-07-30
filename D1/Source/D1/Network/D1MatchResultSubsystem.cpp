@@ -17,7 +17,8 @@ void UD1MatchResultSubsystem::ReportDSReady(const FString& MatchId, const FStrin
 }
 
 void UD1MatchResultSubsystem::ReportMatchResult(const FString& MatchId, const FString& MatchToken, const FString& MapName,
-	int32 DurationSec, const FString& EndReason, const TArray<FMatchResultPlayer>& Players)
+	int32 DurationSec, const FString& EndReason, const TArray<FMatchResultPlayer>& Players,
+	const FSimpleDelegate& OnSettled)
 {
 	const TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
 	Body->SetStringField(TEXT("matchId"),     MatchId);
@@ -38,27 +39,8 @@ void UD1MatchResultSubsystem::ReportMatchResult(const FString& MatchId, const FS
 	}
 	Body->SetArrayField(TEXT("results"), Results);
 
-	// 매치별 서버 토큰을 Bearer로 — 유저 JWT가 아니라 DS 인증 채널. (BuildPostJson은 auth 미첨부로 호출.)
-	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildPostJson(GetGameInstance(), TEXT("/api/match/result"), Body, /*bAttachAuth=*/false);
-	Request->SetHeader(TEXT("Authorization"), D1BackendHttp::MakeBearer(MatchToken));
-
-	Request->OnProcessRequestComplete().BindLambda(
-		[](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded)
-		{
-			const int32 Code = (bSucceeded && Res.IsValid()) ? Res->GetResponseCode() : 0;
-			if (Code == 200)
-			{
-				UE_LOG(LogD1, Log, TEXT("[Match] 결과 POST 성공 (200)"));
-			}
-			else
-			{
-				const FString Content = (bSucceeded && Res.IsValid()) ? Res->GetContentAsString() : TEXT("(no response)");
-				UE_LOG(LogD1, Warning, TEXT("[Match] 결과 POST 실패 code=%d %s"), Code, *Content);
-			}
-		});
-	Request->ProcessRequest();
-
-	UE_LOG(LogD1, Log, TEXT("[Match] 결과 POST 전송 matchId=%s reason=%s players=%d"), *MatchId, *EndReason, Players.Num());
+	UE_LOG(LogD1, Log, TEXT("[Match] 결과 POST 시작 matchId=%s reason=%s players=%d"), *MatchId, *EndReason, Players.Num());
+	SendMatchResult(MatchId, MatchToken, Body, /*Attempt=*/0, OnSettled);
 }
 
 void UD1MatchResultSubsystem::ReportLeaver(const FString& MatchId, const FString& MatchToken, int64 UserId)
@@ -152,4 +134,79 @@ void UD1MatchResultSubsystem::SendServerReady(const FString& MatchId, const FStr
 	Request->ProcessRequest();
 
 	UE_LOG(LogD1, Log, TEXT("[Match] 준비 POST 전송 matchId=%s attempt=%d"), *MatchId, Attempt);
+}
+
+void UD1MatchResultSubsystem::SendMatchResult(const FString& MatchId, const FString& MatchToken,
+	const TSharedRef<FJsonObject>& Body, int32 Attempt, const FSimpleDelegate& OnSettled)
+{
+	// 매치별 서버 토큰을 Bearer로 — 유저 JWT가 아니라 DS 인증 채널. (BuildPostJson은 auth 미첨부로 호출.)
+	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildPostJson(GetGameInstance(), TEXT("/api/match/result"), Body, /*bAttachAuth=*/false);
+	Request->SetHeader(TEXT("Authorization"), D1BackendHttp::MakeBearer(MatchToken));
+
+	TWeakObjectPtr<UD1MatchResultSubsystem> WeakThis(this);
+	Request->OnProcessRequestComplete().BindLambda(
+		[WeakThis, MatchId, MatchToken, Body, Attempt, OnSettled](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded)
+		{
+			const int32 Code = (bSucceeded && Res.IsValid()) ? Res->GetResponseCode() : 0;
+
+			// 409 = 백엔드가 client_match_id UNIQUE로 이미 저장한 재전송. 성공과 동일하게 확정 처리한다.
+			if (Code == 200 || Code == 409)
+			{
+				UE_LOG(LogD1, Log, TEXT("[Match] 결과 POST 확정 code=%d matchId=%s attempt=%d"), Code, *MatchId, Attempt);
+				OnSettled.ExecuteIfBound();
+
+				return;
+			}
+
+			// 그 외 4xx는 백엔드가 내용을 보고 거부한 것 — 재전송해도 판정이 바뀌지 않는다.
+			if (Code >= 400 && Code < 500)
+			{
+				const FString Content = Res.IsValid() ? Res->GetContentAsString() : TEXT("(no response)");
+				UE_LOG(LogD1, Error, TEXT("[Match] 결과 POST 거부 code=%d %s — 재시도 안 함(결과 유실) matchId=%s"),
+					Code, *Content, *MatchId);
+				OnSettled.ExecuteIfBound();
+
+				return;
+			}
+
+			// 일시 실패(전송 실패/0/5xx/429): 백엔드 재시작·일시 장애를 넘기기 위해 백오프 재시도.
+			// 1,2,4,8,15초(누적 30초) — 준비 POST(누적 10초)보다 길게 잡는다. 그쪽은 백엔드의 30초
+			// 준비 타임아웃 안에 들어야 하지만, 이쪽이 넘어야 하는 창은 백엔드의 재기동 시간이다.
+			static constexpr float RetryDelaysSec[] = { 1.f, 2.f, 4.f, 8.f, 15.f };
+			constexpr int32 MaxRetries = static_cast<int32>(UE_ARRAY_COUNT(RetryDelaysSec));
+
+			UD1MatchResultSubsystem* Self = WeakThis.Get();
+			if (!Self || Attempt >= MaxRetries)
+			{
+				UE_LOG(LogD1, Error, TEXT("[Match] 결과 POST 재시도 종료 code=%d attempt=%d — 결과 유실 matchId=%s"),
+					Code, Attempt, *MatchId);
+				OnSettled.ExecuteIfBound();
+
+				return;
+			}
+
+			UGameInstance* GI = Self->GetGameInstance();
+			UWorld* World = GI ? GI->GetWorld() : nullptr;
+			if (!World)
+			{
+				UE_LOG(LogD1, Error, TEXT("[Match] 결과 POST 재시도 불가(World 없음) — 결과 유실 matchId=%s"), *MatchId);
+				OnSettled.ExecuteIfBound();
+
+				return;
+			}
+
+			const int32 NextAttempt = Attempt + 1;
+			const float RetryDelaySec = RetryDelaysSec[Attempt];
+			UE_LOG(LogD1, Warning, TEXT("[Match] 결과 POST 일시 실패 code=%d — %.0fs 후 재시도(%d/%d)"),
+				Code, RetryDelaySec, NextAttempt, MaxRetries);
+			World->GetTimerManager().SetTimer(Self->MatchResultRetryTimerHandle,
+				FTimerDelegate::CreateWeakLambda(Self, [Self, MatchId, MatchToken, Body, NextAttempt, OnSettled]()
+				{
+					Self->SendMatchResult(MatchId, MatchToken, Body, NextAttempt, OnSettled);
+				}),
+				RetryDelaySec, /*bLoop=*/false);
+		});
+	Request->ProcessRequest();
+
+	UE_LOG(LogD1, Log, TEXT("[Match] 결과 POST 전송 matchId=%s attempt=%d"), *MatchId, Attempt);
 }

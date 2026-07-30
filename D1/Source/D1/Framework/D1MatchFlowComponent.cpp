@@ -368,27 +368,59 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 	GS->SetFinalResults(Entries);
 
 	// 백엔드가 띄운 DS일 때만 결과 보고(토큰 없으면 PIE/standalone → 스킵).
+	UD1MatchResultSubsystem* ResultClient = nullptr;
 	if (!CurrentMatchToken.IsEmpty() && World)
 	{
 		if (UGameInstance* GI = World->GetGameInstance())
 		{
-			if (UD1MatchResultSubsystem* ResultClient = GI->GetSubsystem<UD1MatchResultSubsystem>())
-			{
-				const int32 DurationSec = FMath::Max(0,
-					FMath::RoundToInt(GS->GetServerWorldTimeSeconds() - GS->MatchStartServerTime));
-				ResultClient->ReportMatchResult(CurrentMatchId, CurrentMatchToken, GS->MapName,
-					DurationSec, EndReasonToString(Reason), ResultPlayers);
-			}
+			ResultClient = GI->GetSubsystem<UD1MatchResultSubsystem>();
 		}
 	}
 
-	// 클라들이 결과 화면 카운트다운 후 ClientTravel로 빠지면 DS가 스스로 종료.
-	if (World)
+	if (!ResultClient)
 	{
-		if (UD1DedicatedServerSubsystem* DS = World->GetSubsystem<UD1DedicatedServerSubsystem>())
+		// 보고할 곳이 없으면 기다릴 이유도 없다(PIE/standalone).
+		BeginShutdownAfterReport();
+
+		return;
+	}
+
+	// 보고가 확정되기 전에 프로세스가 죽으면 인플라이트 요청이 통째로 사라진다 —
+	// 셧다운 감시는 결과 POST가 확정(성공·409·확정 실패·재시도 소진)된 뒤에 시작한다.
+	const int32 DurationSec = FMath::Max(0,
+		FMath::RoundToInt(GS->GetServerWorldTimeSeconds() - GS->MatchStartServerTime));
+	ResultClient->ReportMatchResult(CurrentMatchId, CurrentMatchToken, GS->MapName,
+		DurationSec, EndReasonToString(Reason), ResultPlayers,
+		FSimpleDelegate::CreateWeakLambda(this, [this]()
 		{
-			DS->BeginShutdownWatch(ShutdownGraceSec);
-		}
+			BeginShutdownAfterReport();
+		}));
+
+	// 안전망 — 보고가 어떤 이유로든 확정 콜백에 도달하지 못해도 DS가 영원히 살아있지는 않게 한다.
+	World->GetTimerManager().SetTimer(ResultReportHardCapTimerHandle,
+		FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			UE_LOG(LogD1, Warning, TEXT("[Match] 결과 보고 하드캡(%.0fs) 도달 — 보고 대기 포기하고 종료 진행"),
+				ResultReportHardCapSec);
+			BeginShutdownAfterReport();
+		}),
+		ResultReportHardCapSec, /*bLoop=*/false);
+}
+
+void UD1MatchFlowComponent::BeginShutdownAfterReport()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	World->GetTimerManager().ClearTimer(ResultReportHardCapTimerHandle);
+
+	// 클라들이 결과 화면 카운트다운 후 ClientTravel로 빠지면 DS가 스스로 종료.
+	// 확정 콜백과 하드캡이 모두 도달할 수 있지만 BeginShutdownWatch가 멱등이라 첫 호출만 유효하다.
+	if (UD1DedicatedServerSubsystem* DS = World->GetSubsystem<UD1DedicatedServerSubsystem>())
+	{
+		DS->BeginShutdownWatch(ShutdownGraceSec);
 	}
 }
 

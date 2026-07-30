@@ -15,6 +15,13 @@ void UD1DedicatedServerSubsystem::BeginShutdownWatch(float InGraceSec)
 		return;
 	}
 
+	// 재호출로 Elapsed를 되돌리면 하드캡이 무한 연장된다 — 첫 호출의 유예만 유효.
+	if (bWatchStarted)
+	{
+		return;
+	}
+	bWatchStarted = true;
+
 	GraceSec = InGraceSec;
 	Elapsed = 0.f;
 	GetWorld()->GetTimerManager().SetTimer(
