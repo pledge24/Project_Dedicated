@@ -97,8 +97,12 @@ private:
 	FString CurrentMatchId;
 	FString CurrentMatchToken;
 
-	/** 결과 보고 확정을 기다리는 상한. 재시도 누적(30초)보다 넉넉해야 하고, 넘으면 보고를 포기하고 종료한다. */
-	float ResultReportHardCapSec = 60.f;
+	/**
+	 * 결과 보고 확정을 기다리는 상한. 넘으면 보고를 포기하고 종료한다.
+	 * 재시도 백오프 누적(30초)에 요청당 HTTP 타임아웃(기본 15초)이 곱해질 수 있어 그보다 넉넉해야 한다 —
+	 * 짧으면 재시도가 끝나기 전에 DS가 죽어 결과가 유실된다. DS 최대 수명(15분) 안이라 포트 점유 문제는 없다.
+	 */
+	float ResultReportHardCapSec = 120.f;
 
 //~ 탈주 처리(게임중 kick·접속 끊김)
 public:

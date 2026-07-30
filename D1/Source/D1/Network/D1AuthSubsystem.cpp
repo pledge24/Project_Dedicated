@@ -39,10 +39,7 @@ void UD1AuthSubsystem::RefreshMyProfile()
 		return;
 	}
 
-	const TSharedRef<IHttpRequest> Request = FHttpModule::Get().CreateRequest();
-	Request->SetURL(D1BackendHttp::GetBaseUrl() + TEXT("/api/auth/me"));
-	Request->SetVerb(TEXT("GET"));
-	Request->SetHeader(TEXT("Authorization"), D1BackendHttp::MakeBearer(Jwt));
+	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(GetGameInstance(), TEXT("/api/auth/me"), /*bAttachAuth=*/true);
 
 	TWeakObjectPtr<UD1AuthSubsystem> WeakThis(this);
 	Request->OnProcessRequestComplete().BindLambda(

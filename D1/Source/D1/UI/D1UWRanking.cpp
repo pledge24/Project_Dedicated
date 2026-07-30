@@ -4,8 +4,10 @@
 
 #include "Components/Button.h"
 #include "Components/ScrollBox.h"
+#include "Components/TextBlock.h"
 #include "Core/D1LogChannels.h"
 #include "Framework/D1GameInstance.h"
+#include "Network/BackendErrorMessages.h"
 #include "Network/D1RankingSubsystem.h"
 #include "UI/D1UWRankingRow.h"
 
@@ -32,10 +34,24 @@ void UD1UWRanking::HandleRankingCompleted(const FBackendResponse& Response, cons
 {
 	if (!Response.bOk)
 	{
-		// 실패해도 빈 슬롯으로 채워 레이아웃은 유지.
-		UE_LOG(LogD1, Warning, TEXT("[Ranking] 조회 실패 — 빈 목록 표시"));
+		// 실패를 빈 목록으로만 보여주면 "아무도 없음"과 구분이 안 된다 — 사유를 표면화한다.
+		const FString Msg = Response.ErrorMessage.IsEmpty()
+			? FBackendErrorMessages::Lookup(Response.ErrorCode)
+			: Response.ErrorMessage;
+		UE_LOG(LogD1, Warning, TEXT("[Ranking] 조회 실패 — %s"), *Msg);
+
+		if (ErrorLabel)
+		{
+			ErrorLabel->SetText(FText::FromString(Msg));
+			ErrorLabel->SetVisibility(ESlateVisibility::Visible);
+		}
+	}
+	else if (ErrorLabel)
+	{
+		ErrorLabel->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
+	// 실패해도 빈 슬롯으로 채워 레이아웃은 유지.
 	PopulateRows(Result);
 	ApplyMyRankRow(Result);
 }

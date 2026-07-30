@@ -9,6 +9,7 @@
 
 class UButton;
 class UScrollBox;
+class UTextBlock;
 class UD1UWRankingRow;
 
 /**
@@ -37,6 +38,10 @@ protected:
 	/** 스크롤 밖 하단 고정 본인 행(WBP_RankingRow 인스턴스). */
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UD1UWRankingRow> MyRankRow;
+
+	/** 조회 실패 사유 표시. 없으면(BP 미배치) 로그만 남고 빈 목록이 그대로 보인다. */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> ErrorLabel;
 
 private:
 	/** 항상 RankRowCount행 — 데이터 없는 뒤쪽은 빈 슬롯. 본인 행은 강조. */

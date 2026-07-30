@@ -37,6 +37,7 @@ namespace D1BackendHttp
 		const TSharedRef<IHttpRequest> Request = FHttpModule::Get().CreateRequest();
 		Request->SetURL(GetBaseUrl() + Path);
 		Request->SetVerb(TEXT("POST"));
+		Request->SetTimeout(GetDefault<UD1OnlineSettings>()->RequestTimeoutSec);
 		Request->SetHeader(TEXT("Content-Type"), TEXT("application/json; charset=utf-8"));
 		Request->SetContentAsString(SerializeJson(Body));
 
@@ -57,6 +58,8 @@ namespace D1BackendHttp
 		const TSharedRef<IHttpRequest> Request = FHttpModule::Get().CreateRequest();
 		Request->SetURL(GetBaseUrl() + Path);
 		Request->SetVerb(TEXT("GET"));
+		// 미설정 시 엔진 기본값(수 분) — 응답 없는 서버에 로그인 버튼이 그만큼 묶인다.
+		Request->SetTimeout(GetDefault<UD1OnlineSettings>()->RequestTimeoutSec);
 
 		if (bAttachAuth)
 		{

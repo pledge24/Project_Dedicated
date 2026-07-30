@@ -24,13 +24,8 @@ void UD1RankingSubsystem::FetchRanking(int32 Limit, int32 Offset, const FOnRanki
 		return;
 	}
 
-	const FString Url = FString::Printf(TEXT("%s/api/ranking?limit=%d&offset=%d"),
-		*D1BackendHttp::GetBaseUrl(), Limit, Offset);
-
-	const TSharedRef<IHttpRequest> Request = FHttpModule::Get().CreateRequest();
-	Request->SetURL(Url);
-	Request->SetVerb(TEXT("GET"));
-	Request->SetHeader(TEXT("Authorization"), D1BackendHttp::MakeBearer(Jwt));
+	const FString Path = FString::Printf(TEXT("/api/ranking?limit=%d&offset=%d"), Limit, Offset);
+	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(GetGameInstance(), Path, /*bAttachAuth=*/true);
 
 	TWeakObjectPtr<UD1RankingSubsystem> WeakThis(this);
 	const FOnRankingCompleted Forward = OnCompleted;
