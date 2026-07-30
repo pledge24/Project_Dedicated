@@ -42,35 +42,14 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
     const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 
     /** upgrade 이벤트(클라가 요청) 핸들 함수 추가 */
-    server.on('upgrade', async (req: IncomingMessage, socket: Duplex, head: Buffer) =>
+    server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) =>
     {
-        const { pathname } = new URL(req.url ?? '', 'http://localhost');
-        if (pathname !== WS_PATH)
+        // async 리스너를 그대로 등록하면 reject를 아무도 잡지 않아 unhandledRejection → 프로세스 종료다.
+        // 핸드셰이크 1건의 실패는 그 소켓만 버리고 끝나야 한다.
+        handleUpgrade(wss, req, socket, head).catch((err) =>
         {
+            logger.error({ err }, 'WS 업그레이드 처리 실패 — 소켓 종료');
             socket.destroy();
-
-            return;
-        }
-
-        /** socket error 이벤트에 핸들링 함수를 추가했다 삭제하는 이유는
-         *  인증 도중 error 발생 시, 핸들링 해줄 함수가 없기 때문.
-         *  그래서 임시용으로 추가했다 삭제하는 것.
-        */
-        socket.on('error', onSocketError);
-        const user = await authenticate(req);
-        if (!user)
-        {
-            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-            socket.destroy();
-
-            return;
-        }
-        socket.removeListener('error', onSocketError);
-
-        wss.handleUpgrade(req, socket, head, (ws) =>
-        {
-            // 해당 emit은 클라이언트를 향하지 않음. 바로 아래 있는 wss.on('connection')을 향한다.
-            wss.emit('connection', ws, req, user);
         });
     });
 
@@ -90,18 +69,26 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
     });
 
     // 죽은 연결 감지 — heartbeat 주기마다 pong 못 받은 소켓은 terminate.
+    // 타이머 콜백에서 새는 예외는 uncaughtException이 되므로 주기 단위로 가둔다.
     const heartbeat = setInterval(() =>
     {
-        for (const client of wss.clients)
+        try
         {
-            const newSocket = client as AuthedWs;
-            if (!newSocket.isAlive)
+            for (const client of wss.clients)
             {
-                newSocket.terminate();
-                continue;
+                const newSocket = client as AuthedWs;
+                if (!newSocket.isAlive)
+                {
+                    newSocket.terminate();
+                    continue;
+                }
+                newSocket.isAlive = false;
+                newSocket.ping();
             }
-            newSocket.isAlive = false;
-            newSocket.ping();
+        }
+        catch (err)
+        {
+            logger.warn({ err }, 'WS heartbeat 실패 — 이번 주기 건너뜀');
         }
     }, config.match.heartbeatMs);
     heartbeat.unref();
@@ -126,6 +113,39 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
             wss.close();
         },
     };
+}
+
+/** 업그레이드 핸드셰이크 본체 — 경로 확인 → JWT 인증 → connection으로 승격. */
+async function handleUpgrade(wss: WebSocketServer, req: IncomingMessage, socket: Duplex, head: Buffer): Promise<void>
+{
+    const { pathname } = new URL(req.url ?? '', 'http://localhost');
+    if (pathname !== WS_PATH)
+    {
+        socket.destroy();
+
+        return;
+    }
+
+    /** socket error 이벤트에 핸들링 함수를 추가했다 삭제하는 이유는
+     *  인증 도중 error 발생 시, 핸들링 해줄 함수가 없기 때문.
+     *  그래서 임시용으로 추가했다 삭제하는 것.
+    */
+    socket.on('error', onSocketError);
+    const user = await authenticate(req);
+    if (!user)
+    {
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.destroy();
+
+        return;
+    }
+    socket.removeListener('error', onSocketError);
+
+    wss.handleUpgrade(req, socket, head, (ws) =>
+    {
+        // 해당 emit은 클라이언트를 향하지 않음. attachMatchWebSocket의 wss.on('connection')을 향한다.
+        wss.emit('connection', ws, req, user);
+    });
 }
 
 /**
@@ -314,16 +334,31 @@ function onConnection(wss: WebSocketServer, ws: WebSocket, user: AuthedUser): vo
 /** 1초 사이클: 매칭 시도 → 성사 그룹마다 DS 할당+푸시(비동기). */
 function runMatchCycle(): void
 {
-    // runMatching이 매칭 즉시 큐에서 제거하므로, 비동기 할당 중 재매칭 위험은 없다.
-    const { groups, botFills } = service.runMatching(Date.now());
-    for (const group of groups)
+    // 이 함수의 예외는 타이머 콜백 밖으로 나가 uncaughtException → 프로세스 종료가 된다.
+    // 매치 하나의 실패가 진행 중인 다른 매치까지 끌고 죽지 않도록 사이클·매치 단위로 가둔다.
+    try
     {
-        void handleMatch(group);
+        // runMatching이 매칭 즉시 큐에서 제거하므로, 비동기 할당 중 재매칭 위험은 없다.
+        const { groups, botFills } = service.runMatching(Date.now());
+        for (const group of groups)
+        {
+            handleMatch(group).catch((err) =>
+            {
+                logger.error({ err, users: group.entries.map((e) => e.userId) }, '매치 처리 실패 — 이 매치만 폐기');
+            });
+        }
+        // 장기 대기자는 봇 3명과 즉시 게임 투입(봇전).
+        for (const entry of botFills)
+        {
+            handleBotMatch(entry).catch((err) =>
+            {
+                logger.error({ err, userId: entry.userId }, '봇전 처리 실패 — 이 매치만 폐기');
+            });
+        }
     }
-    // 장기 대기자는 봇 3명과 즉시 게임 투입(봇전).
-    for (const entry of botFills)
+    catch (err)
     {
-        void handleBotMatch(entry);
+        logger.error({ err }, '매칭 사이클 실패 — 다음 주기에 재시도');
     }
 }
 
