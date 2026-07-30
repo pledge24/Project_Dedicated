@@ -231,6 +231,47 @@ async function main(): Promise<void>
             assert.equal(flags.get(us[3].userId), 1, '탈주자2 abandoned=1 아님');
         }],
 
+        ['미입장자 — 4인 매치에 3명만 보고돼도 결과 저장(나머지는 최하위 미참가)', async () =>
+        {
+            const s = randomBytes(3).toString('hex');
+            const us = await seedUsers('ns', s, 4); // 모두 1000점
+            const mid = `ns-${s}-${randomBytes(4).toString('hex')}`;
+            const stk = randomBytes(24).toString('base64url');
+            await roster.register({
+                matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
+                players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `nj${i}` })),
+            });
+
+            // us[3]은 travel 실패로 한 번도 입장하지 않아 DS 결과에 아예 없다.
+            // 이전엔 인원 등호(!== 4)에 걸려 400 → 정상 플레이한 3명의 점수까지 통째로 유실됐다.
+            const body = {
+                matchId: mid, mapName: MAP, durationSec: 60, endReason: 'winner',
+                results: us.slice(0, 3).map((u, i) => ({ userId: u.userId, slotIndex: i, placement: i + 1, livesLeft: i === 0 ? 2 : 0 })),
+            };
+            const r = await post('/api/match/result', body, stk);
+            assert.equal(r.status, 200, JSON.stringify(r.body));
+
+            // roster 전원(4명)이 저장 — 미입장자는 최하위·abandoned=1. 200 자체가 slotIndex 중복 없음의 증거(DB UNIQUE).
+            assert.equal(await countParticipants(mid), 4, 'match_participants가 roster 인원(4)과 다름');
+            const flags = await selectAbandoned(us.map((u) => u.userId));
+            assert.equal(flags.get(us[3].userId), 1, '미입장자 abandoned=1 아님');
+            assert.equal(flags.get(us[0].userId), 0, '완주자 abandoned=0 아님');
+
+            // 보고된 3명의 점수가 실제로 갱신됐는가(= 유실되지 않았는가)가 이 케이스의 핵심.
+            const ps = r.body.data!.participants as Array<{ userId: number; placement: number; scoreDelta: number }>;
+            assert.equal(ps.length, 4, '응답 참가자 수가 4가 아님');
+            assert.ok(ps.find((p) => p.userId === us[0].userId)!.scoreDelta > 0, '완주 1위 delta 양수 아님');
+            assert.equal(ps.find((p) => p.userId === us[3].userId)!.placement, 4, '미입장자 placement가 최하위(4) 아님');
+            const scores = await selectScore(us.map((u) => u.userId));
+            assert.notEqual(scores.get(us[0].userId), 1000, '완주 1위 점수가 갱신되지 않음(결과 유실)');
+            assert.equal(scores.get(us[3].userId), 1000 + (-35 - config.match.leaverPenalty), '미입장자가 최하위로 정산되지 않음');
+
+            // 재제출 멱등은 그대로.
+            const dup = await post('/api/match/result', body, stk);
+            assert.equal(dup.status, 409, JSON.stringify(dup.body));
+            assert.equal(dup.body.error?.code, 'RESULT_ALREADY_SUBMITTED');
+        }],
+
         ['탈주 경합 — /leaver 다수와 /result 동시 발사해도 각 탈주자 정확히 1회 정산', async () =>
         {
             const s = randomBytes(3).toString('hex');
