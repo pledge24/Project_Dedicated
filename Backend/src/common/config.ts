@@ -64,6 +64,8 @@ export const config = Object.freeze({
     ranking: Object.freeze({
         defaultLimit: asNumber('RANKING_DEFAULT_LIMIT', 50),
         maxLimit:     asNumber('RANKING_MAX_LIMIT', 100),
+        // offset 상한 — MySQL은 OFFSET N을 N행 스캔 후 버리므로 큰 값이 그대로 인덱스 풀스캔이 된다.
+        maxOffset:    asNumber('RANKING_MAX_OFFSET', 10_000),
     }),
 });
 
