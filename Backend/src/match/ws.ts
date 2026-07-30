@@ -413,17 +413,30 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     }
 
     // 3) roster 등록을 spawn 직후로 앞당김 — DS의 ready 콜백을 assertServerToken으로 인증하려면 명단이 있어야 함.
-    roster.register({
-        matchId,
-        serverToken,
-        mapName: config.match.ds.map,
-        startedAt: Date.now(),
-        players: joinPlayers.map((p) => ({
-            userId: p.userId,
-            nickname: p.nickname,
-            joinToken: p.joinToken,
-        })),
-    });
+    //    DB 저장 실패 시 매치를 버린다: roster 없이 진행하면 ready 콜백도 결과 보고도 404가 된다.
+    try
+    {
+        await roster.register({
+            matchId,
+            serverToken,
+            mapName: config.match.ds.map,
+            startedAt: Date.now(),
+            players: joinPlayers.map((p) => ({
+                userId: p.userId,
+                nickname: p.nickname,
+                joinToken: p.joinToken,
+            })),
+        });
+    }
+    catch (err)
+    {
+        allocator.release(server.port);
+        dsApiState.clear(matchId);
+        const requeued = service.abortFormation(group.entries);
+        logger.error({ err, matchId, requeued }, 'roster 등록 실패 — DS 회수, 생존자 재큐');
+
+        return;
+    }
 
     // 4) DS가 "플레이어 받을 준비됨"을 통지할 때까지 대기(stub은 즉시 통과). 실패 시 회수 + 생존자 재큐.
     try
@@ -433,9 +446,9 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     catch (err)
     {
         allocator.release(server.port);
-        roster.remove(matchId);
         dsApiState.clear(matchId);
         const requeued = service.abortFormation(group.entries);
+        await removeRosterQuietly(matchId);
         logger.warn({ err, matchId, requeued }, 'DS 준비 실패/타임아웃 — DS 회수, 생존자 재큐');
 
         return;
@@ -445,9 +458,9 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     if (group.entries.some((e) => !service.isInFormation(e.userId) || e.ref.readyState !== WebSocket.OPEN))
     {
         allocator.release(server.port);
-        roster.remove(matchId);
         dsApiState.clear(matchId);
         const requeued = service.abortFormation(group.entries);
+        await removeRosterQuietly(matchId);
         logger.warn({ matchId, requeued }, '확정 창 이탈 — DS 회수, 생존자 재큐');
 
         return;
@@ -507,16 +520,28 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
     }
 
     // 3) roster 등록(휴먼 + 봇)을 spawn 직후로 앞당김 — DS의 ready 콜백 인증(assertServerToken)에 명단 필요.
-    roster.register({
-        matchId,
-        serverToken,
-        mapName: config.match.ds.map,
-        startedAt: Date.now(),
-        players: [
-            { userId: entry.userId, nickname: entry.nickname, joinToken },
-            ...bots.map((b) => ({ userId: b.userId, nickname: b.nickname, joinToken: '', bot: true, rating: b.rating })),
-        ],
-    });
+    try
+    {
+        await roster.register({
+            matchId,
+            serverToken,
+            mapName: config.match.ds.map,
+            startedAt: Date.now(),
+            players: [
+                { userId: entry.userId, nickname: entry.nickname, joinToken },
+                ...bots.map((b) => ({ userId: b.userId, nickname: b.nickname, joinToken: '', bot: true, rating: b.rating })),
+            ],
+        });
+    }
+    catch (err)
+    {
+        allocator.release(server.port);
+        dsApiState.clear(matchId);
+        const requeued = service.abortFormation([entry]);
+        logger.error({ err, matchId, userId: entry.userId, requeued }, '봇전 roster 등록 실패 — DS 회수, 재큐');
+
+        return;
+    }
 
     // 4) DS 준비 통지 대기(stub은 즉시 통과). 실패 시 DS 회수 + roster 제거 + 휴먼 재큐.
     try
@@ -526,9 +551,9 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
     catch (err)
     {
         allocator.release(server.port);
-        roster.remove(matchId);
         dsApiState.clear(matchId);
         const requeued = service.abortFormation([entry]);
+        await removeRosterQuietly(matchId);
         logger.warn({ err, matchId, userId: entry.userId, requeued }, '봇전 DS 준비 실패/타임아웃 — DS 회수');
 
         return;
@@ -538,9 +563,9 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
     if (!service.isInFormation(entry.userId) || entry.ref.readyState !== WebSocket.OPEN)
     {
         allocator.release(server.port);
-        roster.remove(matchId);
         dsApiState.clear(matchId);
         const requeued = service.abortFormation([entry]);
+        await removeRosterQuietly(matchId);
         logger.warn({ matchId, userId: entry.userId, requeued }, '봇전 확정 창 이탈 — DS 회수');
 
         return;
@@ -551,4 +576,21 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
     allocator.commit(matchId);
     send(entry.ref, { type: 'match:found', ok: true, data: { matchId, server: { host: server.host, port: server.port }, joinToken } });
     logger.info({ matchId, server, userId: entry.userId, bots: bots.length }, '봇전 성사');
+}
+
+/**
+ * 롤백 경로의 roster 정리 — DB 실패가 재큐를 막아선 안 된다.
+ * 남더라도 미확정 매치라 DS가 이미 회수됐고, 만료 sweep이 결국 치운다.
+ * (호출 순서상 메모리 롤백을 먼저 끝낸 뒤 호출한다.)
+ */
+async function removeRosterQuietly(matchId: string): Promise<void>
+{
+    try
+    {
+        await roster.remove(matchId);
+    }
+    catch (err)
+    {
+        logger.warn({ err, matchId }, 'roster 제거 실패 — 만료 sweep에 위임');
+    }
 }

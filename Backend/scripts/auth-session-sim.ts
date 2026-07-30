@@ -235,7 +235,7 @@ async function main(): Promise<void>
 
             const mid = `ksim-${s2}`;
             const stk = randomBytes(24).toString('base64url');
-            roster.register({
+            await roster.register({
                 matchId: mid,
                 serverToken: stk,
                 mapName: 'default map',

@@ -1,5 +1,7 @@
 // 매치 결과 엔드포인트 통합 하네스(인프로세스). 앱을 같은 프로세스에 띄워 roster를 직접 시드한다
-// (roster는 인메모리라 별도 프로세스에선 못 건드림). 언리얼 DS 없이 F5a를 끝까지 검증.
+// (roster 캐시는 인메모리라 별도 프로세스에선 못 건드림). 언리얼 DS 없이 F5a를 끝까지 검증.
+// 시드한 match_rosters 행은 다른 시드 데이터(users·matches)와 마찬가지로 남긴다 — roster.sweep이
+// DS 최대 수명 경과분을 자동 청소하므로 별도 정리가 필요 없다.
 // 실행: npm run match:result-sim   (MySQL 가동 + Backend/.env 필요. 임의 빈 포트로 listen.)
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import assert from 'node:assert/strict';
@@ -55,7 +57,7 @@ async function main(): Promise<void>
     // 2. roster 시드(같은 프로세스라 서버가 보는 그 Map) + 결과 본문
     const matchId = `sim-${suffix}-${randomBytes(4).toString('hex')}`;
     const serverToken = randomBytes(24).toString('base64url');
-    roster.register({
+    await roster.register({
         matchId,
         serverToken,
         mapName: MAP,
@@ -159,7 +161,7 @@ async function main(): Promise<void>
             const us = await seedUsers('lv', s, 4); // 모두 1000점
             const mid = `lv-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            roster.register({
+            await roster.register({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `lj${i}` })),
             });
@@ -203,7 +205,7 @@ async function main(): Promise<void>
             const us = await seedUsers('esc', s, 4); // 모두 1000점
             const mid = `esc-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            roster.register({
+            await roster.register({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `ej${i}` })),
             });
@@ -235,7 +237,7 @@ async function main(): Promise<void>
             const us = await seedUsers('rc', s, 4); // 모두 1000점
             const mid = `rc-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            roster.register({
+            await roster.register({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `rj${i}` })),
             });
@@ -281,7 +283,7 @@ async function main(): Promise<void>
 
             const mid = `zsim-${s2}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            roster.register({
+            await roster.register({
                 matchId: mid,
                 serverToken: stk,
                 mapName: MAP,
@@ -313,7 +315,7 @@ async function main(): Promise<void>
             const hu = (await seedUsers('bf', s, 1))[0]; // 1000점
             const mid = `bf-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            roster.register({
+            await roster.register({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: [
                     { userId: hu.userId, nickname: hu.nickname, joinToken: 'bfjoin' },
@@ -349,7 +351,7 @@ async function main(): Promise<void>
             const hu = (await seedUsers('bw', s, 1))[0];
             const mid = `bw-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            roster.register({
+            await roster.register({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: [
                     { userId: hu.userId, nickname: hu.nickname, joinToken: 'bwjoin' },
