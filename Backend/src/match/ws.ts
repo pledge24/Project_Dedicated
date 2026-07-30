@@ -363,18 +363,18 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     try
     {
         server = config.match.ds.enabled
-            ? ds.allocate(matchId, serverToken, group.entries.length,
+            ? await ds.allocate(matchId, serverToken, group.entries.length,
                 joinPlayers.map((p) => ({ joinToken: p.joinToken, userId: p.userId, nickname: p.nickname })))
             : config.match.stubServer;
     }
     catch (err)
     {
-        logger.error({ err, matchId }, 'DS 할당 실패 — 매치 취소');
-        service.endFormation(userIds);
-        for (const e of group.entries)
-        {
-            sendError(e.ref, 'error', Codes.INTERNAL_ERROR, '게임 서버 할당에 실패했습니다.');
-        }
+        // 포트 고갈은 고아 DS나 진행 중 매치가 빠지면 풀리는 일시적 상태다 → 준비 타임아웃 경로(아래 4)와
+        // 같이 생존자를 재큐한다. endFormation은 재큐를 안 해 대기자를 조용히 떨어뜨렸다.
+        // error를 보내지 않는 것도 의도적 — 클라의 error 핸들러는 MatchmakingState를 Idle로 되돌리지 않아
+        // (queue:left와 달리) 재큐와 조합하면 서버/클라 상태가 어긋난다.
+        const requeued = service.abortFormation(group.entries);
+        logger.error({ err, matchId, requeued }, 'DS 할당 실패 — 생존자 재큐');
 
         return;
     }
@@ -465,16 +465,16 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
     try
     {
         server = config.match.ds.enabled
-            ? ds.allocate(matchId, serverToken, config.match.playersPerMatch,
+            ? await ds.allocate(matchId, serverToken, config.match.playersPerMatch,
                 [{ joinToken, userId: entry.userId, nickname: entry.nickname }],
                 bots.map((b) => ({ userId: b.userId, nickname: b.nickname })))
             : config.match.stubServer;
     }
     catch (err)
     {
-        logger.error({ err, matchId }, '봇전 DS 할당 실패 — 취소');
-        service.endFormation([entry.userId]);
-        sendError(entry.ref, 'error', Codes.INTERNAL_ERROR, '게임 서버 할당에 실패했습니다.');
+        // handleMatch와 동일 — 일시적 고갈이므로 재큐(봇전 대기 시간도 원 joinedAt으로 보존된다).
+        const requeued = service.abortFormation([entry]);
+        logger.error({ err, matchId, userId: entry.userId, requeued }, '봇전 DS 할당 실패 — 재큐');
 
         return;
     }
