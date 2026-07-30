@@ -1,9 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Framework/D1BotController.h"
-#include "DrawDebugHelpers.h"
 #include "EngineUtils.h"
-#include "HAL/IConsoleManager.h"
 
 #include "Game/Character/D1BomberCharacter.h"
 #include "Game/D1Bomb.h"
@@ -21,12 +19,6 @@ namespace
 		FIntPoint( 0,  1),
 		FIntPoint( 0, -1)
 	};
-
-	TAutoConsoleVariable<int32> CVarBotDebug(
-		TEXT("d1.BotDebug"),
-		0,
-		TEXT("봇 AI 디버그 시각화(위험셀/경로/상태). 0=off, 1=on."),
-		ECVF_Default);
 }
 
 AD1BotController::AD1BotController()
@@ -72,7 +64,6 @@ void AD1BotController::Tick(float DeltaSeconds)
 	{
 		ThinkAccumulatorSec = 0.f;
 		Think(Bot, GS, PS);
-		DrawDebug(Bot);
 	}
 	SteerAlongPath(Bot);
 }
@@ -347,50 +338,4 @@ void AD1BotController::EnsureSeeded(const AD1BomberPlayerState* PS)
 
 	ThinkIntervalSec *= Rng.FRandRange(1.f - ThinkIntervalJitter, 1.f + ThinkIntervalJitter);
 	AggressionBias = Rng.FRandRange(0.3f, 0.9f);
-}
-
-void AD1BotController::DrawDebug(const AD1BomberCharacter* Bot) const
-{
-	if (CVarBotDebug.GetValueOnGameThread() == 0)
-	{
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World || !Bot)
-	{
-		return;
-	}
-
-	const float Z = Bot->GetActorLocation().Z;
-	// 사고 주기보다 약간 길게 유지 → 매 사고마다 갱신되며 깜빡임 없음.
-	const float Life = ThinkIntervalSec * 1.5f;
-
-	for (const FIntPoint& C : DangerCells)
-	{
-		DrawDebugBox(World, UD1BomberGridLibrary::CellToWorldCenter(C, Z), FVector(45.f, 45.f, 20.f), FColor::Red, false, Life, 0, 2.f);
-	}
-	for (const FIntPoint& C : CurrentPath)
-	{
-		DrawDebugBox(World, UD1BomberGridLibrary::CellToWorldCenter(C, Z), FVector(28.f, 28.f, 28.f), FColor::Green, false, Life, 0, 2.f);
-	}
-	if (CurrentPath.IsValidIndex(PathIndex))
-	{
-		DrawDebugSphere(World, UD1BomberGridLibrary::CellToWorldCenter(CurrentPath[PathIndex], Z), 25.f, 8, FColor::Yellow, false, Life);
-	}
-
-	const TCHAR* StateLabel = TEXT("Idle");
-	switch (State)
-	{
-	case EBotState::Seek:
-		StateLabel = TEXT("Seek");
-		break;
-	case EBotState::Flee:
-		StateLabel = TEXT("Flee");
-		break;
-	default:
-		break;
-	}
-	DrawDebugString(World, Bot->GetActorLocation() + FVector(0.f, 0.f, 120.f),
-		FString::Printf(TEXT("%s (bombs %d)"), StateLabel, OwnActiveBombCount), nullptr, FColor::White, Life, false);
 }

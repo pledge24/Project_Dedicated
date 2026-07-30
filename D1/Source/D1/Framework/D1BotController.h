@@ -58,9 +58,6 @@ private:
 	/** 첫 Think에서 1회: 봇별 난수 시드 → 사고주기 지터·공격성 편향(움직임 다양성). */
 	void EnsureSeeded(const AD1BomberPlayerState* PS);
 
-	/** d1.BotDebug 켜지면 위험셀(빨강)·경로(초록)·현재 웨이포인트(노랑)·상태명을 서버 월드에 그림(=PIE 뷰포트). */
-	void DrawDebug(const AD1BomberCharacter* Bot) const;
-
 	/** 사고 주기(초). 도화선 3s·잔류 0.5s 대비 충분한 반응성, 매 프레임 부담 회피. */
 	float ThinkIntervalSec = 0.15f;
 
@@ -91,7 +88,8 @@ private:
 	TSet<FIntPoint> EnemyCells;
 	TSet<FIntPoint> HazardCells;
 	TSet<FIntPoint> ItemCells;
-	int32 OwnActiveBombCount = 0;	// Debug용
+	/** 이 봇이 설치해 아직 안 터진 폭탄 수 — 용량(GetBombCapacity) 초과 설치 차단용. */
+	int32 OwnActiveBombCount = 0;
 
 	/** 봇별 개성(EnsureSeeded에서 1회 설정). */
 	FRandomStream Rng;
