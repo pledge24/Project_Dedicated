@@ -118,11 +118,6 @@ export function shutdownAll(): void
     }
 }
 
-export function runningCount(): number
-{
-    return running.size;
-}
-
 /** 특정 포트의 DS를 즉시 회수. 확정 창에서 매치가 취소돼 스폰한 DS를 버릴 때 사용(killProcess public 래퍼). */
 export function release(port: number): void
 {

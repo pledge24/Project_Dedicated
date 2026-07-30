@@ -7,7 +7,7 @@ import buildApp from './app.js';
 import { config } from './common/config.js';
 import { closePool } from './common/db.js';
 import { logger } from './common/logger.js';
-import * as ds from './match/ds.js';
+import { allocator } from './match/dsAllocator.js';
 import { attachMatchWebSocket } from './match/ws.js';
 
 const app = buildApp();
@@ -16,18 +16,15 @@ const app = buildApp();
 const server = http.createServer(app);
 const matchWs = attachMatchWebSocket(server);
 
-// 리스닝 전에 DS 포트 풀을 점검 — 이전 실행이 크래시로 남긴 고아 DS를 로그로 드러낸다.
+// 리스닝 전에 DS 잔재 점검 — 이전 실행이 크래시로 남긴 고아 DS를 로그로 드러낸다(stub은 no-op).
 // 실패해도 기동은 막지 않는다(진단용이라 서비스 가용성보다 우선순위가 낮다).
-if (config.match.ds.enabled)
+try
 {
-    try
-    {
-        await ds.reapOrphans();
-    }
-    catch (err)
-    {
-        logger.warn({ err }, 'DS 포트 풀 점검 실패 — 건너뜀');
-    }
+    await allocator.reapOrphans();
+}
+catch (err)
+{
+    logger.warn({ err }, 'DS 잔재 점검 실패 — 건너뜀');
 }
 
 server.listen(config.port, () =>

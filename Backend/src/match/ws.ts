@@ -15,12 +15,11 @@ import { logger } from '../common/logger.js';
 import { getCurrentTokenVersion, onSuperseded } from '../common/session.js';
 import type { AuthedUser } from '../common/types.js';
 import { makeBotOpponents } from './bots.js';
-import * as ds from './ds.js';
+import { allocator } from './dsAllocator.js';
 import * as dsApiState from './dsApi.state.js';
 import * as service from './matchmaking.service.js';
 import type { ClientMessage, ServerMessage, ServerMessageType } from './protocol.js';
 import type { MatchGroup, QueueEntry } from './queue.js';
-import * as readiness from './readiness.js';
 import * as roster from './roster.js';
 
 const WS_PATH = '/ws/match';
@@ -119,7 +118,7 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
             offSuperseded();
             clearInterval(heartbeat);
             clearInterval(cycle);
-            ds.shutdownAll();
+            allocator.shutdownAll();
             for (const client of wss.clients)
             {
                 client.terminate();
@@ -358,14 +357,12 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
         return;
     }
 
-    // 2) 매치를 실행할 DS를 spawn(또는 stub). 할당 실패(포트 고갈)는 복구 불가라 error 전송.
+    // 2) 매치를 실행할 DS 확보(로컬 프로세스든 stub이든 allocator가 결정).
     let server: { host: string; port: number };
     try
     {
-        server = config.match.ds.enabled
-            ? await ds.allocate(matchId, serverToken, group.entries.length,
-                joinPlayers.map((p) => ({ joinToken: p.joinToken, userId: p.userId, nickname: p.nickname })))
-            : config.match.stubServer;
+        server = await allocator.allocate(matchId, serverToken, group.entries.length,
+            joinPlayers.map((p) => ({ joinToken: p.joinToken, userId: p.userId, nickname: p.nickname })));
     }
     catch (err)
     {
@@ -392,32 +389,26 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
         })),
     });
 
-    // 4) DS가 "플레이어 받을 준비됨"을 통지할 때까지 대기(상한 readyTimeoutMs). 타임아웃/부팅 실패 시 회수 + 생존자 재큐.
-    if (config.match.ds.enabled)
+    // 4) DS가 "플레이어 받을 준비됨"을 통지할 때까지 대기(stub은 즉시 통과). 실패 시 회수 + 생존자 재큐.
+    try
     {
-        try
-        {
-            await readiness.waitForReady(matchId, config.match.ds.readyTimeoutMs);
-        }
-        catch (err)
-        {
-            ds.release(server.port);
-            roster.remove(matchId);
-            dsApiState.clear(matchId);
-            const requeued = service.abortFormation(group.entries);
-            logger.warn({ err, matchId, requeued }, 'DS 준비 실패/타임아웃 — DS 회수, 생존자 재큐');
+        await allocator.waitUntilReady(matchId);
+    }
+    catch (err)
+    {
+        allocator.release(server.port);
+        roster.remove(matchId);
+        dsApiState.clear(matchId);
+        const requeued = service.abortFormation(group.entries);
+        logger.warn({ err, matchId, requeued }, 'DS 준비 실패/타임아웃 — DS 회수, 생존자 재큐');
 
-            return;
-        }
+        return;
     }
 
     // 5) 준비 대기 사이 끊김/재접속/취소 포착(userId 기준). 하나라도 이탈 시 DS 회수 + roster 제거 + 생존자 재큐.
     if (group.entries.some((e) => !service.isInFormation(e.userId) || e.ref.readyState !== WebSocket.OPEN))
     {
-        if (config.match.ds.enabled)
-        {
-            ds.release(server.port);
-        }
+        allocator.release(server.port);
         roster.remove(matchId);
         dsApiState.clear(matchId);
         const requeued = service.abortFormation(group.entries);
@@ -464,11 +455,9 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
     let server: { host: string; port: number };
     try
     {
-        server = config.match.ds.enabled
-            ? await ds.allocate(matchId, serverToken, config.match.playersPerMatch,
-                [{ joinToken, userId: entry.userId, nickname: entry.nickname }],
-                bots.map((b) => ({ userId: b.userId, nickname: b.nickname })))
-            : config.match.stubServer;
+        server = await allocator.allocate(matchId, serverToken, config.match.playersPerMatch,
+            [{ joinToken, userId: entry.userId, nickname: entry.nickname }],
+            bots.map((b) => ({ userId: b.userId, nickname: b.nickname })));
     }
     catch (err)
     {
@@ -491,32 +480,26 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
         ],
     });
 
-    // 4) DS 준비 통지 대기. 타임아웃/부팅 실패 시 DS 회수 + roster 제거 + 휴먼 재큐.
-    if (config.match.ds.enabled)
+    // 4) DS 준비 통지 대기(stub은 즉시 통과). 실패 시 DS 회수 + roster 제거 + 휴먼 재큐.
+    try
     {
-        try
-        {
-            await readiness.waitForReady(matchId, config.match.ds.readyTimeoutMs);
-        }
-        catch (err)
-        {
-            ds.release(server.port);
-            roster.remove(matchId);
-            dsApiState.clear(matchId);
-            const requeued = service.abortFormation([entry]);
-            logger.warn({ err, matchId, userId: entry.userId, requeued }, '봇전 DS 준비 실패/타임아웃 — DS 회수');
+        await allocator.waitUntilReady(matchId);
+    }
+    catch (err)
+    {
+        allocator.release(server.port);
+        roster.remove(matchId);
+        dsApiState.clear(matchId);
+        const requeued = service.abortFormation([entry]);
+        logger.warn({ err, matchId, userId: entry.userId, requeued }, '봇전 DS 준비 실패/타임아웃 — DS 회수');
 
-            return;
-        }
+        return;
     }
 
     // 5) 준비 대기 사이 끊김/재접속/취소 포착. 이탈 시 DS 회수 + roster 제거 + 생존 시 재큐.
     if (!service.isInFormation(entry.userId) || entry.ref.readyState !== WebSocket.OPEN)
     {
-        if (config.match.ds.enabled)
-        {
-            ds.release(server.port);
-        }
+        allocator.release(server.port);
         roster.remove(matchId);
         dsApiState.clear(matchId);
         const requeued = service.abortFormation([entry]);
