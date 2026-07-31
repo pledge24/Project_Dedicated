@@ -43,6 +43,12 @@ void UD1MatchmakingSubsystem::CheckRejoinableMatch()
 				return;
 			}
 
+			// 로비 진입 직후는 첫 heartbeat 전이라 이 요청이 세션 대체를 감지할 유일한 창이다.
+			if (D1BackendHttp::HandleSupersededIfAny(Self->GetGameInstance(), Res))
+			{
+				return;
+			}
+
 			// 실패는 조용히 무시한다 — 재입장은 있으면 좋은 복구 경로지 로비 진입을 막을 이유가 아니다.
 			if (!bSucceeded || !Res.IsValid() || Res->GetResponseCode() != 200)
 			{
