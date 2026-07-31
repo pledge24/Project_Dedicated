@@ -37,15 +37,8 @@ void UD1BomberGridLibrary::TraceExplosionCells(
 	
 	// 원점(Origin) 추가.
 	OutCells.Insert(Origin, 0);
-	
-	static const FIntPoint Directions[4] = {
-		FIntPoint( 1,  0),
-		FIntPoint(-1,  0),
-		FIntPoint( 0,  1),
-		FIntPoint( 0, -1)
-	};
 
-	for (const FIntPoint& Dir : Directions)
+	for (const FIntPoint& Dir : NeighborDirs)
 	{
 		for (int32 Step = 1; Step <= Range; ++Step)
 		{
@@ -85,13 +78,6 @@ bool UD1BomberGridLibrary::FindNearestReachable(
 		return false;
 	}
 
-	static const FIntPoint Directions[4] = {
-		FIntPoint( 1,  0),
-		FIntPoint(-1,  0),
-		FIntPoint( 0,  1),
-		FIntPoint( 0, -1)
-	};
-
 	// TArray + Head 인덱스로 FIFO 큐 대용(거리순 확장 → 첫 goal이 최근접).
 	TArray<FIntPoint> Frontier;
 	Frontier.Add(Start);
@@ -113,7 +99,7 @@ bool UD1BomberGridLibrary::FindNearestReachable(
 			break;
 		}
 
-		for (const FIntPoint& Dir : Directions)
+		for (const FIntPoint& Dir : NeighborDirs)
 		{
 			const FIntPoint Next = Cur + Dir;
 			if (Visited.Contains(Next))

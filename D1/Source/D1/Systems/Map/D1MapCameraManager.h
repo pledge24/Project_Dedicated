@@ -19,9 +19,6 @@ class AD1MapCameraManager : public APlayerCameraManager
 {
 	GENERATED_BODY()
 
-public:
-	AD1MapCameraManager();
-
 protected:
 	//~ Begin APlayerCameraManager Interface
 	virtual void UpdateViewTarget(FTViewTarget& OutVT, float DeltaTime) override;
@@ -44,6 +41,5 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber|Camera")
 	bool bUseGridFraming = false;
 
-	UPROPERTY(Transient)
 	TWeakObjectPtr<AActor> CachedCamera;
 };

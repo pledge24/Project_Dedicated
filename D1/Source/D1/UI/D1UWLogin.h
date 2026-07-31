@@ -8,7 +8,6 @@
 #include "D1UWLogin.generated.h"
 
 class UButton;
-class UEditableTextBox;
 
 /**
  *  로그인 위젯.

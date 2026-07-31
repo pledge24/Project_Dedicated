@@ -5,10 +5,6 @@
 #include "Framework/D1MatchFlowComponent.h"
 #include "Net/UnrealNetwork.h"
 
-namespace
-{
-	constexpr int32 BomberMaxSlots = 4;
-}
 
 AD1BomberGameState::AD1BomberGameState()
 {
@@ -85,7 +81,7 @@ float AD1BomberGameState::GetRemainingTimeSec() const
 TArray<AD1BomberPlayerState*> AD1BomberGameState::GetPlayerStatesBySlot() const
 {
 	TArray<AD1BomberPlayerState*> BySlot;
-	BySlot.Init(nullptr, BomberMaxSlots);
+	BySlot.Init(nullptr, D1MaxPlayerSlots);
 
 	for (APlayerState* PS : PlayerArray)
 	{

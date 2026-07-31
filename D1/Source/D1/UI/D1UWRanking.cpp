@@ -25,7 +25,7 @@ void UD1UWRanking::NativeConstruct()
 	{
 		FOnRankingCompleted OnCompleted;
 		OnCompleted.BindDynamic(this, &UD1UWRanking::HandleRankingCompleted);
-		// 가져오는 랭킹은 TOP 50 + 본인 랭크로 고정.
+		// 상위 RankRowCount명 + 본인 랭크 조회.
 		Ranking->FetchRanking(RankRowCount, 0, OnCompleted);
 	}
 }

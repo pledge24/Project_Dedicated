@@ -14,16 +14,6 @@
 #include "Framework/D1BomberGameState.h"
 #include "Framework/D1BomberPlayerState.h"
 
-namespace
-{
-	const FIntPoint BotNeighborDirs[4] = {
-		FIntPoint( 1,  0),
-		FIntPoint(-1,  0),
-		FIntPoint( 0,  1),
-		FIntPoint( 0, -1)
-	};
-}
-
 AD1BotController::AD1BotController()
 {
 	// AIController 기본값 false — 켜야 PlayerState가 생성돼 PlayerArray에 잡힌다(Lyra 봇 생성 패턴).
@@ -326,7 +316,7 @@ bool AD1BotController::IsAdjacentToSoftBlock(const AD1BomberGameState* GS, const
 		return false;
 	}
 
-	for (const FIntPoint& Dir : BotNeighborDirs)
+	for (const FIntPoint& Dir : UD1BomberGridLibrary::NeighborDirs)
 	{
 		if (GS->IsSoftBlockCell(Cell + Dir))
 		{
@@ -338,7 +328,7 @@ bool AD1BotController::IsAdjacentToSoftBlock(const AD1BomberGameState* GS, const
 
 bool AD1BotController::IsAdjacentToEnemy(const FIntPoint& Cell) const
 {
-	for (const FIntPoint& Dir : BotNeighborDirs)
+	for (const FIntPoint& Dir : UD1BomberGridLibrary::NeighborDirs)
 	{
 		if (EnemyCells.Contains(Cell + Dir))
 		{

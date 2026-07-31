@@ -5,20 +5,20 @@ import { config } from '../common/config.js';
 import * as ds from './ds.js';
 import * as readiness from './readiness.js';
 
-export interface DsServer
+interface DsServer
 {
     host: string;
     port: number;
 }
 
-export interface DsRosterEntry
+interface DsRosterEntry
 {
     joinToken: string;
     userId: number;
     nickname: string;
 }
 
-export interface DsBotEntry
+interface DsBotEntry
 {
     userId: number;
     nickname: string;

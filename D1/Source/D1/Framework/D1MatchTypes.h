@@ -5,6 +5,9 @@
 #include "CoreMinimal.h"
 #include "D1MatchTypes.generated.h"
 
+/** 매치 최대 슬롯 수(4인 개인전). 유효 슬롯 인덱스 = 0..D1MaxPlayerSlots-1. */
+inline constexpr int32 D1MaxPlayerSlots = 4;
+
 /** 매치 종료 사유. DS가 백엔드 결과 POST의 endReason으로 변환해 보낸다. */
 UENUM()
 enum class EBomberEndReason : uint8

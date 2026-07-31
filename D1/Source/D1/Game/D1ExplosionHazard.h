@@ -32,7 +32,7 @@ private:
 
 	/** 반복 스윕 간격(초). 셀(100cm)을 한 틱에 못 건너뛸 만큼 촘촘하게. */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
-	float HazardSweepInterval = 0.05f;
+	float HazardSweepIntervalSec = 0.05f;
 
 	/** 피격 박스: 셀보다 약간 작은 가로(45) + 캐릭터 높이(80). */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")

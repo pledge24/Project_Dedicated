@@ -85,14 +85,13 @@ void UD1MatchmakingSubsystem::StartMatchmaking()
 	MatchSocket = FWebSocketsModule::Get().CreateWebSocket(Url, TArray<FString>(), UpgradeHeaders);
 
 	// CreateWebSocket은 스킴 미지원 URL(BaseUrl 오설정 등)에 null을 반환한다 — 바로 역참조하면
-	// 매칭 버튼 한 번으로 클라가 죽는다. 상태를 되돌리고 에러로 표면화한다.
+	// 매칭 버튼 한 번으로 클라가 죽는다. 에러로 표면화한다(상태는 아직 Idle).
 	if (!MatchSocket.IsValid())
 	{
 		FBackendResponse Err;
 		Err.bOk = false;
 		Err.ErrorCode = EBackendErrorCode::NetworkError;
 		Err.ErrorMessage = TEXT("매칭 서버 주소가 올바르지 않습니다.");
-		MatchmakingState = EMatchmakingState::Idle;
 		UE_LOG(LogD1, Error, TEXT("[Match] WS 생성 실패 — URL 확인 필요: %s"), *Url);
 		OnMatchmakingError.Broadcast(Err);
 
@@ -267,7 +266,6 @@ void UD1MatchmakingSubsystem::HandleSocketConnectionError(const FString& Error)
 	FBackendResponse Err;
 	Err.bOk = false;
 	Err.ErrorCode = EBackendErrorCode::NetworkError;
-	Err.ErrorMessage = TEXT("");
 	OnMatchmakingError.Broadcast(Err);
 }
 

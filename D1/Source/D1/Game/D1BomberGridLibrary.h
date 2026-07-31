@@ -71,4 +71,12 @@ public:
 	static constexpr float CellSize = 100.f;
 	/** 셀 중심 높이·블록 반폭·폭탄칸 풋프린트 공용(=50). */
 	static constexpr float CellHalf = CellSize * 0.5f;
+
+	/** 4방향 이웃(우/좌/하/상). 폭발 추적·BFS·봇 인접 판정 공용. */
+	inline static const FIntPoint NeighborDirs[4] = {
+		FIntPoint( 1,  0),
+		FIntPoint(-1,  0),
+		FIntPoint( 0,  1),
+		FIntPoint( 0, -1)
+	};
 };

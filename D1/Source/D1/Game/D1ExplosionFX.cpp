@@ -21,23 +21,23 @@ void AD1ExplosionFX::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	Elapsed += DeltaSeconds;
-	if (Elapsed >= Lifetime)
+	ElapsedSec += DeltaSeconds;
+	if (ElapsedSec >= LifetimeSec)
 	{
 		Destroy();
 		return;
 	}
 
 	float Scale;
-	if (Elapsed < ExpansionTime)
+	if (ElapsedSec < ExpansionTimeSec)
 	{
-		const float A = FMath::Clamp(Elapsed / FMath::Max(ExpansionTime, KINDA_SMALL_NUMBER), 0.f, 1.f);
+		const float A = FMath::Clamp(ElapsedSec / FMath::Max(ExpansionTimeSec, KINDA_SMALL_NUMBER), 0.f, 1.f);
 		Scale = FMath::Lerp(InitialScale, PeakScale, A);
 	}
 	else
 	{
-		const float HoldDuration = FMath::Max(Lifetime - ExpansionTime, KINDA_SMALL_NUMBER);
-		const float A = FMath::Clamp((Elapsed - ExpansionTime) / HoldDuration, 0.f, 1.f);
+		const float HoldDuration = FMath::Max(LifetimeSec - ExpansionTimeSec, KINDA_SMALL_NUMBER);
+		const float A = FMath::Clamp((ElapsedSec - ExpansionTimeSec) / HoldDuration, 0.f, 1.f);
 		Scale = FMath::Lerp(PeakScale, InitialScale, A);
 	}
 	SetActorScale3D(FVector(Scale));
@@ -46,5 +46,5 @@ void AD1ExplosionFX::Tick(float DeltaSeconds)
 void AD1ExplosionFX::BeginPlay()
 {
 	Super::BeginPlay();
-	Elapsed = 0.f;
+	ElapsedSec = 0.f;
 }

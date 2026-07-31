@@ -94,8 +94,8 @@ protected:
 	void OnRep_Invulnerable();
 
 private:
-	/** 서버 전용: 비치명 피격 후 무적 시작. Duration 뒤 EndInvulnerability. */
-	void StartInvulnerability(float Duration);
+	/** 서버 전용: 비치명 피격 후 무적 시작. DurationSec 뒤 EndInvulnerability. */
+	void StartInvulnerability(float DurationSec);
 	/** 서버 전용. */
 	void EndInvulnerability();
 
@@ -121,7 +121,7 @@ private:
 
 	/** 피격 경직(조작 불가) 지속 시간(초). */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
-	float StunDuration = 1.0f;
+	float StunDurationSec = 1.0f;
 
 	UPROPERTY(Replicated)
 	bool bStunned = false;

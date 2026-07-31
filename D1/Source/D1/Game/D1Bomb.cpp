@@ -3,9 +3,7 @@
 #include "Game/D1Bomb.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "DrawDebugHelpers.h"
 #include "EngineUtils.h"
-#include "Net/UnrealNetwork.h"
 
 #include "Game/Character/D1BomberCharacter.h"
 #include "Game/Character/D1BombPlacementComponent.h"
@@ -36,19 +34,12 @@ AD1Bomb::AD1Bomb()
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
-void AD1Bomb::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(AD1Bomb, DetonationServerTime);
-}
-
 void AD1Bomb::BeginPlay()
 {
 	Super::BeginPlay();
 
 	if (HasAuthority())
 	{
-		DetonationServerTime = GetWorld()->GetTimeSeconds() + FuseSec;
 		GetWorldTimerManager().SetTimer(FuseTimerHandle, this, &AD1Bomb::DoExplode, FuseSec, false);
 	}
 
@@ -74,11 +65,6 @@ void AD1Bomb::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	// 소멸 경로 일원화: 미발화 도화선 타이머 정리.
 	GetWorldTimerManager().ClearAllTimersForObject(this);
 	Super::EndPlay(EndPlayReason);
-}
-
-void AD1Bomb::OnRep_DetonationServerTime()
-{
-	// 클라 카운트다운 VFX(메시 펄스, 사운드 등) 자리.
 }
 
 void AD1Bomb::SetRange(int32 InRange)
@@ -109,7 +95,7 @@ void AD1Bomb::MulticastOnExploded_Implementation(const TArray<FIntPoint>& Affect
 
 	for (const FIntPoint& Cell : AffectedCells)
 	{
-		const FVector Center = UD1BomberGridLibrary::CellToWorldCenter(Cell, 50.f);
+		const FVector Center = UD1BomberGridLibrary::CellToWorldCenter(Cell, UD1BomberGridLibrary::CellHalf);
 		UClass* FXClass = ExplosionFXClass ? ExplosionFXClass.Get() : AD1ExplosionFX::StaticClass();
 		World->SpawnActor<AD1ExplosionFX>(FXClass, Center, FRotator::ZeroRotator, Params);
 	}

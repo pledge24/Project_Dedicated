@@ -1,6 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-
 #include "Framework/D1PlayerController.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/GameInstance.h"
@@ -13,7 +12,6 @@
 #include "Systems/Map/D1MapCameraManager.h"
 #include "TimerManager.h"
 #include "UI/InGame/D1UWMatchResult.h"
-#include "Widgets/Input/SVirtualJoystick.h"
 
 AD1PlayerController::AD1PlayerController()
 {
@@ -59,11 +57,6 @@ void AD1PlayerController::SetupInputComponent()
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 		{
 			for (UInputMappingContext* CurrentContext : DefaultMappingContexts)
-			{
-				Subsystem->AddMappingContext(CurrentContext, 0);
-			}
-
-			for (UInputMappingContext* CurrentContext : MobileExcludedMappingContexts)
 			{
 				Subsystem->AddMappingContext(CurrentContext, 0);
 			}

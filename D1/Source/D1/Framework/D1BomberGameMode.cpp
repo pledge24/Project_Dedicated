@@ -25,7 +25,7 @@ namespace
 		});
 	}
 
-	// PlayerStart의 Slot 반환. 태그가 0~3이 아니라면 DefaultSlot 반환
+	// PlayerStart의 Slot 반환. 태그가 유효 슬롯 범위가 아니라면 DefaultSlot 반환
 	int32 ResolveSlotFromTag(const AActor* Start, int32 DefaultSlot)
 	{
 		if (const APlayerStart* PlayerStart = Cast<APlayerStart>(Start))
@@ -34,7 +34,7 @@ namespace
 			if (TagStr.IsNumeric())
 			{
 				const int32 TagNum = FCString::Atoi(*TagStr);
-				if (0 <= TagNum && TagNum <= 3)
+				if (0 <= TagNum && TagNum < D1MaxPlayerSlots)
 				{
 					return TagNum;
 				}

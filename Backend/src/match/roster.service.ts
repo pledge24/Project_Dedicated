@@ -79,11 +79,6 @@ export function findMatchByUser(userId: number): string | undefined
     return latestId;
 }
 
-export function size(): number
-{
-    return rosters.size;
-}
-
 /**
  * 만료된 roster(DS 수명 시각 초과)를 자료구조에서 제거.
  * DB 쪽 처리는 실패해도 캐시 정합성에 영향이 없고(다음 기동의 loadActive가 같은 기준으로 거른다)
