@@ -26,6 +26,22 @@ if (restoredRosters > 0)
     logger.info({ count: restoredRosters }, '진행 중이던 매치 roster 복원 — 결과 보고 수신 가능');
 }
 
+// 복원 대상에서 빠진 만료 매치 정리 — 결과가 끝내 안 온 것은 abort로 남긴다.
+// 부팅 때도 하는 이유: sweep은 다음 매치 성사 시점에야 도는데, 그 사이 서비스가 조용하면
+// 백엔드·DS가 함께 죽은 매치가 흔적 없이 남는다. 실패해도 기동은 막지 않는다(기록 목적).
+try
+{
+    const aborted = await roster.settleExpired();
+    if (aborted > 0)
+    {
+        logger.warn({ count: aborted }, '결과 미보고 매치를 abort로 기록');
+    }
+}
+catch (err)
+{
+    logger.warn({ err }, '만료 매치 정리 실패 — 다음 sweep에 위임');
+}
+
 // 리스닝 전에 DS 잔재 점검 — 이전 실행이 남긴 DS(크래시 고아 + 살려 보낸 라이브 매치)를 로그로 드러낸다(stub은 no-op).
 // 실패해도 기동은 막지 않는다(진단용이라 서비스 가용성보다 우선순위가 낮다).
 try

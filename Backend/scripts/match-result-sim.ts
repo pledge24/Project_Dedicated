@@ -414,6 +414,48 @@ async function main(): Promise<void>
             assert.equal(r.status, 200, JSON.stringify(r.body));
             assert.equal(await selectWinner(mid), null, '봇 단독승인데 winner_user_id가 NULL 아님');
         }],
+
+        ['결과 미보고 만료 매치 → abort 기록(참가자·점수 변동 없음)', async () =>
+        {
+            const s = randomBytes(3).toString('hex');
+            const u = (await seedUsers('ab', s, 1))[0];
+            const mid = `ab-${s}-${randomBytes(4).toString('hex')}`;
+            await roster.register({
+                matchId: mid, serverToken: randomBytes(24).toString('base64url'), mapName: MAP,
+                startedAt: Date.now(),
+                players: [{ userId: u.userId, nickname: u.nickname, joinToken: 'abjoin' }],
+            });
+
+            const scoreBefore = (await selectScore([u.userId])).get(u.userId)!;
+            // 등록 시각을 과거로 두면 register 자신의 sweep과 경합한다 — 대신 "시간이 흘렀다"를 인자로 준다.
+            await roster.settleExpired(Date.now() + config.match.ds.maxLifetimeMs + 1000);
+
+            assert.equal(await selectEndReason(mid), 'abort', '결과가 안 온 매치가 기록되지 않음');
+            assert.equal(await countParticipants(mid), 0, '아무도 모르는 등수를 지어내면 안 된다');
+            assert.equal((await selectScore([u.userId])).get(u.userId), scoreBefore, '서버 사고로 점수가 변하면 안 된다');
+            assert.equal(roster.get(mid), undefined, '만료 roster가 남아 있으면 늦은 결과가 인증을 통과한다');
+        }],
+
+        ['결과가 이미 저장된 매치는 abort로 덮이지 않는다', async () =>
+        {
+            const s = randomBytes(3).toString('hex');
+            const u = (await seedUsers('nd', s, 1))[0];
+            const mid = `nd-${s}-${randomBytes(4).toString('hex')}`;
+            const stk = randomBytes(24).toString('base64url');
+            await roster.register({
+                matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
+                players: [{ userId: u.userId, nickname: u.nickname, joinToken: 'ndjoin' }],
+            });
+
+            const r = await post('/api/match/result', {
+                matchId: mid, mapName: MAP, durationSec: 77, endReason: 'winner',
+                results: [{ userId: u.userId, slotIndex: 0, placement: 1, livesLeft: 3 }],
+            }, stk);
+            assert.equal(r.status, 200, JSON.stringify(r.body));
+
+            await roster.settleExpired(Date.now() + config.match.ds.maxLifetimeMs + 1000);
+            assert.equal(await selectEndReason(mid), 'winner', '정상 종료 기록이 abort로 덮였다');
+        }],
     ];
 
     let failed = 0;
@@ -519,6 +561,17 @@ async function selectWinner(matchId: string): Promise<number | null>
     );
 
     return rows.length > 0 && rows[0].winner_user_id !== null ? Number(rows[0].winner_user_id) : null;
+}
+
+/** 해당 매치의 end_reason(행이 없으면 null) — abort 기록 검증용. */
+async function selectEndReason(matchId: string): Promise<string | null>
+{
+    const [rows] = await getPool().query<RowDataPacket[]>(
+        'SELECT end_reason FROM matches WHERE client_match_id = ?',
+        [matchId]
+    );
+
+    return rows.length > 0 ? String(rows[0].end_reason) : null;
 }
 
 /** 여러 유저의 match_participants.abandoned(=left) 플래그 조회(각 유저가 매치 1개뿐인 시나리오 전제). */

@@ -225,6 +225,27 @@ export async function hasResult(clientMatchId: string): Promise<boolean>
 }
 
 /**
+ * 결과가 끝내 오지 않은 매치를 abort로 남긴다. 기록만 — 점수·참가자는 건드리지 않는다.
+ *
+ * 왜 참가자 행을 쓰지 않나: 무슨 일이 있었는지 아는 주체는 DS뿐이고 그 DS는 죽었다.
+ * 등수를 지어내면 감사 기록이 거짓이 되고, 이미 탈주로 정산된 사람의 원장과도 어긋난다.
+ * 왜 점수를 건드리지 않나: 서버 측 사고인데 유저 점수를 깎을 근거가 없다.
+ * 이미 기록된 매치면 아무 일도 하지 않는다(늦게 도착한 진짜 결과를 덮지 않기 위해 IGNORE).
+ */
+export async function recordAbortedMatch(matchId: string, mapName: string, startedAt: Date, endedAt: Date): Promise<boolean>
+{
+    const durationSec = Math.max(0, Math.round((endedAt.getTime() - startedAt.getTime()) / 1000));
+    const [res] = await getPool().execute<ResultSetHeader>(
+        'INSERT IGNORE INTO matches ' +
+        '(client_match_id, map_name, started_at, ended_at, duration_sec, end_reason, winner_user_id) ' +
+        "VALUES (?, ?, ?, ?, ?, 'abort', NULL)",
+        [matchId, mapName, startedAt, endedAt, durationSec]
+    );
+
+    return res.affectedRows > 0;
+}
+
+/**
  * 이 유저가 이 매치에서 이미 탈주로 정산됐는가. 재입장 판정용.
  * DS는 매치 시작 후 이탈자를 KickedUserIds에 넣어 재입장을 거절하므로(D1MatchFlowComponent),
  * 정산된 유저에게 주소를 주면 DS가 튕겨낸다 — 백엔드에서 미리 거른다.

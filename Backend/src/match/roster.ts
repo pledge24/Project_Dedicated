@@ -8,6 +8,7 @@
 // (지우면 재제출이 404가 되어 409와 의미가 갈림.) 대신 만료분만 register 시 청소한다.
 import { config } from '../common/config.js';
 import { logger } from '../common/logger.js';
+import * as resultRepo from './result.repository.js';
 import * as repo from './roster.repository.js';
 
 /** 명단에 저장된 플레이어 데이터 단위 */
@@ -104,7 +105,7 @@ export function size(): number
 
 /**
  * 만료된 roster(DS 수명 시각 초과)를 자료구조에서 제거.
- * DB 정리는 실패해도 캐시 정합성에 영향이 없고(다음 기동의 loadActive가 같은 기준으로 거른다)
+ * DB 쪽 처리는 실패해도 캐시 정합성에 영향이 없고(다음 기동의 loadActive가 같은 기준으로 거른다)
  * register를 막아서도 안 되므로 대기하지 않고 로그만 남긴다.
  */
 function sweep(now: number): void
@@ -118,8 +119,55 @@ function sweep(now: number): void
         }
     }
 
-    repo.deleteExpired(cutoff).catch((err) =>
+    settleExpired(now).catch((err) =>
     {
-        logger.warn({ err }, '만료 roster DB 정리 실패 — 다음 sweep에서 재시도');
+        logger.warn({ err }, '만료 roster 정리 실패 — 다음 sweep에서 재시도');
     });
+}
+
+/**
+ * 만료된 매치를 DB에서 정리하고, 결과가 끝내 오지 않은 것을 abort로 기록한다.
+ *
+ * 이 경로가 필요한 이유: 확정된 DS는 백엔드 수명과 분리돼 있어(ds.commit) 게임 도중 죽어도
+ * 아무도 그 사실을 모른다. readiness gate는 이미 소비돼 no-op이고, roster는 조용히 삭제될 뿐이라
+ * 매치가 시작된 흔적조차 남지 않았다. 여기서 최소한 "시작됐고 결과가 없다"를 남긴다.
+ *
+ * 삭제를 먼저 하는 것이 중요하다 — roster가 사라지면 늦게 도착한 결과 POST는 serverToken 검증에서
+ * 404로 걸러진다. 반대로 abort를 먼저 쓰면 client_match_id UNIQUE에 걸려 진짜 결과가 409로 버려진다.
+ */
+export async function settleExpired(now: number = Date.now()): Promise<number>
+{
+    const cutoff = now - config.match.ds.maxLifetimeMs;
+    const expired = await repo.selectExpired(cutoff);
+    if (expired.length === 0)
+    {
+        return 0;
+    }
+
+    // 인증의 진실 원천은 메모리 캐시다 — DB만 지우면 늦은 결과가 여전히 통과한다.
+    // sweep 경로는 이미 지웠지만 부팅·직접 호출 경로도 있으므로 여기서 한 번 더(멱등).
+    for (const m of expired)
+    {
+        rosters.delete(m.matchId);
+    }
+
+    await repo.deleteExpired(cutoff);
+
+    let recorded = 0;
+    for (const m of expired)
+    {
+        if (await resultRepo.hasResult(m.matchId))
+        {
+            continue;
+        }
+
+        if (await resultRepo.recordAbortedMatch(m.matchId, m.mapName, new Date(m.startedAt), new Date(now)))
+        {
+            recorded += 1;
+            logger.warn({ matchId: m.matchId, startedAt: new Date(m.startedAt).toISOString() },
+                '결과 미보고 매치 — abort로 기록(DS 크래시 추정, 점수 변동 없음)');
+        }
+    }
+
+    return recorded;
 }

@@ -48,6 +48,29 @@ export async function selectActive(sinceEpochMs: number): Promise<MatchRoster[]>
     return rows.map(toRoster);
 }
 
+/** 만료된 매치의 식별 정보 — abort 기록에 필요한 최소치(명단은 쓰지 않는다). */
+export interface ExpiredRoster
+{
+    matchId: string;
+    mapName: string;
+    startedAt: number;
+}
+
+/** 만료분 조회 — 지우기 전에 "결과가 끝내 안 온 매치"를 가려내기 위해 먼저 읽는다. */
+export async function selectExpired(beforeEpochMs: number): Promise<ExpiredRoster[]>
+{
+    const [rows] = await getPool().execute<RosterRow[]>(
+        'SELECT match_id, map_name, started_at FROM match_rosters WHERE started_at <= ?',
+        [new Date(beforeEpochMs)]
+    );
+
+    return rows.map((row) => ({
+        matchId: row.match_id,
+        mapName: row.map_name,
+        startedAt: row.started_at.getTime(),
+    }));
+}
+
 /** 만료분 정리 — 메모리 sweep과 같은 기준(DS 최대 수명)으로 호출된다. */
 export async function deleteExpired(beforeEpochMs: number): Promise<void>
 {
