@@ -33,7 +33,7 @@ protected:
 	void OnLoginClicked();
 
 	UFUNCTION()
-	void OnLoginCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User);
+	void HandleLoginCompleted(const FBackendResponse& Response, const FAuthUserDTO& User);
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UButton> LoginButton;

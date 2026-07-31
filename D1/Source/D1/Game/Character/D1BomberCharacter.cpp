@@ -78,7 +78,7 @@ void AD1BomberCharacter::Restart()
 	}
 
 	const AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
-	if (GS && GS->MatchPhase != EBomberMatchPhase::Playing)
+	if (GS && GS->GetMatchPhase() != EBomberMatchPhase::Playing)
 	{
 		if (UCharacterMovementComponent* Move = GetCharacterMovement())
 		{
@@ -147,7 +147,7 @@ void AD1BomberCharacter::DoMove(float Right, float Forward)
 
 	// 카운트다운 시작(Playing) 전·종료 후엔 이동 불가 → "이동 가능 == 게임 시작" 일치(폭탄 게이트와 동일).
 	const AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
-	if (GS && GS->MatchPhase != EBomberMatchPhase::Playing)
+	if (GS && GS->GetMatchPhase() != EBomberMatchPhase::Playing)
 	{
 		return;
 	}

@@ -58,18 +58,9 @@ void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayers, float InWai
 
 	// 맵 빌드·시작 게이트 준비 완료 → 백엔드에 "플레이어 받을 준비됨" 통지(토큰 있는 실 DS만).
 	// 백엔드는 이 콜백을 받고 클라에 match:found(입장 패킷) 전송. PIE/standalone은 토큰 없어 스킵.
-	if (!CurrentMatchToken.IsEmpty())
+	if (UD1MatchResultSubsystem* ResultClient = GetResultClient())
 	{
-		if (UWorld* World = GetWorld())
-		{
-			if (UGameInstance* GI = World->GetGameInstance())
-			{
-				if (UD1MatchResultSubsystem* ResultClient = GI->GetSubsystem<UD1MatchResultSubsystem>())
-				{
-					ResultClient->ReportDSReady(CurrentMatchId, CurrentMatchToken);
-				}
-			}
-		}
+		ResultClient->ReportDSReady(CurrentMatchId, CurrentMatchToken);
 	}
 
 	// 시작 게이트: 예상 인원 0/1(PIE·솔로)이면 즉시 시작, 아니면 전원 입장(PostLogin) 또는 타임아웃까지 Waiting.
@@ -133,14 +124,14 @@ void UD1MatchFlowComponent::StartMatch()
 
 	if (AD1BomberGameState* GS = GetBomberGameState())
 	{
-		GS->MatchStartServerTime = GS->GetServerWorldTimeSeconds();
-		GS->MatchPhase = EBomberMatchPhase::Playing;
+		GS->SetMatchStartServerTime(GS->GetServerWorldTimeSeconds());
+		GS->SetMatchPhase(EBomberMatchPhase::Playing);
 
 		if (World)
 		{
 			World->GetTimerManager().SetTimer(
 				MatchTimerHandle, this, &UD1MatchFlowComponent::OnMatchTimeExpired,
-				GS->MatchDurationSec, /*bLoop=*/false);
+				GS->GetMatchDurationSec(), /*bLoop=*/false);
 		}
 	}
 
@@ -311,7 +302,7 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 	AD1BomberGameState* GS = GetBomberGameState();
 	if (GS)
 	{
-		GS->MatchPhase = EBomberMatchPhase::Finished;
+		GS->SetMatchPhase(EBomberMatchPhase::Finished);
 	}
 
 	UE_LOG(LogD1, Log, TEXT("Match ended (%s). Winner=%s (Placement=%d)"),
@@ -358,19 +349,8 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 				B->SetPlacement(1);
 			}
 
-			FD1MatchResultEntry Entry;
-			Entry.Placement = B->GetPlacement();
-			Entry.Nickname  = B->GetPlayerName();
-			Entry.SlotIndex = B->GetPlayerSlotIndex();
-			Entry.LivesLeft = B->GetLives();
-			Entries.Add(Entry);
-
-			FMatchResultPlayer RP;
-			RP.UserId    = B->GetBackendUserId();
-			RP.SlotIndex = B->GetPlayerSlotIndex();
-			RP.Placement = B->GetPlacement();
-			RP.LivesLeft = B->GetLives();
-			ResultPlayers.Add(RP);
+			AppendResultPair(Entries, ResultPlayers, B->GetBackendUserId(), B->GetPlayerSlotIndex(),
+				B->GetPlacement(), B->GetLives(), B->GetPlayerName(), /*bLeft=*/false);
 		}
 	}
 
@@ -390,16 +370,8 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 	GS->SetFinalResults(Entries);
 
 	// 백엔드가 띄운 DS일 때만 결과 보고(토큰 없으면 PIE/standalone → 스킵).
-	UD1MatchResultSubsystem* ResultClient = nullptr;
-	if (!CurrentMatchToken.IsEmpty() && World)
-	{
-		if (UGameInstance* GI = World->GetGameInstance())
-		{
-			ResultClient = GI->GetSubsystem<UD1MatchResultSubsystem>();
-		}
-	}
-
-	if (!ResultClient)
+	UD1MatchResultSubsystem* ResultClient = GetResultClient();
+	if (!ResultClient || !World)
 	{
 		// 보고할 곳이 없으면 기다릴 이유도 없다(PIE/standalone).
 		BeginShutdownAfterReport();
@@ -410,8 +382,8 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 	// 보고가 확정되기 전에 프로세스가 죽으면 인플라이트 요청이 통째로 사라진다 —
 	// 셧다운 감시는 결과 POST가 확정(성공·409·확정 실패·재시도 소진)된 뒤에 시작한다.
 	const int32 DurationSec = FMath::Max(0,
-		FMath::RoundToInt(GS->GetServerWorldTimeSeconds() - GS->MatchStartServerTime));
-	ResultClient->ReportMatchResult(CurrentMatchId, CurrentMatchToken, GS->MapName,
+		FMath::RoundToInt(GS->GetServerWorldTimeSeconds() - GS->GetMatchStartServerTime()));
+	ResultClient->ReportMatchResult(CurrentMatchId, CurrentMatchToken, GS->GetMapName(),
 		DurationSec, EndReasonToString(Reason), ResultPlayers,
 		FSimpleDelegate::CreateWeakLambda(this, [this]()
 		{
@@ -470,24 +442,31 @@ void UD1MatchFlowComponent::AppendNoShowResults(TArray<FD1MatchResultEntry>& InO
 		// Left=true로 보고하는 이유: 완주자 ELO 계산에서 빠져 정상 플레이한 사람들끼리만 점수가 오간다.
 		// (Left=false면 미입장자가 실참가자로 ELO에 섞인다.) 입장 직후 나간 탈주자와 동일 취급이라
 		// "안 들어오는 편이 이득"인 비대칭도 생기지 않는다.
-		FMatchResultPlayer RP;
-		RP.UserId    = Expected.UserId;
-		RP.SlotIndex = NextFreeSlot;
-		RP.Placement = SeatCount;
-		RP.LivesLeft = 0;
-		RP.Left      = true;
-		InOutPlayers.Add(RP);
-
-		FD1MatchResultEntry Entry;
-		Entry.Placement = SeatCount;
-		Entry.Nickname  = Expected.Nickname;
-		Entry.SlotIndex = NextFreeSlot;
-		Entry.LivesLeft = 0;
-		InOutEntries.Add(Entry);
+		AppendResultPair(InOutEntries, InOutPlayers, Expected.UserId, NextFreeSlot,
+			SeatCount, /*LivesLeft=*/0, Expected.Nickname, /*bLeft=*/true);
 
 		UE_LOG(LogD1, Warning, TEXT("[Match] 미입장자 결과 보정 userId=%lld nickname=%s slot=%d placement=%d"),
 			Expected.UserId, *Expected.Nickname, NextFreeSlot, SeatCount);
 	}
+}
+
+void UD1MatchFlowComponent::AppendResultPair(TArray<FD1MatchResultEntry>& InOutEntries, TArray<FMatchResultPlayer>& InOutPlayers,
+	int64 UserId, int32 SlotIndex, int32 Placement, int32 LivesLeft, const FString& Nickname, bool bLeft)
+{
+	FD1MatchResultEntry Entry;
+	Entry.Placement = Placement;
+	Entry.Nickname  = Nickname;
+	Entry.SlotIndex = SlotIndex;
+	Entry.LivesLeft = LivesLeft;
+	InOutEntries.Add(Entry);
+
+	FMatchResultPlayer Player;
+	Player.UserId    = UserId;
+	Player.SlotIndex = SlotIndex;
+	Player.Placement = Placement;
+	Player.LivesLeft = LivesLeft;
+	Player.Left      = bLeft;
+	InOutPlayers.Add(Player);
 }
 
 void UD1MatchFlowComponent::BeginShutdownAfterReport()
@@ -559,16 +538,8 @@ void UD1MatchFlowComponent::StopKickPolling()
 
 void UD1MatchFlowComponent::PollKicks()
 {
-	if (CurrentMatchId.IsEmpty() || CurrentMatchToken.IsEmpty())
-	{
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	UGameInstance* GI = World ? World->GetGameInstance() : nullptr;
-
-	UD1MatchResultSubsystem* Result = GI ? GI->GetSubsystem<UD1MatchResultSubsystem>() : nullptr;
-	if (!Result)
+	UD1MatchResultSubsystem* Result = GetResultClient();
+	if (CurrentMatchId.IsEmpty() || !Result)
 	{
 		return;
 	}
@@ -658,34 +629,13 @@ void UD1MatchFlowComponent::ProcessLeaver(AD1BomberPlayerState* Target, bool bNo
 
 	AlivePlayerStates.Remove(Target);
 
-	FMatchResultPlayer RP;
-	RP.UserId    = UserId;
-	RP.SlotIndex = Target->GetPlayerSlotIndex();
-	RP.Placement = LastPlacement;
-	RP.LivesLeft = Target->GetLives();
-	RP.Left      = true;
-	LeftPlayers.Add(RP);
-
-	FD1MatchResultEntry Entry;
-	Entry.Placement = LastPlacement;
-	Entry.Nickname  = Target->GetPlayerName();
-	Entry.SlotIndex = Target->GetPlayerSlotIndex();
-	Entry.LivesLeft = Target->GetLives();
-	LeftEntries.Add(Entry);
+	AppendResultPair(LeftEntries, LeftPlayers, UserId, Target->GetPlayerSlotIndex(),
+		LastPlacement, Target->GetLives(), Target->GetPlayerName(), /*bLeft=*/true);
 
 	// 탈주 즉시 정산 — 백엔드가 최하위 확정값을 바로 반영(로비 즉시 반영). 토큰 있는 실 DS만.
-	if (!CurrentMatchToken.IsEmpty())
+	if (UD1MatchResultSubsystem* ResultClient = GetResultClient())
 	{
-		if (UWorld* World = GetWorld())
-		{
-			if (UGameInstance* GI = World->GetGameInstance())
-			{
-				if (UD1MatchResultSubsystem* ResultClient = GI->GetSubsystem<UD1MatchResultSubsystem>())
-				{
-					ResultClient->ReportLeaver(CurrentMatchId, CurrentMatchToken, UserId);
-				}
-			}
-		}
+		ResultClient->ReportLeaver(CurrentMatchId, CurrentMatchToken, UserId);
 	}
 
 	// 클라 통지(팝업 + 로그인 복귀) + 남은 시간 입력 차단. 끊김(disconnect)은 이미 떠나 생략.
@@ -709,18 +659,30 @@ void UD1MatchFlowComponent::ProcessLeaver(AD1BomberPlayerState* Target, bool bNo
 bool UD1MatchFlowComponent::HasMatchStarted() const
 {
 	const AD1BomberGameState* GS = GetBomberGameState();
-	return GS && GS->MatchPhase != EBomberMatchPhase::Waiting;
+	return GS && GS->GetMatchPhase() != EBomberMatchPhase::Waiting;
 }
 
 bool UD1MatchFlowComponent::IsMatchEnded() const
 {
 	const AD1BomberGameState* GS = GetBomberGameState();
-	return GS && GS->MatchPhase == EBomberMatchPhase::Finished;
+	return GS && GS->GetMatchPhase() == EBomberMatchPhase::Finished;
 }
 
 AD1BomberGameState* UD1MatchFlowComponent::GetBomberGameState() const
 {
 	return Cast<AD1BomberGameState>(GetOwner());
+}
+
+UD1MatchResultSubsystem* UD1MatchFlowComponent::GetResultClient() const
+{
+	if (CurrentMatchToken.IsEmpty())
+	{
+		return nullptr;
+	}
+
+	UWorld* World = GetWorld();
+	UGameInstance* GI = World ? World->GetGameInstance() : nullptr;
+	return GI ? GI->GetSubsystem<UD1MatchResultSubsystem>() : nullptr;
 }
 
 bool UD1MatchFlowComponent::HasServerAuthority() const

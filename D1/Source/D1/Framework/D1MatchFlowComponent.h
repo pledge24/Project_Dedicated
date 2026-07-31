@@ -12,6 +12,7 @@
 class AController;
 class AD1BomberGameState;
 class AD1BomberPlayerState;
+class UD1MatchResultSubsystem;
 
 /**
  *  매치 흐름 담당 컴포넌트 (GameState 부착·서버 전용).
@@ -86,6 +87,12 @@ private:
 	 * 백엔드 roster와 인원이 어긋나 정상 플레이한 나머지 인원의 결과까지 통째로 거부된다.
 	 */
 	void AppendNoShowResults(TArray<FD1MatchResultEntry>& InOutEntries, TArray<FMatchResultPlayer>& InOutPlayers) const;
+	/**
+	 * 결과 스냅샷(UI)과 백엔드 보고 페이로드에 한 명분을 동시 추가.
+	 * 두 배열의 인원이 어긋나면 백엔드가 매치 전체 결과를 거부하므로 추가는 반드시 이 함수로.
+	 */
+	static void AppendResultPair(TArray<FD1MatchResultEntry>& InOutEntries, TArray<FMatchResultPlayer>& InOutPlayers,
+		int64 UserId, int32 SlotIndex, int32 Placement, int32 LivesLeft, const FString& Nickname, bool bLeft);
 	/** 결과 보고가 확정됐거나 하드캡에 걸렸을 때 DS 셧다운 감시 시작. 선착순 1회만 유효(감시가 멱등). */
 	void BeginShutdownAfterReport();
 
@@ -139,6 +146,9 @@ private:
 
 	/** 소유 GameState. 없으면 nullptr. */
 	AD1BomberGameState* GetBomberGameState() const;
+
+	/** 결과 보고 Subsystem. 토큰 없으면(PIE/standalone) nullptr — 호출측은 보고 스킵. */
+	UD1MatchResultSubsystem* GetResultClient() const;
 
 	/** 서버 권위 여부. 모든 진입점 방어 가드. */
 	bool HasServerAuthority() const;

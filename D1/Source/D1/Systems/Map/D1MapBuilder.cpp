@@ -85,13 +85,10 @@ bool UD1MapBuilder::Build(UWorld* World, AD1BomberGameState* GS, const FD1MapBui
 		return false;
 	}
 
-	// 폭발/경계 판정 권위 데이터(클라에도 복제).
-	GS->GridSize = Layout.GridSize;
-	GS->WallCells = Layout.WallCells;
-	GS->SoftBlockCells = Layout.SoftBlockCells;
-
-	// 선정된 맵의 논리 이름(결과 보고용). 빈 값이면 애셋 오브젝트명으로 대체(백엔드 non-empty 검증 통과).
-	GS->MapName = MapToUse->MapName.IsEmpty() ? MapToUse->GetName() : MapToUse->MapName;
+	// 폭발/경계 판정 권위 데이터(클라에도 복제). 맵 논리 이름은 결과 보고용 —
+	// 빈 값이면 애셋 오브젝트명으로 대체(백엔드 non-empty 검증 통과).
+	GS->SetGridData(Layout.GridSize, Layout.WallCells, Layout.SoftBlockCells,
+		MapToUse->MapName.IsEmpty() ? MapToUse->GetName() : MapToUse->MapName);
 
 	// 3. 맵 스폰
 	FActorSpawnParameters Params;

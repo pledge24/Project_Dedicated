@@ -37,11 +37,11 @@ void UD1UWLogin::OnLoginClicked()
 	BeginAuthSubmit();
 
 	FOnAuthCompleted Cb;
-	Cb.BindDynamic(this, &UD1UWLogin::OnLoginCompletedInternal);
+	Cb.BindDynamic(this, &UD1UWLogin::HandleLoginCompleted);
 	AuthSubsystem->Login(LoginId, Password, Cb);
 }
 
-void UD1UWLogin::OnLoginCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User)
+void UD1UWLogin::HandleLoginCompleted(const FBackendResponse& Response, const FAuthUserDTO& User)
 {
 	if (!FinishAuthSubmit(Response))
 	{

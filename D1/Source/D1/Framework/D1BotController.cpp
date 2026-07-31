@@ -40,7 +40,7 @@ void AD1BotController::Tick(float DeltaSeconds)
 	}
 
 	const AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
-	if (!GS || GS->MatchPhase != EBomberMatchPhase::Playing)
+	if (!GS || GS->GetMatchPhase() != EBomberMatchPhase::Playing)
 	{
 		return;
 	}
@@ -53,7 +53,7 @@ void AD1BotController::Tick(float DeltaSeconds)
 
 	// 사고는 저빈도(누산기)로 throttle, 조향(AddMovementInput 소비)은 매 프레임.
 	ThinkAccumulatorSec += DeltaSeconds;
-	if (ThinkAccumulatorSec >= ThinkIntervalSec)
+	if (ThinkAccumulatorSec >= EffectiveThinkIntervalSec)
 	{
 		ThinkAccumulatorSec = 0.f;
 		Think(Bot, GS, PS);
@@ -351,6 +351,6 @@ void AD1BotController::EnsureSeeded(const AD1BomberPlayerState* PS)
 	const int32 Seed = (Slot >= 0) ? (7919 * (Slot + 1)) : static_cast<int32>(GetUniqueID());
 	Rng.Initialize(Seed);
 
-	ThinkIntervalSec *= Rng.FRandRange(1.f - ThinkIntervalJitter, 1.f + ThinkIntervalJitter);
+	EffectiveThinkIntervalSec = ThinkIntervalSec * Rng.FRandRange(1.f - ThinkIntervalJitter, 1.f + ThinkIntervalJitter);
 	AggressionBias = Rng.FRandRange(0.3f, 0.9f);
 }

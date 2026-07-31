@@ -83,7 +83,7 @@ void AD1PlayerController::HandleMatchFinished()
 
 	if (UD1UWMatchResult* Result = Cast<UD1UWMatchResult>(ResultWidget))
 	{
-		Result->SetResults(GS->FinalResults);
+		Result->SetResults(GS->GetFinalResults());
 	}
 
 	// 결과 화면 — 마우스 커서 + UI 입력.
@@ -106,7 +106,7 @@ void AD1PlayerController::TryBindMatchFinished()
 	GS->OnMatchFinished.AddDynamic(this, &AD1PlayerController::HandleMatchFinished);
 
 	// 이미 끝난 매치에 늦게 구독한 경우(재접속 등) 즉시 표시.
-	if (GS->FinalResults.Num() > 0)
+	if (GS->GetFinalResults().Num() > 0)
 	{
 		HandleMatchFinished();
 	}

@@ -126,7 +126,7 @@ bool UD1BombPlacementComponent::CanPlaceBombAt(const FIntPoint& Cell, AD1BomberP
 	}
 
 	const AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
-	if (GS && GS->MatchPhase != EBomberMatchPhase::Playing)
+	if (GS && GS->GetMatchPhase() != EBomberMatchPhase::Playing)
 	{
 		return false;
 	}
