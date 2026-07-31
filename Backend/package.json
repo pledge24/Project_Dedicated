@@ -25,6 +25,7 @@
     "match:rejoin-sim": "tsx scripts/rejoin-sim.ts",
     "match:restart-sim": "tsx scripts/restart-survival-sim.ts",
     "match:bots": "tsx scripts/match-bots.ts",
+    "demo:authority": "tsx scripts/authority-demo.ts",
     "ranking:sim": "tsx scripts/ranking-sim.ts",
     "auth:sim": "tsx scripts/auth-session-sim.ts"
   },
