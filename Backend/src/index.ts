@@ -82,7 +82,7 @@ async function shutdown(signal: string): Promise<void>
     }, SHUTDOWN_TIMEOUT_MS);
     force.unref();
 
-    server.close(async (err) =>
+    server.close((err) =>
     {
         if (err)
         {
@@ -91,17 +91,18 @@ async function shutdown(signal: string): Promise<void>
 
             return;
         }
-        try
-        {
-            await closePool();
-            logger.info('graceful shutdown 완료');
-            process.exit(0);
-        }
-        catch (poolErr)
-        {
-            logger.error({ err: poolErr }, 'DB pool close 실패');
-            process.exit(1);
-        }
+        // close 콜백은 void 계약 — async를 넘기면 reject가 아무 데도 안 잡힌다. 내부에서 정리 후 exit.
+        closePool()
+            .then(() =>
+            {
+                logger.info('graceful shutdown 완료');
+                process.exit(0);
+            })
+            .catch((poolErr: unknown) =>
+            {
+                logger.error({ err: poolErr }, 'DB pool close 실패');
+                process.exit(1);
+            });
     });
 }
 

@@ -24,6 +24,7 @@ export const config = Object.freeze({
         resultMax: asNumber('RATE_LIMIT_RESULT_MAX', 30),    // DS 결과 보고(/api/match/result)
         pollMax:   asNumber('RATE_LIMIT_POLL_MAX', 300),     // DS kick 폴링(/api/match/:id/kicks) — 매치당 12/분 × 다수 매치가 같은 host IP
         rankingMax: asNumber('RATE_LIMIT_RANKING_MAX', 60),  // 랭킹 조회(/api/ranking)
+        sessionMax: asNumber('RATE_LIMIT_SESSION_MAX', 60),  // 세션 조회(/me·/heartbeat) — requireAuth가 매번 DB SELECT라 무제한이면 증폭됨
         wsMax: asNumber('RATE_LIMIT_WS_MAX', 100),           // 매칭 WS 메시지(연결당) — OWASP 시작점
     }),
     match: Object.freeze({

@@ -97,8 +97,8 @@ export default function buildApp(): Express
         res.status(Codes.NOT_FOUND.http).json(fail(Codes.NOT_FOUND.code, '요청한 경로를 찾을 수 없습니다.'));
     });
 
-    // 에러 미들웨어 (4-arg 시그니처여야 Express가 에러 핸들러로 인식)
-    app.use((err: unknown, req: Request, res: Response, next: NextFunction) =>
+    // 에러 미들웨어 (4-arg 시그니처여야 Express가 에러 핸들러로 인식 — _next는 그 용도로만 존재)
+    app.use((err: unknown, req: Request, res: Response, _next: NextFunction) =>
     {
         if (err instanceof AppError)
         {

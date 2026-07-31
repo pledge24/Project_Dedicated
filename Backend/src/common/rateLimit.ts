@@ -12,12 +12,12 @@ function rateLimitHandler(req: Request, res: Response): void
     res.status(Codes.RATE_LIMITED.http).json(fail(Codes.RATE_LIMITED.code, '요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.'));
 }
 
-/** max 요청/windowMs 제한 미들웨어 생성. windowMs는 전역 설정을 공유한다. */
-export function makeRateLimiter(max: number)
+/** limit 요청/windowMs 제한 미들웨어 생성. windowMs는 전역 설정을 공유한다. */
+export function makeRateLimiter(limit: number)
 {
     return rateLimit({
         windowMs: config.rateLimit.windowMs,
-        max,
+        limit,
         standardHeaders: true,
         legacyHeaders: false,
         handler: rateLimitHandler,

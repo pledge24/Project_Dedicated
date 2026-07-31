@@ -306,7 +306,7 @@ function onConnection(wss: WebSocketServer, ws: WebSocket, user: AuthedUser): vo
 
     newSocket.on('error', (err) =>
     {
-        logger.warn({ err, userId: newSocket.userId }, 'WS 에러')
+        logger.warn({ err, userId: newSocket.userId }, 'WS 에러');
     });
 
     logger.info({ userId: newSocket.userId }, 'WS 연결 수립');
