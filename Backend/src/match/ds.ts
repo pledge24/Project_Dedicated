@@ -5,6 +5,9 @@
 import { spawn } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import dgram from 'node:dgram';
+import { existsSync, unlinkSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import { config } from '../common/config.js';
 import { logger } from '../common/logger.js';
@@ -52,23 +55,29 @@ export async function allocate(matchId: string, serverToken: string, expectedPla
 function spawnOnPort(port: number, matchId: string, serverToken: string, expectedPlayers: number, roster: { joinToken: string; userId: number; nickname: string }[], bots: { userId: number; nickname: string }[]): void
 {
     /**
-     * matchId·serverToken·roster는 커맨드라인 스위치로 주입하면, DS가 FParse로 읽는다.
+     * 매치 설정은 파일로 넘기고 커맨드라인에는 경로만 둔다.
+     * 커맨드라인은 같은 사용자 세션의 아무 프로세스나 읽을 수 있는데(작업관리자·Get-Process·WMI),
+     * 거기 실려 있던 serverToken은 결과 위조 권한이고 roster의 joinToken은 남의 신원으로 입장할 권한이다.
+     * 서버 권위 모델 전체가 이 두 값에 걸려 있으므로 노출 창을 "매치 내내"에서 "DS가 읽을 때까지"로 줄인다.
+     * DS는 읽는 즉시 파일을 지우고, 백엔드도 안전망 타이머로 한 번 더 지운다(DS가 못 뜬 경우).
+     *
      * expectedPlayers: DS가 전원 입장까지 매치 시작을 미루는 게이트용(미충족 시 DS 측 타임아웃으로 시작).
-     * Roster:          token:userId:base64(nickname);… — DS가 ?join= 토큰으로 권위 신원(userId·이름)을 매핑. 좌석은 DS가 랜덤 배정.
-     *                   닉네임은 한글(비-ASCII)이라 Windows 커맨드라인 코드페이지 깨짐 방지 위해 표준 base64로 인코딩(UE FBase64::Decode 호환).
-     * Bots:            userId:base64(nickname);… — 봇전(Bot-Fill) 봇 좌석. 토큰 없음(DS가 서버측 스폰). userId는 음수 sentinel.
-     *                   ExpectedPlayers는 총원(휴먼+봇)이라 봇이 PlayerArray를 채우고 휴먼 입장 시 시작 게이트가 충족된다.
+     *                  총원(휴먼+봇)이라 봇이 PlayerArray를 채우고 휴먼 입장 시 게이트가 충족된다.
+     * roster:          DS가 ?join= 토큰으로 권위 신원(userId·이름)을 매핑. 좌석은 DS가 랜덤 배정.
+     * bots:            봇전(Bot-Fill) 봇 좌석. 토큰 없음(DS가 서버측 스폰). userId는 음수 sentinel.
      * stdio 'ignore' — DS는 -log로 자체 콘솔/로그파일에 기록. 파이프 미소비로 막히는 것 방지.
      */
-    const rosterArg = roster.map((r) => `${r.joinToken}:${r.userId}:${Buffer.from(r.nickname, 'utf8').toString('base64')}`).join(';');
-    const args = [ds.map, `-port=${port}`, `-MatchId=${matchId}`, `-MatchToken=${serverToken}`, `-ExpectedPlayers=${expectedPlayers}`, `-Roster=${rosterArg}`];
-    if (bots.length > 0)
-    {
-        const botsArg = bots.map((b) => `${b.userId}:${Buffer.from(b.nickname, 'utf8').toString('base64')}`).join(';');
-        args.push(`-Bots=${botsArg}`);
-    }
-    args.push('-log');
+    const configPath = writeMatchConfig(matchId, {
+        matchId,
+        matchToken: serverToken,
+        expectedPlayers,
+        roster: roster.map((r) => ({ joinToken: r.joinToken, userId: r.userId, nickname: r.nickname })),
+        bots: bots.map((b) => ({ userId: b.userId, nickname: b.nickname })),
+    });
+
+    const args = [ds.map, `-port=${port}`, `-MatchConfig=${configPath}`, '-log'];
     const child = spawn(ds.exePath, args, { stdio: 'ignore', windowsHide: false });
+    scheduleConfigCleanup(configPath, matchId);
 
     const killTimer = setTimeout(() =>
     {
@@ -104,6 +113,53 @@ function spawnOnPort(port: number, matchId: string, serverToken: string, expecte
     });
 
     logger.info({ port, matchId, map: ds.map }, 'DS spawn — 준비 콜백 대기');
+}
+
+/** DS에 넘길 매치 설정. 커맨드라인에 두면 안 되는 값(토큰)이 전부 여기 모인다. */
+interface MatchConfigFile
+{
+    matchId: string;
+    matchToken: string;
+    expectedPlayers: number;
+    roster: { joinToken: string; userId: number; nickname: string }[];
+    bots: { userId: number; nickname: string }[];
+}
+
+/**
+ * 설정 파일을 임시 디렉터리에 쓰고 경로 반환.
+ * mode 0o600 — POSIX에서 소유자 외 읽기 차단. Windows는 mode를 무시하지만 %TEMP%가 이미 사용자별이다.
+ * 실패는 throw해 allocate가 매치를 버리게 한다(토큰 없이 뜬 DS는 결과를 보고할 수 없다).
+ */
+function writeMatchConfig(matchId: string, cfg: MatchConfigFile): string
+{
+    const filePath = path.join(os.tmpdir(), `d1-match-${matchId}.json`);
+    writeFileSync(filePath, JSON.stringify(cfg), { encoding: 'utf8', mode: 0o600 });
+
+    return filePath;
+}
+
+/**
+ * 안전망 삭제 — 정상 경로에서는 DS가 읽자마자 지운다. DS가 못 뜨거나 크래시한 경우를 대비해
+ * 백엔드도 한 번 더 지운다. 준비 타임아웃(readyTimeoutMs)보다 넉넉히 뒤에 돌아 정상 부팅을 방해하지 않는다.
+ */
+function scheduleConfigCleanup(filePath: string, matchId: string): void
+{
+    const timer = setTimeout(() =>
+    {
+        try
+        {
+            if (existsSync(filePath))
+            {
+                unlinkSync(filePath);
+                logger.warn({ matchId, filePath }, 'DS가 매치 설정 파일을 지우지 않음 — 백엔드가 정리');
+            }
+        }
+        catch (err)
+        {
+            logger.warn({ err, matchId, filePath }, '매치 설정 파일 정리 실패');
+        }
+    }, ds.readyTimeoutMs * 2);
+    timer.unref();
 }
 
 /**
@@ -160,10 +216,18 @@ export function shutdownUncommitted(): void
     }
 }
 
-/** 특정 포트의 DS를 즉시 회수. 확정 창에서 매치가 취소돼 스폰한 DS를 버릴 때 사용(killProcess public 래퍼). */
-export function release(port: number): void
+/** 해당 매치의 DS를 즉시 회수. 확정 창에서 매치가 취소돼 스폰한 DS를 버릴 때 사용. */
+export function release(matchId: string): void
 {
-    killProcess(port);
+    for (const proc of running.values())
+    {
+        if (proc.matchId === matchId)
+        {
+            killProcess(proc.port);
+
+            return;
+        }
+    }
 }
 
 /**

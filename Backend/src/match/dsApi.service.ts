@@ -1,5 +1,7 @@
 // DS→백엔드 요청 처리 (service 레이어) — 결과 보고 + kick 폴링 + 탈주 즉시 정산.
 // 서버 권위 모델: DS만 매치당 serverToken으로 접근한다.
+import { timingSafeEqual } from 'node:crypto';
+
 import { isDuplicateKeyError } from '../common/db.js';
 import { AppError, Codes } from '../common/errors.js';
 import { logger } from '../common/logger.js';
@@ -18,12 +20,26 @@ function assertServerToken(serverToken: string, matchId: string): rosters.MatchR
     {
         throw new AppError(Codes.MATCH_NOT_FOUND, '해당 매치를 찾을 수 없습니다.');
     }
-    if (serverToken !== roster.serverToken)
+    if (!tokensEqual(serverToken, roster.serverToken))
     {
         throw new AppError(Codes.INVALID_SERVER_TOKEN, '서버 토큰이 유효하지 않습니다.');
     }
 
     return roster;
+}
+
+/**
+ * 상수 시간 비교 — `!==`는 첫 불일치 바이트에서 끊겨 비교 시간이 일치 접두사 길이에 비례한다.
+ * 토큰은 매치별 랜덤 24바이트라 현실적 위험은 낮지만, 이 값 하나가 서버 권위 전체의 근거이므로
+ * 타이밍 채널을 남겨둘 이유가 없다. 길이가 다르면 timingSafeEqual이 throw하므로 먼저 거른다
+ * (길이 노출은 무해 — 토큰 길이는 고정이고 공개 정보다).
+ */
+function tokensEqual(given: string, expected: string): boolean
+{
+    const a = Buffer.from(given, 'utf8');
+    const b = Buffer.from(expected, 'utf8');
+
+    return a.length === b.length && timingSafeEqual(a, b);
 }
 
 /**

@@ -35,8 +35,12 @@ export interface DsAllocator
      * Agones의 SDK.Allocate()에 대응하는 경계: "플레이어가 붙었다"를 오케스트레이터에 알리는 지점.
      */
     commit(matchId: string): void;
-    /** 확보한 서버를 즉시 회수(확정 창에서 매치가 깨졌을 때). */
-    release(port: number): void;
+    /**
+     * 확보한 서버를 즉시 회수(확정 창에서 매치가 깨졌을 때).
+     * 포트가 아니라 matchId로 지목한다 — 나머지 5개 메서드와 키를 맞춰야 원격 구현이 가능하다.
+     * (Agones/GameLift에서는 포트가 인스턴스를 식별하지 않는다. 여러 인스턴스가 같은 포트를 쓴다.)
+     */
+    release(matchId: string): void;
     /** 프로세스 종료 시 정리 — 확정 전 서버만 회수하고 라이브 매치는 살려 둔다. */
     shutdownUncommitted(): void;
     /** 부팅 시 이전 실행이 남긴 잔재 점검. */
@@ -50,7 +54,7 @@ const localAllocator: DsAllocator = {
     // 준비 판정은 DS의 POST /ready → readiness.signal. 상한은 config의 readyTimeoutMs.
     waitUntilReady: (matchId) => readiness.waitForReady(matchId, config.match.ds.readyTimeoutMs),
     commit: (matchId) => ds.commit(matchId),
-    release: (port) => ds.release(port),
+    release: (matchId) => ds.release(matchId),
     shutdownUncommitted: () => ds.shutdownUncommitted(),
     reapOrphans: () => ds.reapOrphans(),
 };

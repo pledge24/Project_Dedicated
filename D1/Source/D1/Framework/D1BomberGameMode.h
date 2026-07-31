@@ -77,11 +77,20 @@ private:
 
 //~ 인증 — 접속 신원 검증
 private:
-	/** -MatchId/-MatchToken 으로 주입. 결과 POST 인증용(비면 스킵). */
+	/** 매치 설정 적재 — -MatchConfig= 파일이 있으면 그쪽, 없으면 커맨드라인 스위치(PIE·수동 실행). */
+	void LoadMatchConfig();
+
+	/** 설정 파일(JSON) 파싱. 성공 시 true. 읽은 파일은 즉시 지운다 — 토큰이 디스크에 남는 창을 줄인다. */
+	bool LoadMatchConfigFromFile(const FString& FilePath);
+
+	/** 구경로 — -MatchId/-MatchToken/-Roster/-Bots 스위치에서 직접 파싱. */
+	void LoadMatchConfigFromCommandLine();
+
+	/** 결과 POST 인증용(비면 스킵 = PIE/standalone). */
 	FString CurrentMatchId;
 	FString CurrentMatchToken;
 
-	/** -Roster= 로 주입(token→userId). InitNewPlayer가 ?join=로 신원 매핑. */
+	/** join 토큰 → 신원. InitNewPlayer가 ?join=로 신원 매핑. */
 	TMap<FString, FD1JoinEntry> JoinRoster;
 
 //~ 슬롯 배정
@@ -97,6 +106,9 @@ private:
 	/** 봇 컨트롤러 클래스(기본 AD1BotController, 생성자 지정). PlayerState를 얻어 PlayerArray에 편입. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AController> BotControllerClass;
+
+	/** 설정에서 주입된 봇 좌석(userId·닉네임). 비어 있으면 일반 매치. */
+	TArray<FD1JoinEntry> PendingBots;
 
 //~ 시작 게이트·매치 흐름
 private:

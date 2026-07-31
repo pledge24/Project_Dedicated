@@ -431,7 +431,7 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     }
     catch (err)
     {
-        allocator.release(server.port);
+        allocator.release(matchId);
         dsApiState.clear(matchId);
         const requeued = service.abortFormation(group.entries);
         logger.error({ err, matchId, requeued }, 'roster 등록 실패 — DS 회수, 생존자 재큐');
@@ -446,7 +446,7 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     }
     catch (err)
     {
-        allocator.release(server.port);
+        allocator.release(matchId);
         dsApiState.clear(matchId);
         const requeued = service.abortFormation(group.entries);
         await removeRosterQuietly(matchId);
@@ -458,7 +458,7 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
     // 5) 준비 대기 사이 끊김/재접속/취소 포착(userId 기준). 하나라도 이탈 시 DS 회수 + roster 제거 + 생존자 재큐.
     if (group.entries.some((e) => !service.isInFormation(e.userId) || e.ref.readyState !== WebSocket.OPEN))
     {
-        allocator.release(server.port);
+        allocator.release(matchId);
         dsApiState.clear(matchId);
         const requeued = service.abortFormation(group.entries);
         await removeRosterQuietly(matchId);
@@ -537,7 +537,7 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
     }
     catch (err)
     {
-        allocator.release(server.port);
+        allocator.release(matchId);
         dsApiState.clear(matchId);
         const requeued = service.abortFormation([entry]);
         logger.error({ err, matchId, userId: entry.userId, requeued }, '봇전 roster 등록 실패 — DS 회수, 재큐');
@@ -552,7 +552,7 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
     }
     catch (err)
     {
-        allocator.release(server.port);
+        allocator.release(matchId);
         dsApiState.clear(matchId);
         const requeued = service.abortFormation([entry]);
         await removeRosterQuietly(matchId);
@@ -564,7 +564,7 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
     // 5) 준비 대기 사이 끊김/재접속/취소 포착. 이탈 시 DS 회수 + roster 제거 + 생존 시 재큐.
     if (!service.isInFormation(entry.userId) || entry.ref.readyState !== WebSocket.OPEN)
     {
-        allocator.release(server.port);
+        allocator.release(matchId);
         dsApiState.clear(matchId);
         const requeued = service.abortFormation([entry]);
         await removeRosterQuietly(matchId);
