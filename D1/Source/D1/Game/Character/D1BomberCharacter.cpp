@@ -326,19 +326,14 @@ bool AD1BomberCharacter::CanPlaceBombAt(const FIntPoint& Cell, AD1BomberPlayerSt
 	}
 
 	// 월드 폭탄 전역 검사해서 동일한 셀에 중복 설치 방지.
-	for (const AD1Bomb* Existing : TActorRange<AD1Bomb>(GetWorld()))
-	{
-		if (!IsValid(Existing))
+	bool bCellOccupied = false;
+	UD1BomberGridLibrary::ForEachActorInCells<AD1Bomb>(GetWorld(), { Cell },
+		[&bCellOccupied](AD1Bomb*)
 		{
-			continue;
-		}
-		if (UD1BomberGridLibrary::WorldToCell(Existing->GetActorLocation()) == Cell)
-		{
-			return false;
-		}
-	}
+			bCellOccupied = true;
+		});
 
-	return true;
+	return !bCellOccupied;
 }
 
 void AD1BomberCharacter::UpdateIgnoredBombs()

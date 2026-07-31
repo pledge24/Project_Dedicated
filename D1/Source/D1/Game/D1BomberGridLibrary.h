@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EngineUtils.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Templates/Function.h"
 #include "D1BomberGridLibrary.generated.h"
@@ -44,6 +45,24 @@ public:
 		TFunctionRef<bool(FIntPoint)> IsGoal,
 		TFunctionRef<bool(FIntPoint)> IsPassable,
 		TArray<FIntPoint>& OutPath);
+
+	/** Cells에 포함된 셀 위의 T 액터 순회 — "월드 전수 → 셀 변환 → 포함 검사" 패턴 공용화. */
+	template <typename T>
+	static void ForEachActorInCells(UWorld* World, const TArray<FIntPoint>& Cells, TFunctionRef<void(T*)> Visit)
+	{
+		if (!World || Cells.Num() == 0)
+		{
+			return;
+		}
+
+		for (T* Actor : TActorRange<T>(World))
+		{
+			if (IsValid(Actor) && Cells.Contains(WorldToCell(Actor->GetActorLocation())))
+			{
+				Visit(Actor);
+			}
+		}
+	}
 
 	static constexpr float CellSize = 100.f;
 	/** 셀 중심 높이·블록 반폭·폭탄칸 풋프린트 공용(=50). */

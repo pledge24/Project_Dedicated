@@ -148,44 +148,26 @@ void AD1Bomb::DoExplode()
 
 void AD1Bomb::DestroySoftBlocks(const TArray<FIntPoint>& SoftBlockHits)
 {
-	// 폭발 줄기가 닿은 파괴 가능 블록을 "파괴 중"으로 전환. 
+	// 폭발 줄기가 닿은 파괴 가능 블록을 "파괴 중"으로 전환.
 	// 셀 제거는 블록이 시간 경과 후 스스로 처리(파괴 중에도 폭발 차단 유지)
-	if (SoftBlockHits.Num() == 0)
-	{
-		return;
-	}
-
-	for (AD1SoftBlock* Block : TActorRange<AD1SoftBlock>(GetWorld()))
-	{
-		if (!IsValid(Block) || Block->IsDestroying())
+	UD1BomberGridLibrary::ForEachActorInCells<AD1SoftBlock>(GetWorld(), SoftBlockHits,
+		[](AD1SoftBlock* Block)
 		{
-			continue;
-		}
-
-		const FIntPoint BlockCell = UD1BomberGridLibrary::WorldToCell(Block->GetActorLocation());
-		if (SoftBlockHits.Contains(BlockCell))
-		{
-			Block->StartDestroying();
-		}
-	}
+			if (!Block->IsDestroying())
+			{
+				Block->StartDestroying();
+			}
+		});
 }
 
 void AD1Bomb::DestroyPowerups(const TArray<FIntPoint>& Cells)
 {
 	// 폭발 십자에 걸린 드롭 아이템 파괴. Destroy()는 복제로 클라에서도 사라진다.
-	for (AD1PowerupPickup* Pickup : TActorRange<AD1PowerupPickup>(GetWorld()))
-	{
-		if (!IsValid(Pickup))
-		{
-			continue;
-		}
-
-		const FIntPoint PickupCell = UD1BomberGridLibrary::WorldToCell(Pickup->GetActorLocation());
-		if (Cells.Contains(PickupCell))
+	UD1BomberGridLibrary::ForEachActorInCells<AD1PowerupPickup>(GetWorld(), Cells,
+		[](AD1PowerupPickup* Pickup)
 		{
 			Pickup->Destroy();
-		}
-	}
+		});
 }
 
 void AD1Bomb::SpawnExplosionHazard(const TArray<FIntPoint>& Cells)
@@ -227,22 +209,12 @@ void AD1Bomb::TriggerChainDetonation()
 void AD1Bomb::ChainDetonateBombs(const TArray<FIntPoint>& Cells)
 {
 	// 폭발 십자 위에 있는 다른 폭탄 격발.
-	for (AD1Bomb* Other : TActorRange<AD1Bomb>(GetWorld()))
-	{
-		if (!IsValid(Other) || Other == this)
+	UD1BomberGridLibrary::ForEachActorInCells<AD1Bomb>(GetWorld(), Cells,
+		[this](AD1Bomb* Other)
 		{
-			continue;
-		}
-		
-		if (Other->State != ED1BombState::Fusing)
-		{
-			continue;
-		}
-
-		const FIntPoint OtherCell = UD1BomberGridLibrary::WorldToCell(Other->GetActorLocation());
-		if (Cells.Contains(OtherCell))
-		{
-			Other->TriggerChainDetonation();
-		}
-	}
+			if (Other != this && Other->State == ED1BombState::Fusing)
+			{
+				Other->TriggerChainDetonation();
+			}
+		});
 }
