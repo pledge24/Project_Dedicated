@@ -37,12 +37,32 @@ public:
 	void ReportLeaver(const FString& MatchId, const FString& MatchToken, int64 UserId);
 
 private:
-	/** ReportServerReady 내부 구현. Attempt=재시도 회차(0부터). 전송 실패 시 백오프 후 자기 재호출. */
-	void SendServerReady(const FString& MatchId, const FString& MatchToken, int32 Attempt);
+	/** 준비/결과 POST 공통 재시도 정책 — 지연 배열·409 처리·확정 콜백·로그 수위만 다르다. */
+	struct FD1ReportPolicy
+	{
+		/** 로그 라벨 ("준비"/"결과"). */
+		FString Label;
 
-	/** ReportMatchResult 내부 구현. Body는 회차 간 재사용해 재전송 페이로드 동일성을 보장한다. */
-	void SendMatchResult(const FString& MatchId, const FString& MatchToken, const TSharedRef<FJsonObject>& Body,
-		int32 Attempt, const FSimpleDelegate& OnSettled);
+		/** 로그용 matchId (결과 POST는 경로에 matchId가 없음). */
+		FString MatchId;
+
+		/** 회차별 백오프(초). 소진 시 확정 종료. */
+		TArray<float> RetryDelaysSec;
+
+		/** 409를 확정 성공으로 취급 (결과 POST의 멱등 재전송). */
+		bool bTreat409AsSettled = false;
+
+		/** 유실을 Error 수위로 로그 (결과 = 서버 권위 데이터). */
+		bool bLogLossAsError = false;
+
+		/** 전송 확정 시(성공·거부·소진) 정확히 한 번. 미바인딩이면 무시. */
+		FSimpleDelegate OnSettled;
+	};
+
+	/** 준비/결과 공용 전송부. Body는 회차 간 재사용해 재전송 페이로드 동일성을 보장.
+	 *  일시 실패(전송 실패·0·5xx·429)는 정책 백오프로 자기 재호출. */
+	void SendReport(const FString& Path, const FString& MatchToken, const TSharedRef<FJsonObject>& Body,
+		int32 Attempt, const FD1ReportPolicy& Policy, FTimerHandle& RetryTimerHandle);
 
 	FTimerHandle ServerReadyRetryTimerHandle;
 	FTimerHandle MatchResultRetryTimerHandle;

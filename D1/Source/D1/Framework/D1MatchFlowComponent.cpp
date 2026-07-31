@@ -573,9 +573,9 @@ void UD1MatchFlowComponent::PollKicks()
 	UGameInstance* GI = World ? World->GetGameInstance() : nullptr;
 
 	const FString Path = FString::Printf(TEXT("/api/match/%s/kicks"), *CurrentMatchId);
-	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(GI, Path, /*bAttachAuth=*/false);
-	// 매치별 서버 토큰을 Bearer로 — 유저 JWT 아님(결과 POST와 동일 인증 채널).
-	Request->SetHeader(TEXT("Authorization"), D1BackendHttp::MakeBearer(CurrentMatchToken));
+	// 매치별 서버 토큰 — 유저 JWT 아님(결과 POST와 동일 인증 채널).
+	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(
+		GI, Path, D1BackendHttp::EBackendAuth::ServerToken, CurrentMatchToken);
 
 	TWeakObjectPtr<UD1MatchFlowComponent> WeakThis(this);
 	Request->OnProcessRequestComplete().BindLambda(

@@ -43,7 +43,7 @@ public:
 private:
 	//~ 내부 헬퍼
 	void SendAuthRequest(const FString& Path, const TSharedRef<FJsonObject>& Body, const FOnAuthCompleted& OnCompleted);
-	void HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded, FOnAuthCompleted Forward);
-	void HandleProfileResponse(FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded);
-	void HandleHeartbeatResponse(FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded);
+	void HandleAuthResponse(const FHttpResponsePtr& Res, bool bSucceeded, FOnAuthCompleted Forward);
+	void HandleProfileResponse(const FHttpResponsePtr& Res, bool bSucceeded);
+	void HandleHeartbeatResponse(const FHttpResponsePtr& Res, bool bSucceeded);
 };

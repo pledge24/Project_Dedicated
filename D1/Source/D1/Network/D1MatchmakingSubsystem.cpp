@@ -31,20 +31,13 @@ void UD1MatchmakingSubsystem::CheckRejoinableMatch()
 		return;
 	}
 
-	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(GetGameInstance(), TEXT("/api/match/current"), /*bAttachAuth=*/true);
-
-	TWeakObjectPtr<UD1MatchmakingSubsystem> WeakThis(this);
-	Request->OnProcessRequestComplete().BindLambda(
-		[WeakThis](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded)
+	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(
+		GetGameInstance(), TEXT("/api/match/current"), D1BackendHttp::EBackendAuth::SessionJwt);
+	D1BackendHttp::SendAsync(this, Request,
+		[this](const FHttpResponsePtr& Res, bool bSucceeded)
 		{
-			UD1MatchmakingSubsystem* Self = WeakThis.Get();
-			if (!Self)
-			{
-				return;
-			}
-
 			// 로비 진입 직후는 첫 heartbeat 전이라 이 요청이 세션 대체를 감지할 유일한 창이다.
-			if (D1BackendHttp::HandleSupersededIfAny(Self->GetGameInstance(), Res))
+			if (D1BackendHttp::HandleSupersededIfAny(GetGameInstance(), Res))
 			{
 				return;
 			}
@@ -55,9 +48,8 @@ void UD1MatchmakingSubsystem::CheckRejoinableMatch()
 				return;
 			}
 
-			Self->HandleRejoinResponse(Res->GetContentAsString());
+			HandleRejoinResponse(Res->GetContentAsString());
 		});
-	Request->ProcessRequest();
 }
 
 void UD1MatchmakingSubsystem::StartMatchmaking()
@@ -230,15 +222,7 @@ void UD1MatchmakingSubsystem::HandleSocketMessage(const FString& Message)
 		const TSharedPtr<FJsonObject>* DataObj = nullptr;
 		if (D1BackendHttp::GetObjectField(Root, TEXT("data"), DataObj))
 		{
-			(*DataObj)->TryGetStringField(TEXT("matchId"), Match.MatchId);
-			(*DataObj)->TryGetStringField(TEXT("joinToken"), Match.JoinToken);
-
-			const TSharedPtr<FJsonObject>* ServerObj = nullptr;
-			if (D1BackendHttp::GetObjectField(*DataObj, TEXT("server"), ServerObj))
-			{
-				(*ServerObj)->TryGetStringField(TEXT("host"), Match.ServerHost);
-				(*ServerObj)->TryGetNumberField(TEXT("port"), Match.ServerPort);
-			}
+			D1BackendHttp::ParseMatchFound(*DataObj, Match);
 		}
 
 		MatchmakingState = EMatchmakingState::Matched;
@@ -330,15 +314,7 @@ void UD1MatchmakingSubsystem::HandleRejoinResponse(const FString& Body)
 	}
 
 	FMatchFoundDTO Match;
-	(*DataObj)->TryGetStringField(TEXT("matchId"), Match.MatchId);
-	(*DataObj)->TryGetStringField(TEXT("joinToken"), Match.JoinToken);
-
-	const TSharedPtr<FJsonObject>* ServerObj = nullptr;
-	if (D1BackendHttp::GetObjectField(*DataObj, TEXT("server"), ServerObj))
-	{
-		(*ServerObj)->TryGetStringField(TEXT("host"), Match.ServerHost);
-		(*ServerObj)->TryGetNumberField(TEXT("port"), Match.ServerPort);
-	}
+	D1BackendHttp::ParseMatchFound(*DataObj, Match);
 
 	// 성사 경로와 같은 상태·이벤트를 태운다 — 로비 UI가 이미 이 흐름을 구독하고 있다.
 	MatchmakingState = EMatchmakingState::Matched;
