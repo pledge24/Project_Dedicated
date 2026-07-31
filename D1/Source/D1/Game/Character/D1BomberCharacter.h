@@ -31,6 +31,7 @@ public:
 
 	//~ Begin APawn Interface
 	virtual void PossessedBy(AController* NewController) override;
+	virtual void Restart() override;
 	//~ End APawn Interface
 
 protected:
