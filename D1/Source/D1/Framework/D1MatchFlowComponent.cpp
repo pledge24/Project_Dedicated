@@ -234,6 +234,13 @@ void UD1MatchFlowComponent::EvaluateEndCondition()
 
 	FlushPendingDeaths(); // 이번 프레임 배치에 공동 등수 부여
 
+	// Logout으로 PS 액터가 파괴되면(봇·roster 미등록 이탈은 NotifyPlayerDisconnected가 걸러냄)
+	// 무효 엔트리가 남아 생존자 수를 부풀린다 — 종료 판정 전 정리.
+	AlivePlayerStates.RemoveAll([](const TObjectPtr<AD1BomberPlayerState>& PS)
+	{
+		return !IsValid(PS);
+	});
+
 	if (AlivePlayerStates.Num() <= 1)
 	{
 		const bool bHasSurvivor = AlivePlayerStates.Num() == 1;
