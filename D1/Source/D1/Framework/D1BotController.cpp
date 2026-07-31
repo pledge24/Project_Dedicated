@@ -6,6 +6,7 @@
 
 #include "Core/D1LogChannels.h"
 #include "Game/Character/D1BomberCharacter.h"
+#include "Game/Character/D1BombPlacementComponent.h"
 #include "Game/D1Bomb.h"
 #include "Game/D1ExplosionHazard.h"
 #include "Game/D1BomberGridLibrary.h"
@@ -127,7 +128,7 @@ void AD1BotController::Think(AD1BomberCharacter* Bot, const AD1BomberGameState* 
 		TArray<FIntPoint> Escape;
 		if (WouldSurviveBombAt(GS, Cur, Range, Escape))
 		{
-			Bot->ServerPlaceBombForAI();
+			Bot->GetBombPlacement()->ServerPlaceBombForAI();
 			State = EBotState::Flee;
 			CurrentPath = MoveTemp(Escape);
 			PathIndex = 1;

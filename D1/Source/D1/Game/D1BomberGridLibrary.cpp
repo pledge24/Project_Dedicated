@@ -3,6 +3,8 @@
 #include "Game/D1BomberGridLibrary.h"
 #include "Algo/Reverse.h"
 #include "Framework/D1BomberGameState.h"
+#include "Game/Character/D1BomberCharacter.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 FIntPoint UD1BomberGridLibrary::WorldToCell(const FVector& WorldLocation)
 {
@@ -144,4 +146,24 @@ bool UD1BomberGridLibrary::FindNearestReachable(
 	}
 	Algo::Reverse(OutPath);
 	return true;
+}
+
+void UD1BomberGridLibrary::OverlapBomberCharacters(const UObject* WorldContext, const FVector& Center, const FVector& Extent, TArray<AD1BomberCharacter*>& OutChars)
+{
+	OutChars.Reset();
+
+	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
+	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
+
+	TArray<AActor*> Found;
+	UKismetSystemLibrary::BoxOverlapActors(WorldContext, Center, Extent, ObjectTypes,
+		AD1BomberCharacter::StaticClass(), TArray<AActor*>(), Found);
+
+	for (AActor* A : Found)
+	{
+		if (AD1BomberCharacter* BC = Cast<AD1BomberCharacter>(A))
+		{
+			OutChars.Add(BC);
+		}
+	}
 }

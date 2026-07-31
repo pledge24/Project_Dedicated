@@ -8,6 +8,7 @@
 #include "Net/UnrealNetwork.h"
 
 #include "Game/Character/D1BomberCharacter.h"
+#include "Game/Character/D1BombPlacementComponent.h"
 #include "Framework/D1BomberGameState.h"
 #include "Game/D1BomberGridLibrary.h"
 #include "Game/D1ExplosionFX.h"
@@ -54,13 +55,16 @@ void AD1Bomb::BeginPlay()
 	// 폭탄이 스폰된 타이밍에 해당 셀 내부에 위치한 캐릭터들은 Sweep 충돌을 무시하도록 등록. (서버/클라 양쪽에서 실행)
 	{
 		TArray<AD1BomberCharacter*> Overlapping;
-		AD1BomberCharacter::OverlapBomberCharacters(this, GetActorLocation(),
+		UD1BomberGridLibrary::OverlapBomberCharacters(this, GetActorLocation(),
 			FVector(UD1BomberGridLibrary::CellHalf, UD1BomberGridLibrary::CellHalf, UD1BomberGridLibrary::CellSize),
 			Overlapping);
 
 		for (AD1BomberCharacter* BC : Overlapping)
 		{
-			BC->AddIgnoredBomb(this);
+			if (UD1BombPlacementComponent* Placement = BC->GetBombPlacement())
+			{
+				Placement->AddIgnoredBomb(this);
+			}
 		}
 	}
 }
@@ -137,10 +141,13 @@ void AD1Bomb::DoExplode()
 		MulticastOnExploded(Cells);
 	}
 
-	// 소유자 폭탄 슬롯 회수 — Owner(설치 캐릭터)에서 직접.
+	// 소유자 폭탄 슬롯 회수 — Owner(설치 캐릭터)의 설치 컴포넌트에서 직접.
 	if (AD1BomberCharacter* OwnerBC = GetOwner<AD1BomberCharacter>())
 	{
-		OwnerBC->NotifyBombDestroyed(this);
+		if (UD1BombPlacementComponent* Placement = OwnerBC->GetBombPlacement())
+		{
+			Placement->NotifyBombDestroyed(this);
+		}
 	}
 
 	Destroy();

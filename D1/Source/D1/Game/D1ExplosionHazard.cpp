@@ -55,7 +55,7 @@ void AD1ExplosionHazard::ApplyExplosionDamage()
 	{
 		const FVector Center = UD1BomberGridLibrary::CellToWorldCenter(Cell, UD1BomberGridLibrary::CellHalf);
 		TArray<AD1BomberCharacter*> Chars;
-		AD1BomberCharacter::OverlapBomberCharacters(this, Center, ExplosionHitExtent, Chars);
+		UD1BomberGridLibrary::OverlapBomberCharacters(this, Center, ExplosionHitExtent, Chars);
 
 		for (AD1BomberCharacter* BC : Chars)
 		{

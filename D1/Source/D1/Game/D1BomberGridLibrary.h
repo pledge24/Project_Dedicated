@@ -8,6 +8,7 @@
 #include "Templates/Function.h"
 #include "D1BomberGridLibrary.generated.h"
 
+class AD1BomberCharacter;
 class AD1BomberGameState;
 
 /**
@@ -45,6 +46,9 @@ public:
 		TFunctionRef<bool(FIntPoint)> IsGoal,
 		TFunctionRef<bool(FIntPoint)> IsPassable,
 		TArray<FIntPoint>& OutPath);
+
+	/** 박스 안의 봄버 캐릭터 수집(Pawn 오버랩 질의 공용화 — 폭탄/폭발 피격 판정용). */
+	static void OverlapBomberCharacters(const UObject* WorldContext, const FVector& Center, const FVector& Extent, TArray<AD1BomberCharacter*>& OutChars);
 
 	/** Cells에 포함된 셀 위의 T 액터 순회 — "월드 전수 → 셀 변환 → 포함 검사" 패턴 공용화. */
 	template <typename T>
