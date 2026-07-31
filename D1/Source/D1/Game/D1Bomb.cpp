@@ -88,6 +88,12 @@ void AD1Bomb::SetRange(int32 InRange)
 
 void AD1Bomb::MulticastOnExploded_Implementation(const TArray<FIntPoint>& AffectedCells)
 {
+	// NetMulticast는 서버 로컬에서도 실행된다 — 렌더 없는 DS의 FX 스폰·Tick은 순수 낭비.
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+
 	UWorld* World = GetWorld();
 	if (!World)
 	{
