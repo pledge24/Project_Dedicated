@@ -37,6 +37,12 @@ public:
 	/** 새 로그인 성립 시 GameInstance가 호출 — 다음 대체 감지를 위해 가드 리셋. */
 	void ResetSupersededGuard() { bHandled = false; }
 
+	/** 의도한 이동으로 로비 맵을 연다(로그인 성공·결과 화면 복귀 공용, 맵은 온라인 설정 단일 출처). */
+	void TravelToLobby();
+
+	/** 의도한 이동으로 프론트엔드(로그인) 맵을 연다(비로그인 방어 등). 세션은 건드리지 않는다. */
+	void TravelToFrontend();
+
 protected:
 	UFUNCTION()
 	void OnNoticeConfirmed();
@@ -48,6 +54,7 @@ private:
 	void LeaveToDestination();
 	void ReturnToLogin();
 	void ReturnToLobby();
+	void OpenFrontendMap();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> NoticeWidget;

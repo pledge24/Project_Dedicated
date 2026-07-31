@@ -9,12 +9,13 @@
 #include "Components/VerticalBox.h"
 #include "Core/D1LogChannels.h"
 #include "Framework/D1GameInstance.h"
-#include "Kismet/GameplayStatics.h"
 #include "Network/BackendErrorMessages.h"
 #include "Network/D1AuthSubsystem.h"
 #include "Network/D1MatchmakingSubsystem.h"
 #include "Network/D1OnlineSettings.h"
+#include "Network/D1SessionSubsystem.h"
 #include "TimerManager.h"
+#include "UI/D1UILayers.h"
 
 // 매치 정원(백엔드 playersPerMatch와 동일). match:found가 개수를 싣지 않아 클라 상수로 표기.
 static constexpr int32 MatchPlayerCount = 4;
@@ -29,9 +30,9 @@ void UD1UWLobby::NativeConstruct()
 	if (!GI || !GI->IsLoggedIn())
 	{
 		UE_LOG(LogD1, Warning, TEXT("[Lobby] 비로그인 상태로 진입 — Frontend로 복귀"));
-		if (!FrontendMap.IsNull())
+		if (UD1SessionSubsystem* Session = GI ? GI->GetSubsystem<UD1SessionSubsystem>() : nullptr)
 		{
-			UGameplayStatics::OpenLevelBySoftObjectPtr(this, FrontendMap);
+			Session->TravelToFrontend();
 		}
 		return;
 	}
@@ -264,9 +265,7 @@ void UD1UWLobby::HandleMatchFound(const FMatchFoundDTO& Match)
 
 void UD1UWLobby::HandleMatchmakingError(const FBackendResponse& Error)
 {
-	const FString Msg = Error.ErrorMessage.IsEmpty()
-		? FBackendErrorMessages::Lookup(Error.ErrorCode)
-		: Error.ErrorMessage;
+	const FString Msg = FBackendErrorMessages::Resolve(Error);
 
 	UE_LOG(LogD1, Warning, TEXT("[Lobby] 매칭 에러: %s"), *Msg);
 
@@ -327,11 +326,11 @@ void UD1UWLobby::OnRankingClicked()
 		return;
 	}
 
-	// ZOrder 10 → 로비 위, 배경(-1) 위. SwitchToWidget 경유 금지(로비 파괴됨).
+	// SwitchToWidget 경유 금지(로비 파괴됨) — 팝업층에 직접 띄운다.
 	RankingWidget = CreateWidget<UUserWidget>(GetOwningPlayer(), RankingWidgetClass);
 	if (RankingWidget)
 	{
-		RankingWidget->AddToViewport(10);
+		RankingWidget->AddToViewport(D1UILayer::Popup);
 	}
 }
 

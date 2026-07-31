@@ -35,9 +35,7 @@ void UD1UWRanking::HandleRankingCompleted(const FBackendResponse& Response, cons
 	if (!Response.bOk)
 	{
 		// 실패를 빈 목록으로만 보여주면 "아무도 없음"과 구분이 안 된다 — 사유를 표면화한다.
-		const FString Msg = Response.ErrorMessage.IsEmpty()
-			? FBackendErrorMessages::Lookup(Response.ErrorCode)
-			: Response.ErrorMessage;
+		const FString Msg = FBackendErrorMessages::Resolve(Response);
 		UE_LOG(LogD1, Warning, TEXT("[Ranking] 조회 실패 — %s"), *Msg);
 
 		if (ErrorLabel)

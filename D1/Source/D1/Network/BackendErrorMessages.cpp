@@ -18,6 +18,8 @@ FString FBackendErrorMessages::Lookup(EBackendErrorCode Code)
 		return TEXT("요청이 너무 잦습니다. 잠시 후 다시 시도해주세요.");
 	case EBackendErrorCode::NetworkError:
 		return TEXT("서버에 연결할 수 없습니다.");
+	case EBackendErrorCode::NotAuthenticated:
+		return TEXT("로그인이 필요합니다.");
 	case EBackendErrorCode::InternalError:
 		return TEXT("서버 오류가 발생했습니다.");
 	case EBackendErrorCode::None:
@@ -25,4 +27,9 @@ FString FBackendErrorMessages::Lookup(EBackendErrorCode Code)
 	default:
 		return TEXT("알 수 없는 오류가 발생했습니다.");
 	}
+}
+
+FString FBackendErrorMessages::Resolve(const FBackendResponse& Response)
+{
+	return Response.ErrorMessage.IsEmpty() ? Lookup(Response.ErrorCode) : Response.ErrorMessage;
 }

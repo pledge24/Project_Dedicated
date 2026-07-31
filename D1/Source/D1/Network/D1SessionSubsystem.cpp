@@ -10,6 +10,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Network/D1MatchmakingSubsystem.h"
 #include "Network/D1OnlineSettings.h"
+#include "UI/D1UILayers.h"
 #include "UI/D1UWSystemNotice.h"
 
 void UD1SessionSubsystem::NotifySessionSuperseded()
@@ -76,6 +77,19 @@ void UD1SessionSubsystem::NotifyMapLoaded()
 	bHandled = false;
 }
 
+void UD1SessionSubsystem::TravelToLobby()
+{
+	// 이동이 일으키는 넷드라이버 종료(DS에서 복귀 등)가 장애로 잡히지 않게 먼저 표시.
+	BeginIntentionalTravel();
+	ReturnToLobby();
+}
+
+void UD1SessionSubsystem::TravelToFrontend()
+{
+	BeginIntentionalTravel();
+	OpenFrontendMap();
+}
+
 void UD1SessionSubsystem::OnNoticeConfirmed()
 {
 	if (NoticeWidget)
@@ -110,8 +124,7 @@ bool UD1SessionSubsystem::ShowNotice(const FText& Title, const FText& Message)
 		return false;
 	}
 
-	// ZOrder 100 → 랭킹 팝업(10)·종료 버튼(5)보다 위.
-	NoticeWidget->AddToViewport(100);
+	NoticeWidget->AddToViewport(D1UILayer::Modal);
 
 	if (UD1UWSystemNotice* Notice = Cast<UD1UWSystemNotice>(NoticeWidget))
 	{
@@ -148,16 +161,7 @@ void UD1SessionSubsystem::ReturnToLogin()
 		GI->ClearSession();
 	}
 
-	const UD1OnlineSettings* Settings = GetDefault<UD1OnlineSettings>();
-	if (Settings && !Settings->FrontendMap.IsNull())
-	{
-		// TRAVEL_Absolute — DS 접속(게임중 kick)이나 로비 어디서든 프론트엔드 맵을 새로 연다.
-		UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->FrontendMap);
-	}
-	else
-	{
-		UE_LOG(LogD1, Error, TEXT("[Session] FrontendMap 미설정 — 로그인 화면 복귀 불가 (Project Settings > D1 > Session)"));
-	}
+	OpenFrontendMap();
 }
 
 void UD1SessionSubsystem::ReturnToLobby()
@@ -173,4 +177,18 @@ void UD1SessionSubsystem::ReturnToLobby()
 	// 로비 맵이 없으면 세션이 살아있어도 갈 곳이 없다 — 로그인 화면으로라도 내보낸다(갇힘 방지).
 	UE_LOG(LogD1, Error, TEXT("[Session] LobbyMap 미설정 — 로그인 화면으로 폴백 (Project Settings > D1 > Session)"));
 	ReturnToLogin();
+}
+
+void UD1SessionSubsystem::OpenFrontendMap()
+{
+	const UD1OnlineSettings* Settings = GetDefault<UD1OnlineSettings>();
+	if (Settings && !Settings->FrontendMap.IsNull())
+	{
+		// TRAVEL_Absolute — DS 접속(게임중 kick)이나 로비 어디서든 프론트엔드 맵을 새로 연다.
+		UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->FrontendMap);
+
+		return;
+	}
+
+	UE_LOG(LogD1, Error, TEXT("[Session] FrontendMap 미설정 — 로그인 화면 복귀 불가 (Project Settings > D1 > Session)"));
 }

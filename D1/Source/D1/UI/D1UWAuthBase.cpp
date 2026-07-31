@@ -67,10 +67,7 @@ bool UD1UWAuthBase::FinishAuthSubmit(const FBackendResponse& Response)
 
 	if (!Response.bOk)
 	{
-		const FString Msg = Response.ErrorMessage.IsEmpty()
-			? FBackendErrorMessages::Lookup(Response.ErrorCode)
-			: Response.ErrorMessage;
-		EndRequest(false, Msg);
+		EndRequest(false, FBackendErrorMessages::Resolve(Response));
 		return false;
 	}
 

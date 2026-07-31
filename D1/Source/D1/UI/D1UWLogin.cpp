@@ -5,9 +5,9 @@
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
 #include "Core/D1LogChannels.h"
-#include "Kismet/GameplayStatics.h"
 #include "Framework/Menu/D1MenuPlayerController.h"
 #include "Network/D1AuthSubsystem.h"
+#include "Network/D1SessionSubsystem.h"
 
 void UD1UWLogin::NativeConstruct()
 {
@@ -48,13 +48,10 @@ void UD1UWLogin::OnLoginCompletedInternal(const FBackendResponse& Response, cons
 		return;
 	}
 
-	if (LobbyMap.IsNull())
+	if (UD1SessionSubsystem* Session = GetGameInstance() ? GetGameInstance()->GetSubsystem<UD1SessionSubsystem>() : nullptr)
 	{
-		UE_LOG(LogD1, Error, TEXT("[Login] LobbyMap이 비어있음 (디테일 패널에서 MP_Lobby 지정 필요)"));
-		return;
+		Session->TravelToLobby();
 	}
-
-	UGameplayStatics::OpenLevelBySoftObjectPtr(this, LobbyMap);
 }
 
 void UD1UWLogin::OnGotoRegisterClicked()

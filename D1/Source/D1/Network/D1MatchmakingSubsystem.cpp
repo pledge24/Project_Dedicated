@@ -73,8 +73,7 @@ void UD1MatchmakingSubsystem::StartMatchmaking()
 	{
 		FBackendResponse Err;
 		Err.bOk = false;
-		Err.ErrorCode = EBackendErrorCode::Unknown;
-		Err.ErrorMessage = TEXT("로그인이 필요합니다.");
+		Err.ErrorCode = EBackendErrorCode::NotAuthenticated;
 		OnMatchmakingError.Broadcast(Err);
 		return;
 	}

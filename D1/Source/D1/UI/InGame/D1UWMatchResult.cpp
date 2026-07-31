@@ -6,7 +6,6 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Engine/GameInstance.h"
-#include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "Core/D1LogChannels.h"
 #include "Network/D1SessionSubsystem.h"
@@ -95,22 +94,13 @@ void UD1UWMatchResult::ReturnToLobby()
 		World->GetTimerManager().ClearTimer(CountdownTimerHandle);
 	}
 
-	if (LobbyMap.IsNull())
+	// 이동이 DS 연결을 끊는다 — SessionSubsystem이 의도한 이탈 표시 후 로비 맵(설정 단일 출처)을 연다.
+	if (UD1SessionSubsystem* Session = GetGameInstance() ? GetGameInstance()->GetSubsystem<UD1SessionSubsystem>() : nullptr)
 	{
-		UE_LOG(LogD1, Error, TEXT("[MatchResult] LobbyMap이 비어있음 (디테일 패널에서 MP_Lobby 지정 필요)"));
+		Session->TravelToLobby();
+
 		return;
 	}
 
-	// 아래 OpenLevel이 DS 연결을 끊는다 — 그 끊김이 장애로 잡혀 "연결이 끊어졌습니다" 팝업이
-	// 결과 화면 위에 뜨지 않도록 의도한 이탈임을 먼저 알린다.
-	if (UGameInstance* GI = GetGameInstance())
-	{
-		if (UD1SessionSubsystem* Session = GI->GetSubsystem<UD1SessionSubsystem>())
-		{
-			Session->BeginIntentionalTravel();
-		}
-	}
-
-	// TRAVEL_Absolute → DS 연결 끊고 로컬 MP_Lobby 로드.
-	UGameplayStatics::OpenLevelBySoftObjectPtr(this, LobbyMap);
+	UE_LOG(LogD1, Error, TEXT("[MatchResult] SessionSubsystem 없음 — 로비 복귀 불가"));
 }

@@ -14,7 +14,7 @@ void UD1RankingSubsystem::FetchRanking(int32 Limit, int32 Offset, const FOnRanki
 		// 비로그인 — 조회할 세션 없음.
 		FBackendResponse Out;
 		Out.bOk = false;
-		Out.ErrorCode = EBackendErrorCode::NetworkError;
+		Out.ErrorCode = EBackendErrorCode::NotAuthenticated;
 		OnCompleted.ExecuteIfBound(Out, FD1RankingResult());
 		return;
 	}

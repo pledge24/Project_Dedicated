@@ -12,7 +12,7 @@ class UEditableTextBox;
 
 /**
  *  로그인 위젯.
- *  로그인 성공 시 GameInstance에 세션이 자동 저장되고, 이 위젯이 LobbyMap으로 OpenLevel.
+ *  로그인 성공 시 GameInstance에 세션이 자동 저장되고, SessionSubsystem이 로비 맵으로 이동.
  */
 UCLASS()
 class UD1UWLogin : public UD1UWAuthBase
@@ -38,11 +38,6 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UButton> LoginButton;
-
-private:
-	/** 로그인 성공 후 이동할 맵 — 디테일 패널에서 MP_Lobby 지정. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Login", meta = (AllowPrivateAccess = "true"))
-	TSoftObjectPtr<UWorld> LobbyMap;
 
 //~ 회원가입 전환
 protected:
