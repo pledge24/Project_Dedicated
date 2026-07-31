@@ -353,6 +353,9 @@ void UD1MatchmakingSubsystem::TravelToMatch(const FMatchFoundDTO& Match)
 {
 	if (Match.ServerHost.IsEmpty() || Match.ServerPort <= 0)
 	{
+		UE_LOG(LogD1, Warning, TEXT("[Match] 매치 서버 주소 불량 host=%s port=%d — travel 불가"),
+			*Match.ServerHost, Match.ServerPort);
+		NotifyTravelFailed(TEXT("매치 서버 주소가 올바르지 않습니다."));
 		return;
 	}
 
@@ -360,6 +363,7 @@ void UD1MatchmakingSubsystem::TravelToMatch(const FMatchFoundDTO& Match)
 	if (!PC)
 	{
 		UE_LOG(LogD1, Warning, TEXT("[Match] 로컬 PlayerController 없음 — travel 불가"));
+		NotifyTravelFailed(TEXT("매치 입장에 실패했습니다."));
 		return;
 	}
 
@@ -374,4 +378,15 @@ void UD1MatchmakingSubsystem::TravelToMatch(const FMatchFoundDTO& Match)
 		*Match.ServerHost, Match.ServerPort, *Match.MatchId, *Match.JoinToken);
 	UE_LOG(LogD1, Log, TEXT("[Match] DS 입장: %s"), *Url);
 	PC->ClientTravel(Url, TRAVEL_Absolute);
+}
+
+void UD1MatchmakingSubsystem::NotifyTravelFailed(const FString& Message)
+{
+	MatchmakingState = EMatchmakingState::Idle;
+
+	FBackendResponse Err;
+	Err.bOk = false;
+	Err.ErrorCode = EBackendErrorCode::Unknown;
+	Err.ErrorMessage = Message;
+	OnMatchmakingError.Broadcast(Err);
 }

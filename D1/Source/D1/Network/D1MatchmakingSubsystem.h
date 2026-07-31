@@ -64,6 +64,8 @@ private:
 	//~ 내부 헬퍼 — DS 입장 (신규 성사·재입장 공용)
 	void HandleRejoinResponse(const FString& Body);
 	void TravelToMatch(const FMatchFoundDTO& Match);
+	/** travel 불가 시 상태 리셋 + 에러 표면화 — OnMatchFound로 접힌 로비 UI가 복구되도록. */
+	void NotifyTravelFailed(const FString& Message);
 
 	//~ 내부 상태 (비-UPROPERTY)
 	TSharedPtr<IWebSocket> MatchSocket;

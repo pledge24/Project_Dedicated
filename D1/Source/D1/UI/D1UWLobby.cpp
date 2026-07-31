@@ -233,6 +233,16 @@ void UD1UWLobby::HandleMatchFound(const FMatchFoundDTO& Match)
 
 	StopMatchSearchingElapsed();
 
+	// 재입장 경로(CheckRejoinableMatch)는 버튼 클릭 없이 도착 — 패널·버튼 상태를 직접 맞춘다.
+	if (MatchStatusPanel)
+	{
+		MatchStatusPanel->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+	if (StartMatchingButton)
+	{
+		StartMatchingButton->SetIsEnabled(false);
+	}
+
 	if (MatchStatusLabel)
 	{
 		MatchStatusLabel->SetText(FText::Format(
@@ -270,6 +280,16 @@ void UD1UWLobby::HandleMatchmakingError(const FBackendResponse& Error)
 	{
 		// 에러 문구는 패널에 남겨두고 다시 시도 가능하게 Start 재활성
 		StartMatchingButton->SetIsEnabled(true);
+	}
+
+	// HandleMatchFound가 접은 위젯 원복 — travel 실패 후 재검색 UI가 온전하도록.
+	if (MatchSearchingElapsedLabel)
+	{
+		MatchSearchingElapsedLabel->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+	if (CancelMatchingButton)
+	{
+		CancelMatchingButton->SetVisibility(ESlateVisibility::Visible);
 	}
 }
 
