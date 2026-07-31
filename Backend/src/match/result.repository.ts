@@ -4,7 +4,7 @@ import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import type { PoolConnection } from 'mysql2/promise';
 
 import { config } from '../common/config.js';
-import { withTransaction } from '../common/db.js';
+import { getPool, withTransaction } from '../common/db.js';
 import type { MatchEndReason } from '../common/types.js';
 import { computeFfaEloDeltas } from './elo.js';
 
@@ -208,6 +208,35 @@ export async function settleLeaverProfile(clientMatchId: string, userId: number)
 
         return applyLeaverPenalty(conn, clientMatchId, userId, profileByUser.get(userId)!.score, new Date());
     });
+}
+
+/**
+ * 이 매치의 결과가 이미 저장됐는가. 재입장 판정용 — 결과가 있으면 경기는 끝난 것이다.
+ * roster는 재제출 멱등을 위해 종료 후에도 sweep 전까지 남으므로, roster 존재만으로는 진행 중을 알 수 없다.
+ */
+export async function hasResult(clientMatchId: string): Promise<boolean>
+{
+    const [rows] = await getPool().execute<RowDataPacket[]>(
+        'SELECT 1 FROM matches WHERE client_match_id = ? LIMIT 1',
+        [clientMatchId]
+    );
+
+    return rows.length > 0;
+}
+
+/**
+ * 이 유저가 이 매치에서 이미 탈주로 정산됐는가. 재입장 판정용.
+ * DS는 매치 시작 후 이탈자를 KickedUserIds에 넣어 재입장을 거절하므로(D1MatchFlowComponent),
+ * 정산된 유저에게 주소를 주면 DS가 튕겨낸다 — 백엔드에서 미리 거른다.
+ */
+export async function isLeaverSettled(clientMatchId: string, userId: number): Promise<boolean>
+{
+    const [rows] = await getPool().execute<RowDataPacket[]>(
+        'SELECT 1 FROM match_leaver_settlements WHERE client_match_id = ? AND user_id = ? LIMIT 1',
+        [clientMatchId, userId]
+    );
+
+    return rows.length > 0;
 }
 
 /**

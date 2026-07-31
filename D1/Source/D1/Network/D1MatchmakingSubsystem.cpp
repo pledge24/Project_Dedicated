@@ -6,6 +6,7 @@
 #include "Dom/JsonObject.h"
 #include "Engine/GameInstance.h"
 #include "GameFramework/PlayerController.h"
+#include "Interfaces/IHttpResponse.h"
 #include "IWebSocket.h"
 #include "Network/D1BackendHttp.h"
 #include "Network/D1SessionSubsystem.h"
@@ -15,6 +16,42 @@ void UD1MatchmakingSubsystem::Deinitialize()
 {
 	CloseMatchSocket();
 	Super::Deinitialize();
+}
+
+void UD1MatchmakingSubsystem::CheckRejoinableMatch()
+{
+	// 매칭 중이면 확인하지 않는다 — 큐/확정 흐름이 진행 중인데 travel을 끼워 넣으면 상태가 어긋난다.
+	if (MatchmakingState != EMatchmakingState::Idle)
+	{
+		return;
+	}
+
+	if (D1BackendHttp::GetSessionJwt(GetGameInstance()).IsEmpty())
+	{
+		return;
+	}
+
+	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(GetGameInstance(), TEXT("/api/match/current"), /*bAttachAuth=*/true);
+
+	TWeakObjectPtr<UD1MatchmakingSubsystem> WeakThis(this);
+	Request->OnProcessRequestComplete().BindLambda(
+		[WeakThis](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded)
+		{
+			UD1MatchmakingSubsystem* Self = WeakThis.Get();
+			if (!Self)
+			{
+				return;
+			}
+
+			// 실패는 조용히 무시한다 — 재입장은 있으면 좋은 복구 경로지 로비 진입을 막을 이유가 아니다.
+			if (!bSucceeded || !Res.IsValid() || Res->GetResponseCode() != 200)
+			{
+				return;
+			}
+
+			Self->HandleRejoinResponse(Res->GetContentAsString());
+		});
+	Request->ProcessRequest();
 }
 
 void UD1MatchmakingSubsystem::StartMatchmaking()
@@ -205,29 +242,7 @@ void UD1MatchmakingSubsystem::HandleSocketMessage(const FString& Message)
 
 		// travel이 월드를 내리므로 WS 먼저 정리.
 		CloseMatchSocket();
-
-		// 할당받은 DS 주소로 입장. 로컬 PC에서 raw "host:port"로 ClientTravel.
-		if (!Match.ServerHost.IsEmpty() && Match.ServerPort > 0)
-		{
-			if (APlayerController* PC = GetGameInstance()->GetFirstLocalPlayerController())
-			{
-				// 본인 입장 토큰을 ?join= 으로 동봉 → DS가 roster로 권위 신원(userId·slot) 확정.
-				// userId/slot은 클라가 주장하지 않는다(서버권위). UE URL 옵션은 ? 로 구분.
-				if (Match.JoinToken.IsEmpty())
-				{
-					UE_LOG(LogD1, Warning, TEXT("[Match] match:found에 join 토큰 없음 — 신원 매핑 실패 가능"));
-				}
-
-				const FString Url = FString::Printf(TEXT("%s:%d?matchId=%s?join=%s"),
-					*Match.ServerHost, Match.ServerPort, *Match.MatchId, *Match.JoinToken);
-				UE_LOG(LogD1, Log, TEXT("[Match] DS 입장: %s"), *Url);
-				PC->ClientTravel(Url, TRAVEL_Absolute);
-			}
-			else
-			{
-				UE_LOG(LogD1, Warning, TEXT("[Match] 로컬 PlayerController 없음 — travel 불가"));
-			}
-		}
+		TravelToMatch(Match);
 		return;
 	}
 
@@ -286,4 +301,71 @@ void UD1MatchmakingSubsystem::HandleSocketClosed(int32 StatusCode, const FString
 	Err.ErrorCode = EBackendErrorCode::NetworkError;
 	Err.ErrorMessage = TEXT("매칭 서버 연결이 끊겼습니다.");
 	OnMatchmakingError.Broadcast(Err);
+}
+
+void UD1MatchmakingSubsystem::HandleRejoinResponse(const FString& Body)
+{
+	TSharedPtr<FJsonObject> Root;
+	if (!D1BackendHttp::DeserializeJson(Body, Root))
+	{
+		return;
+	}
+
+	const TSharedPtr<FJsonObject>* DataObj = nullptr;
+	if (!D1BackendHttp::GetObjectField(Root, TEXT("data"), DataObj))
+	{
+		return;
+	}
+
+	bool bActive = false;
+	if (!(*DataObj)->TryGetBoolField(TEXT("active"), bActive) || !bActive)
+	{
+		return;
+	}
+
+	FMatchFoundDTO Match;
+	(*DataObj)->TryGetStringField(TEXT("matchId"), Match.MatchId);
+	(*DataObj)->TryGetStringField(TEXT("joinToken"), Match.JoinToken);
+
+	const TSharedPtr<FJsonObject>* ServerObj = nullptr;
+	if (D1BackendHttp::GetObjectField(*DataObj, TEXT("server"), ServerObj))
+	{
+		(*ServerObj)->TryGetStringField(TEXT("host"), Match.ServerHost);
+		(*ServerObj)->TryGetNumberField(TEXT("port"), Match.ServerPort);
+	}
+
+	// 성사 경로와 같은 상태·이벤트를 태운다 — 로비 UI가 이미 이 흐름을 구독하고 있다.
+	MatchmakingState = EMatchmakingState::Matched;
+	UE_LOG(LogD1, Log, TEXT("[Match] 진행 중 매치로 재입장 matchId=%s server=%s:%d"),
+		*Match.MatchId, *Match.ServerHost, Match.ServerPort);
+	OnMatchFound.Broadcast(Match);
+
+	TravelToMatch(Match);
+}
+
+void UD1MatchmakingSubsystem::TravelToMatch(const FMatchFoundDTO& Match)
+{
+	if (Match.ServerHost.IsEmpty() || Match.ServerPort <= 0)
+	{
+		return;
+	}
+
+	APlayerController* PC = GetGameInstance()->GetFirstLocalPlayerController();
+	if (!PC)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Match] 로컬 PlayerController 없음 — travel 불가"));
+		return;
+	}
+
+	// 본인 입장 토큰을 ?join= 으로 동봉 → DS가 roster로 권위 신원(userId·slot) 확정.
+	// userId/slot은 클라가 주장하지 않는다(서버권위). UE URL 옵션은 ? 로 구분.
+	if (Match.JoinToken.IsEmpty())
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Match] join 토큰 없음 — 신원 매핑 실패 가능"));
+	}
+
+	const FString Url = FString::Printf(TEXT("%s:%d?matchId=%s?join=%s"),
+		*Match.ServerHost, Match.ServerPort, *Match.MatchId, *Match.JoinToken);
+	UE_LOG(LogD1, Log, TEXT("[Match] DS 입장: %s"), *Url);
+	PC->ClientTravel(Url, TRAVEL_Absolute);
 }

@@ -22,6 +22,7 @@
     "match:sim": "tsx scripts/match-sim.ts",
     "match:elo": "tsx scripts/match-elo.ts",
     "match:result-sim": "tsx scripts/match-result-sim.ts",
+    "match:rejoin-sim": "tsx scripts/rejoin-sim.ts",
     "match:restart-sim": "tsx scripts/restart-survival-sim.ts",
     "match:bots": "tsx scripts/match-bots.ts",
     "ranking:sim": "tsx scripts/ranking-sim.ts",

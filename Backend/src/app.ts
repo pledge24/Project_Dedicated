@@ -10,6 +10,7 @@ import { fail, ok } from './common/envelope.js';
 import { AppError, Codes } from './common/errors.js';
 import { logger } from './common/logger.js';
 import dsApiRouter from './match/dsApi.router.js';
+import matchmakingRouter from './match/matchmaking.router.js';
 import rankingRouter from './ranking/ranking.router.js';
 
 export default function buildApp(): Express
@@ -60,6 +61,8 @@ export default function buildApp(): Express
 
     // 라우터 마운트
     app.use('/api/auth', authRouter);
+    // 같은 prefix에 인증 주체가 다른 두 라우터 — 플레이어(JWT)용을 먼저, DS(serverToken)용을 뒤에.
+    app.use('/api/match', matchmakingRouter);
     app.use('/api/match', dsApiRouter);
     app.use('/api/ranking', rankingRouter);
 

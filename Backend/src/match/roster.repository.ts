@@ -9,6 +9,8 @@ interface RosterRow extends RowDataPacket
 {
     match_id: string;
     server_token: string;
+    server_host: string | null;
+    server_port: number | null;
     map_name: string;
     started_at: Date;
     players_json: RosterPlayer[] | string;
@@ -18,12 +20,13 @@ interface RosterRow extends RowDataPacket
 export async function insert(roster: MatchRoster): Promise<void>
 {
     await getPool().execute(
-        'INSERT INTO match_rosters (match_id, server_token, map_name, started_at, players_json) ' +
-        'VALUES (?, ?, ?, ?, ?) ' +
-        'ON DUPLICATE KEY UPDATE server_token = VALUES(server_token), map_name = VALUES(map_name), ' +
+        'INSERT INTO match_rosters (match_id, server_token, server_host, server_port, map_name, started_at, players_json) ' +
+        'VALUES (?, ?, ?, ?, ?, ?, ?) ' +
+        'ON DUPLICATE KEY UPDATE server_token = VALUES(server_token), server_host = VALUES(server_host), ' +
+        'server_port = VALUES(server_port), map_name = VALUES(map_name), ' +
         'started_at = VALUES(started_at), players_json = VALUES(players_json)',
-        [roster.matchId, roster.serverToken, roster.mapName, new Date(roster.startedAt),
-            JSON.stringify(roster.players)]
+        [roster.matchId, roster.serverToken, roster.server?.host ?? null, roster.server?.port ?? null,
+            roster.mapName, new Date(roster.startedAt), JSON.stringify(roster.players)]
     );
 }
 
@@ -37,7 +40,7 @@ export async function deleteById(matchId: string): Promise<void>
 export async function selectActive(sinceEpochMs: number): Promise<MatchRoster[]>
 {
     const [rows] = await getPool().execute<RosterRow[]>(
-        'SELECT match_id, server_token, map_name, started_at, players_json ' +
+        'SELECT match_id, server_token, server_host, server_port, map_name, started_at, players_json ' +
         'FROM match_rosters WHERE started_at > ? ORDER BY started_at ASC',
         [new Date(sinceEpochMs)]
     );
@@ -64,5 +67,8 @@ function toRoster(row: RosterRow): MatchRoster
         mapName: row.map_name,
         startedAt: row.started_at.getTime(),
         players,
+        server: row.server_host !== null && row.server_port !== null
+            ? { host: row.server_host, port: row.server_port }
+            : undefined,
     };
 }

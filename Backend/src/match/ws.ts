@@ -419,6 +419,7 @@ async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
         await roster.register({
             matchId,
             serverToken,
+            server,
             mapName: config.match.ds.map,
             startedAt: Date.now(),
             players: joinPlayers.map((p) => ({
@@ -525,6 +526,7 @@ async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
         await roster.register({
             matchId,
             serverToken,
+            server,
             mapName: config.match.ds.map,
             startedAt: Date.now(),
             players: [

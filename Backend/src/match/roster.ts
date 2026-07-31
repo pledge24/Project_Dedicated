@@ -28,6 +28,8 @@ export interface MatchRoster
     mapName: string;
     startedAt: number;      // epoch ms
     players: RosterPlayer[];
+    /** 이 매치를 실행 중인 DS 주소. 재입장 안내에 쓴다. 008 이전에 등록된 행은 undefined. */
+    server?: { host: string; port: number };
 }
 
 /** 명단 모음 - 모든 매치의 명단이 이 곳에 저장된다(중요!) */
