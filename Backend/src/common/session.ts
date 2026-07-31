@@ -1,7 +1,7 @@
 // 단일 세션 강제 — users.token_version 현재값 조회 + 세션 대체 알림 버스.
 // HTTP 미들웨어·매칭 WS 공용.
-import { EventEmitter } from 'node:events';
 import type { RowDataPacket } from 'mysql2';
+import { EventEmitter } from 'node:events';
 
 import { queryOne } from './db.js';
 
