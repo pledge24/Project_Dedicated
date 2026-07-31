@@ -75,6 +75,17 @@ void AD1BomberCharacter::PossessedBy(AController* NewController)
 	Super::PossessedBy(NewController);
 	RefreshPlayerStateBinding();	// PS -> Pawn 순으로 Replicate 된 경우.
 	RefreshLocalHighlight();		// 리슨 호스트 본인 폰 강조(서버 전용 경로).
+
+	// 시작 게이트: DoMove의 페이즈 게이트는 클라 입력 경로라 ServerMove가 재검증하지 않는다.
+	// 조작 클라의 시작 전 이동을 막으려면 서버가 직접 잠가야 한다. StartMatch가 해제.
+	const AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
+	if (GS && GS->MatchPhase != EBomberMatchPhase::Playing)
+	{
+		if (UCharacterMovementComponent* Move = GetCharacterMovement())
+		{
+			Move->SetMovementMode(MOVE_None);
+		}
+	}
 }
 
 void AD1BomberCharacter::BeginPlay()

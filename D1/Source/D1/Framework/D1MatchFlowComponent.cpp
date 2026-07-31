@@ -6,10 +6,13 @@
 #include "Dom/JsonObject.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Framework/D1BomberGameState.h"
 #include "Framework/D1BomberPlayerState.h"
 #include "Framework/D1MatchTypes.h"
 #include "Framework/D1PlayerController.h"
+#include "Game/Character/D1BomberCharacter.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "HttpModule.h"
 #include "Interfaces/IHttpRequest.h"
@@ -143,6 +146,19 @@ void UD1MatchFlowComponent::StartMatch()
 			World->GetTimerManager().SetTimer(
 				MatchTimerHandle, this, &UD1MatchFlowComponent::OnMatchTimeExpired,
 				GS->MatchDurationSec, /*bLoop=*/false);
+		}
+	}
+
+	// 시작 게이트 해제 — 입장 시 서버가 잠근 이동(PossessedBy의 MOVE_None) 일괄 재개.
+	if (World)
+	{
+		for (AD1BomberCharacter* Character : TActorRange<AD1BomberCharacter>(World))
+		{
+			UCharacterMovementComponent* Move = Character->GetCharacterMovement();
+			if (Move && Move->MovementMode == MOVE_None)
+			{
+				Move->SetMovementMode(MOVE_Walking);
+			}
 		}
 	}
 
