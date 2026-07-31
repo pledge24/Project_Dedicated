@@ -36,6 +36,9 @@ public:
 	/** 서버 전용(DS): 탈주 발생 즉시 호출. 백엔드가 최하위 확정값으로 점수를 바로 정산(로비 반영). */
 	void ReportLeaver(const FString& MatchId, const FString& MatchToken, int64 UserId);
 
+	/** 서버 전용(DS): kick 대기열 1회 조회(GET /api/match/:id/kicks). 성공 시에만 OnKicked(userId 배열). */
+	void FetchKicks(const FString& MatchId, const FString& MatchToken, TFunction<void(const TArray<int64>&)> OnKicked);
+
 private:
 	/** 준비/결과 POST 공통 재시도 정책 — 지연 배열·409 처리·확정 콜백·로그 수위만 다르다. */
 	struct FD1ReportPolicy

@@ -4,6 +4,7 @@
 
 #include "Core/D1LogChannels.h"
 #include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Interfaces/IHttpRequest.h"
@@ -84,6 +85,52 @@ void UD1MatchResultSubsystem::ReportLeaver(const FString& MatchId, const FString
 	Request->ProcessRequest();
 
 	UE_LOG(LogD1, Log, TEXT("[Match] 탈주 즉시 정산 POST userId=%lld matchId=%s"), UserId, *MatchId);
+}
+
+void UD1MatchResultSubsystem::FetchKicks(const FString& MatchId, const FString& MatchToken,
+	TFunction<void(const TArray<int64>&)> OnKicked)
+{
+	const FString Path = FString::Printf(TEXT("/api/match/%s/kicks"), *MatchId);
+	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(
+		GetGameInstance(), Path, D1BackendHttp::EBackendAuth::ServerToken, MatchToken);
+
+	D1BackendHttp::SendAsync(this, Request,
+		[OnKicked = MoveTemp(OnKicked)](const FHttpResponsePtr& Res, bool bSucceeded)
+		{
+			// 폴링 1회 실패는 무시 — 다음 주기가 곧 온다.
+			if (!bSucceeded || !Res.IsValid() || Res->GetResponseCode() != 200)
+			{
+				return;
+			}
+
+			TSharedPtr<FJsonObject> Root;
+			if (!D1BackendHttp::DeserializeJson(Res->GetContentAsString(), Root))
+			{
+				return;
+			}
+
+			const TSharedPtr<FJsonObject>* DataObj = nullptr;
+			if (!D1BackendHttp::GetObjectField(Root, TEXT("data"), DataObj))
+			{
+				return;
+			}
+
+			const TArray<TSharedPtr<FJsonValue>>* UserIdValues = nullptr;
+			if (!(*DataObj)->TryGetArrayField(TEXT("userIds"), UserIdValues))
+			{
+				return;
+			}
+
+			TArray<int64> UserIds;
+			for (const TSharedPtr<FJsonValue>& Value : *UserIdValues)
+			{
+				if (Value.IsValid())
+				{
+					UserIds.Add(static_cast<int64>(Value->AsNumber()));
+				}
+			}
+			OnKicked(UserIds);
+		});
 }
 
 void UD1MatchResultSubsystem::SendReport(const FString& Path, const FString& MatchToken,

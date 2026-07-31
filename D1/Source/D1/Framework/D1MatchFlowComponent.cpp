@@ -3,7 +3,6 @@
 #include "Framework/D1MatchFlowComponent.h"
 
 #include "Core/D1LogChannels.h"
-#include "Dom/JsonObject.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -14,11 +13,7 @@
 #include "Game/Character/D1BomberCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
-#include "HttpModule.h"
-#include "Interfaces/IHttpRequest.h"
-#include "Interfaces/IHttpResponse.h"
 #include "Network/BackendTypes.h"
-#include "Network/D1BackendHttp.h"
 #include "Network/D1DedicatedServerSubsystem.h"
 #include "Network/D1MatchResultSubsystem.h"
 #include "Network/D1OnlineSettings.h"
@@ -572,51 +567,27 @@ void UD1MatchFlowComponent::PollKicks()
 	UWorld* World = GetWorld();
 	UGameInstance* GI = World ? World->GetGameInstance() : nullptr;
 
-	const FString Path = FString::Printf(TEXT("/api/match/%s/kicks"), *CurrentMatchId);
-	// 매치별 서버 토큰 — 유저 JWT 아님(결과 POST와 동일 인증 채널).
-	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(
-		GI, Path, D1BackendHttp::EBackendAuth::ServerToken, CurrentMatchToken);
+	UD1MatchResultSubsystem* Result = GI ? GI->GetSubsystem<UD1MatchResultSubsystem>() : nullptr;
+	if (!Result)
+	{
+		return;
+	}
 
 	TWeakObjectPtr<UD1MatchFlowComponent> WeakThis(this);
-	Request->OnProcessRequestComplete().BindLambda(
-		[WeakThis](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded)
+	Result->FetchKicks(CurrentMatchId, CurrentMatchToken,
+		[WeakThis](const TArray<int64>& UserIds)
 		{
 			UD1MatchFlowComponent* Self = WeakThis.Get();
-			if (Self && bSucceeded && Res.IsValid() && Res->GetResponseCode() == 200)
+			if (!Self)
 			{
-				Self->HandleKickResponse(Res->GetContentAsString());
+				return;
+			}
+
+			for (const int64 UserId : UserIds)
+			{
+				Self->HandleKickUser(UserId);
 			}
 		});
-	Request->ProcessRequest();
-}
-
-void UD1MatchFlowComponent::HandleKickResponse(const FString& Body)
-{
-	TSharedPtr<FJsonObject> Root;
-	if (!D1BackendHttp::DeserializeJson(Body, Root))
-	{
-		return;
-	}
-
-	const TSharedPtr<FJsonObject>* DataObj = nullptr;
-	if (!D1BackendHttp::GetObjectField(Root, TEXT("data"), DataObj))
-	{
-		return;
-	}
-
-	const TArray<TSharedPtr<FJsonValue>>* UserIds = nullptr;
-	if (!(*DataObj)->TryGetArrayField(TEXT("userIds"), UserIds))
-	{
-		return;
-	}
-
-	for (const TSharedPtr<FJsonValue>& Value : *UserIds)
-	{
-		if (Value.IsValid())
-		{
-			HandleKickUser(static_cast<int64>(Value->AsNumber()));
-		}
-	}
 }
 
 void UD1MatchFlowComponent::HandleKickUser(int64 UserId)

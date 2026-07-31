@@ -113,11 +113,10 @@ public:
 	void NotifyPlayerDisconnected(AController* Exiting);
 
 private:
-	/** 백엔드 kick 대기열을 주기 폴링(DS·토큰 있을 때만). */
+	/** 백엔드 kick 대기열을 주기 폴링(DS·토큰 있을 때만). HTTP는 MatchResultSubsystem::FetchKicks 위임. */
 	void StartKickPolling();
 	void StopKickPolling();
 	void PollKicks();
-	void HandleKickResponse(const FString& Body);
 	/** 대상 유저를 kick — 온라인이면 탈주 처리·통지, 종료 후면 통지만. */
 	void HandleKickUser(int64 UserId);
 	/** 탈주 공용부(최하위·SetLeft·GameState 슬롯기록·결과 캡처·즉시정산·종료체크). bNotifyClient=false면 클라 통지 생략(끊김). */
