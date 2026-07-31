@@ -9,7 +9,7 @@ import { WebSocket } from 'ws';
 
 import buildApp from '../src/app.js';
 import { closePool } from '../src/common/db.js';
-import * as roster from '../src/match/roster.js';
+import * as roster from '../src/match/roster.service.js';
 import { attachMatchWebSocket } from '../src/match/ws.js';
 
 const PASSWORD = 'sesstest123';

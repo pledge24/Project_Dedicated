@@ -3,7 +3,7 @@
 import type { RowDataPacket } from 'mysql2';
 
 import { getPool } from '../common/db.js';
-import type { MatchRoster, RosterPlayer } from './roster.js';
+import type { MatchRoster, RosterPlayer } from './roster.types.js';
 
 interface RosterRow extends RowDataPacket
 {

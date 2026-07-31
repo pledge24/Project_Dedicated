@@ -19,7 +19,7 @@ import buildApp from '../src/app.js';
 import { config } from '../src/common/config.js';
 import { closePool, getPool } from '../src/common/db.js';
 import * as ds from '../src/match/ds.js';
-import * as roster from '../src/match/roster.js';
+import * as roster from '../src/match/roster.service.js';
 
 const MAP = 'default map';
 

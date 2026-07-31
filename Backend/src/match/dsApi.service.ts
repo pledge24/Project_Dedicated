@@ -10,7 +10,7 @@ import * as state from './dsApi.state.js';
 import * as readiness from './readiness.js';
 import type { SettledLeaver } from './result.repository.js';
 import * as repo from './result.repository.js';
-import * as rosters from './roster.js';
+import * as rosters from './roster.service.js';
 
 /** serverToken을 검증하고 roster를 반환. 실패 시 AppError. */
 function assertServerToken(serverToken: string, matchId: string): rosters.MatchRoster

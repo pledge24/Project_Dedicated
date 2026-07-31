@@ -4,13 +4,14 @@ import { WebSocket } from 'ws';
 
 import { config } from '../common/config.js';
 import { AppError, Codes } from '../common/errors.js';
+import * as dsApiState from './dsApi.state.js';
 import { selectRequeue } from './formation.js';
 import * as repo from './matchmaking.repository.js';
 import type { MatchFoundData } from './protocol.js';
 import { MatchQueue } from './queue.js';
 import type { MatchGroup, QueueEntry } from './queue.js';
 import * as resultRepo from './result.repository.js';
-import * as roster from './roster.js';
+import * as roster from './roster.service.js';
 
 // ref = 그 유저의 WS 소켓. 매칭 성사 시 여기로 푸시한다.
 const queue = new MatchQueue<WebSocket>({
@@ -103,6 +104,16 @@ export function abortFormation(entries: QueueEntry<WebSocket>[]): number
     return survivors.length;
 }
 
+/** 세션 대체로 끊긴 유저가 게임중이면 kick 대기열에 표시 — DS가 폴링으로 회수한다. */
+export function kickUserFromLiveMatch(userId: number): void
+{
+    const matchId = roster.findMatchByUser(userId);
+    if (matchId)
+    {
+        dsApiState.markKick(matchId, userId);
+    }
+}
+
 /** runMatching 결과 — 실 매치 그룹 + 봇전 대상(장기 대기자 1명씩). */
 export interface MatchingResult
 {
@@ -162,20 +173,4 @@ export async function findRejoinableMatch(userId: number): Promise<MatchFoundDat
     }
 
     return { matchId, server: { host: found.server.host, port: found.server.port }, joinToken: player.joinToken };
-}
-
-/** 매치 그룹 + 할당된 서버 주소 → match:found payload + 푸시 대상 소켓. */
-export function buildMatchFound(
-    group: MatchGroup<WebSocket>,
-    matchId: string,
-    server: { host: string; port: number }
-): { data: MatchFoundData; targets: WebSocket[] }
-{
-    const data: MatchFoundData = {
-        matchId,
-        server: { host: server.host, port: server.port },
-        joinToken: '', // per-recipient — ws.handleMatch가 수신자별로 채움
-    };
-
-    return { data, targets: group.entries.map((e) => e.ref) };
 }

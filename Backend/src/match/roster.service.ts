@@ -10,28 +10,9 @@ import { config } from '../common/config.js';
 import { logger } from '../common/logger.js';
 import * as resultRepo from './result.repository.js';
 import * as repo from './roster.repository.js';
+import type { MatchRoster } from './roster.types.js';
 
-/** 명단에 저장된 플레이어 데이터 단위 */
-export interface RosterPlayer
-{
-    userId: number;
-    nickname: string;
-    joinToken: string;      // 매치별 1회용 입장 토큰. DS가 ?join= 으로 받은 토큰을 이 신원에 매핑. 봇은 빈 문자열.
-    bot?: boolean;          // 봇전 봇 좌석(DB 미존재). true면 결과 저장 시 프로필/participants 기록 skip.
-    rating?: number;        // 봇 ELO 입력 점수(백엔드 소유). 봇에만 존재.
-}
-
-/** 매치된 게임의 플레이어 명단(roster) */
-export interface MatchRoster
-{
-    matchId: string;
-    serverToken: string;
-    mapName: string;
-    startedAt: number;      // epoch ms
-    players: RosterPlayer[];
-    /** 이 매치를 실행 중인 DS 주소. 재입장 안내에 쓴다. 008 이전에 등록된 행은 undefined. */
-    server?: { host: string; port: number };
-}
+export type { MatchRoster, RosterPlayer } from './roster.types.js';
 
 /** 명단 모음 - 모든 매치의 명단이 이 곳에 저장된다(중요!) */
 const rosters = new Map<string, MatchRoster>();

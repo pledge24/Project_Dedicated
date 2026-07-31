@@ -14,11 +14,9 @@ import { logger } from '../common/logger.js';
 import { getCurrentTokenVersion, onSuperseded } from '../common/session.js';
 import type { AuthedUser } from '../common/types.js';
 import { allocator } from './dsAllocator.js';
-import * as dsApiState from './dsApi.state.js';
 import { handleBotMatch, handleMatch } from './matchFormation.handler.js';
 import * as service from './matchmaking.service.js';
 import type { ClientMessage } from './protocol.js';
-import * as roster from './roster.js';
 import { send, sendError } from './wsSend.js';
 
 const WS_PATH = '/ws/match';
@@ -56,15 +54,11 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
     wss.on('connection', (ws: WebSocket, _req: IncomingMessage, user: AuthedUser) => onConnection(wss, ws, user));
 
     // 재로그인(세션 대체) 알림 구독 — 버전 대조는 핸드셰이크 때뿐이라 이미 연결된 옛 소켓은 여기서 끊는다.
-    // 게임중(DS 접속)인 유저면 별도로 kick 대기열에 표시 → DS가 폴링으로 회수(WS는 이미 끊긴 상태라 여기선 안 잡힘).
+    // 게임중(DS 접속)인 유저면 kick 대기열 표시(service 위임) → DS가 폴링으로 회수(WS는 이미 끊긴 상태라 여기선 안 잡힘).
     const offSuperseded = onSuperseded((userId) =>
     {
         kickThisUserSockets(wss, userId);
-        const matchId = roster.findMatchByUser(userId);
-        if (matchId)
-        {
-            dsApiState.markKick(matchId, userId);
-        }
+        service.kickUserFromLiveMatch(userId);
     });
 
     // 죽은 연결 감지 — heartbeat 주기마다 pong 못 받은 소켓은 terminate.
