@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="1000" height="620" font-family="Segoe UI, Malgun Gothic, sans-serif">
+  <defs>
+    <marker id="ar-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4aa3ff"/>
+    </marker>
+    <marker id="ar-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#3ecf8e"/>
+    </marker>
+    <marker id="ar-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#f0883e"/>
+    </marker>
+    <marker id="ar-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b07cf0"/>
+    </marker>
+    <marker id="ar-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#e5534b"/>
+    </marker>
+    <marker id="ar-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#56d4dd"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="620" fill="#0d1117"/>
+
+  <text x="28" y="40" fill="#e6edf3" font-size="20" font-weight="600">Project_Dedicated — 랭킹 대전 아키텍처</text>
+  <text x="28" y="62" fill="#8b949e" font-size="13">가로축 = 신뢰 수준(왼쪽: 클라가 주장하는 값 / 오른쪽: 서버가 확정하는 값) · 세로축 = 한 판의 시간 흐름</text>
+
+  <!-- 신뢰 경계 -->
+  <line x1="330" y1="86" x2="330" y2="596" stroke="#e5534b" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="338" y="102" fill="#e5534b" font-size="12" font-weight="600">신뢰 경계</text>
+  <text x="338" y="118" fill="#e5534b" font-size="11">← 이쪽 값은 검증 없이 믿지 않는다</text>
+
+  <!-- 클라이언트 -->
+  <rect x="28" y="130" width="270" height="180" rx="8" fill="#161b22" stroke="#30363d"/>
+  <text x="44" y="154" fill="#e6edf3" font-size="14" font-weight="600">Client (UE 5.7)</text>
+  <text x="44" y="176" fill="#8b949e" font-size="12">D1AuthSubsystem — 로그인·프로필</text>
+  <text x="44" y="196" fill="#8b949e" font-size="12">D1MatchmakingSubsystem — 큐·재입장</text>
+  <text x="44" y="216" fill="#8b949e" font-size="12">D1RankingSubsystem — 랭킹 조회</text>
+  <text x="44" y="236" fill="#8b949e" font-size="12">D1SessionSubsystem — 단일 세션</text>
+  <rect x="44" y="252" width="238" height="42" rx="5" fill="#1c2128" stroke="#30363d"/>
+  <text x="56" y="270" fill="#8b949e" font-size="11">가진 것: JWT + 매치별 join 토큰</text>
+  <text x="56" y="286" fill="#8b949e" font-size="11">못 하는 것: 점수·등수·신원 주장</text>
+
+  <!-- 백엔드 -->
+  <rect x="380" y="130" width="300" height="300" rx="8" fill="#161b22" stroke="#30363d"/>
+  <text x="396" y="154" fill="#e6edf3" font-size="14" font-weight="600">Backend (Node · 단일 프로세스 :3000)</text>
+  <text x="396" y="172" fill="#6e7681" font-size="11">network → handler → service → repository</text>
+
+  <rect x="396" y="186" width="268" height="34" rx="5" fill="#1c2128" stroke="#30363d"/>
+  <text x="408" y="207" fill="#4aa3ff" font-size="12">auth — bcrypt · JWT · token_version</text>
+
+  <rect x="396" y="228" width="268" height="52" rx="5" fill="#1c2128" stroke="#30363d"/>
+  <text x="408" y="248" fill="#3ecf8e" font-size="12">match — 큐(점수 윈도우 · seed)</text>
+  <text x="408" y="266" fill="#6e7681" font-size="11">1초 사이클 · 장기 대기자는 봇전으로</text>
+
+  <rect x="396" y="288" width="268" height="52" rx="5" fill="#1c2128" stroke="#30363d"/>
+  <text x="408" y="308" fill="#f0883e" font-size="12">DsAllocator (seam)</text>
+  <text x="408" y="326" fill="#6e7681" font-size="11">local ▸ 확장점: Agones / GameLift</text>
+
+  <rect x="396" y="348" width="268" height="34" rx="5" fill="#1c2128" stroke="#30363d"/>
+  <text x="408" y="369" fill="#b07cf0" font-size="12">ranking — score DESC 인덱스</text>
+
+  <rect x="396" y="390" width="268" height="26" rx="5" fill="#21262d" stroke="#30363d"/>
+  <text x="408" y="408" fill="#8b949e" font-size="11">roster (DB 영속) — 재시작을 건너 살아남음</text>
+
+  <!-- DS -->
+  <rect x="740" y="130" width="232" height="180" rx="8" fill="#161b22" stroke="#30363d"/>
+  <text x="756" y="154" fill="#e6edf3" font-size="14" font-weight="600">Dedicated Server</text>
+  <text x="756" y="172" fill="#6e7681" font-size="11">매치 1개 = 프로세스 1개</text>
+  <text x="756" y="196" fill="#8b949e" font-size="12">권위: 이동 · 폭탄 · 사망 · 등수</text>
+  <text x="756" y="216" fill="#8b949e" font-size="12">join 토큰 → userId·좌석 확정</text>
+  <rect x="756" y="230" width="200" height="62" rx="5" fill="#1c2128" stroke="#30363d"/>
+  <text x="768" y="249" fill="#8b949e" font-size="11">설정은 임시 파일로 수령</text>
+  <text x="768" y="265" fill="#8b949e" font-size="11">-MatchConfig=… → 읽고 즉시 삭제</text>
+  <text x="768" y="281" fill="#6e7681" font-size="11">(커맨드라인에 토큰을 두지 않는다)</text>
+
+  <!-- DB -->
+  <rect x="740" y="348" width="232" height="120" rx="8" fill="#161b22" stroke="#30363d"/>
+  <text x="756" y="372" fill="#e6edf3" font-size="14" font-weight="600">MySQL</text>
+  <text x="756" y="394" fill="#8b949e" font-size="12">users · player_profiles</text>
+  <text x="756" y="414" fill="#8b949e" font-size="12">matches · match_participants</text>
+  <text x="756" y="434" fill="#8b949e" font-size="12">match_rosters · leaver_settlements</text>
+  <text x="756" y="456" fill="#6e7681" font-size="11">결과 저장은 한 트랜잭션</text>
+
+  <!-- 화살표: 클라 → 백엔드 -->
+  <line x1="298" y1="200" x2="392" y2="200" stroke="#4aa3ff" stroke-width="2" marker-end="url(#ar-blue)"/>
+  <text x="300" y="192" fill="#4aa3ff" font-size="11">HTTP  /api/auth · /api/ranking</text>
+
+  <line x1="298" y1="252" x2="392" y2="252" stroke="#3ecf8e" stroke-width="2" marker-end="url(#ar-green)"/>
+  <text x="300" y="244" fill="#3ecf8e" font-size="11">WS  /ws/match</text>
+
+  <!-- 백엔드 → 클라 푸시 -->
+  <line x1="392" y1="272" x2="298" y2="272" stroke="#3ecf8e" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#ar-green)"/>
+  <text x="300" y="288" fill="#3ecf8e" font-size="11">match:found {host, port, joinToken}</text>
+
+  <!-- 백엔드 → DS spawn -->
+  <line x1="672" y1="240" x2="734" y2="220" stroke="#f0883e" stroke-width="2" marker-end="url(#ar-orange)"/>
+  <text x="600" y="470" fill="#f0883e" font-size="11">① spawn(포트 프로브 후)</text>
+
+  <!-- DS → 백엔드 ready -->
+  <line x1="734" y1="252" x2="672" y2="272" stroke="#f0883e" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#ar-orange)"/>
+
+  <!-- 클라 → DS travel -->
+  <path d="M 163 310 L 163 520 L 856 520 L 856 316" fill="none" stroke="#56d4dd" stroke-width="2" marker-end="url(#ar-cyan)"/>
+  <text x="380" y="514" fill="#56d4dd" font-size="11">② ClientTravel  host:port?join=&lt;토큰&gt;  — 신원은 DS가 확정</text>
+
+  <!-- DS → 백엔드 result (ready 콜백과 같은 채널: HTTP + serverToken) -->
+  <path d="M 856 468 L 856 560 L 530 560 L 530 436" fill="none" stroke="#f0883e" stroke-width="2" marker-end="url(#ar-orange)"/>
+  <text x="560" y="578" fill="#f0883e" font-size="11">③ POST /api/match/result  ·  Bearer &lt;serverToken&gt;  — DS만 가능</text>
+
+  <!-- 백엔드 → DB -->
+  <line x1="672" y1="400" x2="734" y2="400" stroke="#b07cf0" stroke-width="2" marker-end="url(#ar-purple)"/>
+
+  <!-- 거부 표시 -->
+  <path d="M 163 130 L 163 96 L 530 96 L 530 124" fill="none" stroke="#e5534b" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#ar-red)"/>
+  <text x="176" y="90" fill="#e5534b" font-size="11">클라가 결과를 직접 POST → 403 INVALID_SERVER_TOKEN</text>
+</svg>
