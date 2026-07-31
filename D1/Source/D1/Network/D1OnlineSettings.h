@@ -27,7 +27,7 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Backend", meta=(DisplayName="Base URL"))
 	FString BaseUrl = TEXT("http://127.0.0.1:3000");
 
-	/** HTTP 요청 상한(초). 미설정 시 엔진 기본값(수 분)이라 응답 없는 서버에 UI가 오래 묶인다. */
+	/** HTTP 요청 전체의 상한(초). 엔진 기본 총 타임아웃은 0(비활성)이라, 안 걸면 느리게 응답하는 서버에 UI가 무기한 묶인다. */
 	UPROPERTY(Config, EditAnywhere, Category="Backend", meta=(DisplayName="Request Timeout (sec)", ClampMin="1"))
 	float RequestTimeoutSec = 15.f;
 
