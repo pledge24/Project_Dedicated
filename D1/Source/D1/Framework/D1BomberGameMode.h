@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Framework/D1MatchConfig.h"
 #include "Framework/D1MatchTypes.h"
 #include "GameFramework/GameModeBase.h"
 #include "D1BomberGameMode.generated.h"
@@ -77,21 +78,8 @@ private:
 
 //~ 인증 — 접속 신원 검증
 private:
-	/** 매치 설정 적재 — -MatchConfig= 파일이 있으면 그쪽, 없으면 커맨드라인 스위치(PIE·수동 실행). */
-	void LoadMatchConfig();
-
-	/** 설정 파일(JSON) 파싱. 성공 시 true. 읽은 파일은 즉시 지운다 — 토큰이 디스크에 남는 창을 줄인다. */
-	bool LoadMatchConfigFromFile(const FString& FilePath);
-
-	/** 구경로 — -MatchId/-MatchToken/-Roster/-Bots 스위치에서 직접 파싱. */
-	void LoadMatchConfigFromCommandLine();
-
-	/** 결과 POST 인증용(비면 스킵 = PIE/standalone). */
-	FString CurrentMatchId;
-	FString CurrentMatchToken;
-
-	/** join 토큰 → 신원. InitNewPlayer가 ?join=로 신원 매핑. */
-	TMap<FString, FD1JoinEntry> JoinRoster;
+	/** BeginPlay에서 FD1MatchConfig::Load()로 적재 — 매치 식별자/토큰/명단/봇 좌석. */
+	FD1MatchConfig MatchConfig;
 
 //~ 슬롯 배정
 private:
@@ -107,9 +95,6 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AController> BotControllerClass;
 
-	/** 설정에서 주입된 봇 좌석(userId·닉네임). 비어 있으면 일반 매치. */
-	TArray<FD1JoinEntry> PendingBots;
-
 //~ 시작 게이트·매치 흐름
 private:
 	/** 시작 게이트 대기 상한(초). 안 차도 이 시간 뒤 시작. */
@@ -119,7 +104,4 @@ private:
 	/** 매치 종료 후 이 시간 뒤 DS 강제 종료(하드캡). 클라 복귀보다 길게. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
 	float ShutdownGraceSec = 30.f;
-
-	/** -ExpectedPlayers= 로 주입. 매치 흐름 컴포넌트에 전달할 시작 정원(0/1=즉시). */
-	int32 ExpectedPlayerCount = 0;
 };
