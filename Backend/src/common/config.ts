@@ -53,7 +53,7 @@ export const config = Object.freeze({
         ds: Object.freeze({
             enabled:       process.env.MATCH_DS_ENABLED === 'true',
             exePath:       process.env.MATCH_DS_EXE || '',  // 머신별 절대경로 — DS 사용 시 .env에서 지정
-            map:           process.env.MATCH_DS_MAP || '/Game/D1/Maps/MP_Ingame', // 미쿡 시 임시로 /Game/Maps/MP_Test
+            map:           process.env.MATCH_DS_MAP || '/Game/D1/Maps/MP_Ingame', // 쿡되지 않은 빌드에선 /Game/Maps/MP_Test로 임시 교체
             host:          process.env.MATCH_DS_HOST || '127.0.0.1',
             portMin:       asNumber('MATCH_DS_PORT_MIN', 7777),
             portMax:       asNumber('MATCH_DS_PORT_MAX', 7787),

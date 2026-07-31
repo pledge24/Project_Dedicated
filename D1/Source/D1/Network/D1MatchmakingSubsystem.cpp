@@ -111,7 +111,6 @@ void UD1MatchmakingSubsystem::StartMatchmaking()
 
 void UD1MatchmakingSubsystem::CancelMatchmaking()
 {
-	// 4가지 상태 중 유일하게 큐 밖에 있는 Idle 상태만 거른다.
 	if (MatchmakingState == EMatchmakingState::Idle)
 	{
 		CloseMatchSocket();	// 혹시나 ws 소켓이 열려있는 경우
@@ -279,7 +278,7 @@ void UD1MatchmakingSubsystem::HandleSocketClosed(int32 StatusCode, const FString
 		return;
 	}
 
-	// 큐 대기/연결 중 예기치 않게 끊김 → 에러 표면화. 재연결은 이번 슬라이스 제외.
+	// 큐 대기/연결 중 예기치 않게 끊김 → 에러 표면화(자동 재연결 없음).
 	CloseMatchSocket();
 	MatchmakingState = EMatchmakingState::Idle;
 

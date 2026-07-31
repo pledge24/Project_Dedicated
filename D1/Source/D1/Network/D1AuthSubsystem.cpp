@@ -32,7 +32,6 @@ void UD1AuthSubsystem::RefreshMyProfile()
 {
 	if (D1BackendHttp::GetSessionJwt(GetGameInstance()).IsEmpty())
 	{
-		// 비로그인 — 갱신할 세션 없음.
 		return;
 	}
 
@@ -49,7 +48,6 @@ void UD1AuthSubsystem::SendHeartbeat()
 {
 	if (D1BackendHttp::GetSessionJwt(GetGameInstance()).IsEmpty())
 	{
-		// 비로그인 — 확인할 세션 없음.
 		return;
 	}
 
@@ -140,7 +138,6 @@ void UD1AuthSubsystem::HandleHeartbeatResponse(const FHttpResponsePtr& Res, bool
 
 	if (Res->GetResponseCode() == 200)
 	{
-		// 세션 유효.
 		return;
 	}
 

@@ -11,7 +11,6 @@ void UD1RankingSubsystem::FetchRanking(int32 Limit, int32 Offset, const FOnRanki
 {
 	if (D1BackendHttp::GetSessionJwt(GetGameInstance()).IsEmpty())
 	{
-		// 비로그인 — 조회할 세션 없음.
 		FBackendResponse Out;
 		Out.bOk = false;
 		Out.ErrorCode = EBackendErrorCode::NotAuthenticated;

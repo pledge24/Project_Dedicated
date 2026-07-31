@@ -88,8 +88,6 @@ void AD1BomberPlayerState::SetLeft()
 void AD1BomberPlayerState::OnRep_bLeft()
 {
 	OnLeftChanged.Broadcast();
-
-	// 카드 컨테이너가 "탈주" 표시로 다시 그리도록 GameState 디스패처도 트리거.
 	NotifyCardsDirty();
 }
 
@@ -105,7 +103,6 @@ void AD1BomberPlayerState::SetIsBot(bool bInIsBot)
 
 void AD1BomberPlayerState::OnRep_bIsBot()
 {
-	// 카드 컨테이너가 "BOT" 배지로 다시 그리도록 GameState 디스패처 트리거(bLeft와 동일 방식).
 	NotifyCardsDirty();
 }
 
@@ -127,8 +124,6 @@ void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)
 void AD1BomberPlayerState::OnRep_PlayerSlotIndex()
 {
 	OnSlotIndexChanged.Broadcast();
-
-	// 컨테이너 위젯이 한 곳에서 카드 전체를 다시 그릴 수 있게 GameState 디스패처도 트리거.
 	NotifyCardsDirty();
 }
 

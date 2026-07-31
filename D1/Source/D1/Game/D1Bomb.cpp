@@ -18,12 +18,12 @@ AD1Bomb::AD1Bomb()
 {
 	bReplicates = true;
 	
-	// 최적화 설정. (이동 rep 비활성화, 네트워크 갱신 주기 하향(100 -> 10), Tick 비활성화)
+	// 제자리 고정 액터 — 이동 복제 불필요, 넷 갱신 10Hz(기본 100)면 충분, Tick 없음.
 	SetReplicateMovement(false);
 	SetNetUpdateFrequency(10.f);
 	PrimaryActorTick.bCanEverTick = false;
 
-	// 옆 칸에 있는 캐릭터가 폭탄 모서리에 끼는걸 방지하기 위해 충돌체 크기 100 -> 80으로 조정.
+	// 충돌 박스는 셀(100cm)보다 작은 80cm — 옆 칸 캐릭터가 폭탄 모서리에 끼는 것 방지.
 	CollisionComp = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionComp"));
 	CollisionComp->InitBoxExtent(FVector(40.f, 40.f, 40.f));
 	CollisionComp->SetCollisionProfileName(TEXT("BomberBomb"));
@@ -108,7 +108,6 @@ void AD1Bomb::DoExplode()
 		return;
 	}
 
-	// 이중 폭발 방지
 	State = ED1BombState::Exploding;
 
 	AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
@@ -201,7 +200,6 @@ void AD1Bomb::TriggerChainDetonation()
 
 void AD1Bomb::ChainDetonateBombs(const TArray<FIntPoint>& Cells)
 {
-	// 폭발 십자 위에 있는 다른 폭탄 격발.
 	UD1BomberGridLibrary::ForEachActorInCells<AD1Bomb>(GetWorld(), Cells,
 		[this](AD1Bomb* Other)
 		{

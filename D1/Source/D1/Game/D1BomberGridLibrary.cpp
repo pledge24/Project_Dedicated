@@ -35,7 +35,6 @@ void UD1BomberGridLibrary::TraceExplosionCells(
 		return;	
 	}
 	
-	// 원점(Origin) 추가.
 	OutCells.Insert(Origin, 0);
 
 	for (const FIntPoint& Dir : NeighborDirs)

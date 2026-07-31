@@ -59,7 +59,6 @@ export default function buildApp(): Express
         res.json(ok({ service: 'd1-backend', version: '0.1.0' }));
     });
 
-    // 라우터 마운트
     app.use('/api/auth', authRouter);
     // 같은 prefix에 인증 주체가 다른 두 라우터 — 플레이어(JWT)용을 먼저, DS(serverToken)용을 뒤에.
     app.use('/api/match', matchmakingRouter);

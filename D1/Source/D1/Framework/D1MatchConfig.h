@@ -35,6 +35,6 @@ private:
 	/** 설정 파일(JSON) 파싱. 성공 시 true. 읽은 파일은 즉시 지운다 — 토큰이 디스크에 남는 창을 줄인다. */
 	bool LoadFromFile(const FString& FilePath);
 
-	/** 구경로 — -MatchId/-MatchToken/-Roster/-Bots 스위치에서 직접 파싱. */
+	/** -MatchConfig= 파일이 없을 때의 폴백(PIE·수동 실행) — -MatchId/-MatchToken/-Roster/-Bots 스위치에서 직접 파싱. */
 	void LoadFromCommandLine();
 };

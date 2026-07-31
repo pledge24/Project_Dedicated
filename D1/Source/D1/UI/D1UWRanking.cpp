@@ -20,12 +20,10 @@ void UD1UWRanking::NativeConstruct()
 		CloseButton->OnClicked.AddDynamic(this, &UD1UWRanking::OnCloseClicked);
 	}
 
-	// 팝업이 열릴 때마다 최신 랭킹 조회.
 	if (UD1RankingSubsystem* Ranking = GetGameInstance()->GetSubsystem<UD1RankingSubsystem>())
 	{
 		FOnRankingCompleted OnCompleted;
 		OnCompleted.BindDynamic(this, &UD1UWRanking::HandleRankingCompleted);
-		// 상위 RankRowCount명 + 본인 랭크 조회.
 		Ranking->FetchRanking(RankRowCount, 0, OnCompleted);
 	}
 }

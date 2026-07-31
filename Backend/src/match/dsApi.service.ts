@@ -57,7 +57,6 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
 {
     const roster = assertServerToken(serverToken, req.matchId);
 
-    // assert 체크.
     assertResultsMatchRoster(roster.players, req.results);
 
     const participants = buildParticipants(roster, req.results);

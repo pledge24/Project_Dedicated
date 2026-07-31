@@ -38,7 +38,6 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
     // maxPayload: ws 기본값 100MiB → 16KB. 큐 메시지는 수십 바이트라 대형 메시지 flood 차단.
     const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 
-    /** upgrade 이벤트(클라가 요청) 핸들 함수 추가 */
     server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) =>
     {
         // async 리스너를 그대로 등록하면 reject를 아무도 잡지 않아 unhandledRejection → 프로세스 종료다.
@@ -50,7 +49,6 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
         });
     });
 
-    /** 연결 이벤트(이 서버가 요청) 핸들 함수 추가 */
     wss.on('connection', (ws: WebSocket, _req: IncomingMessage, user: AuthedUser) => onConnection(wss, ws, user));
 
     // 재로그인(세션 대체) 알림 구독 — 버전 대조는 핸드셰이크 때뿐이라 이미 연결된 옛 소켓은 여기서 끊는다.
@@ -86,7 +84,6 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
     }, config.match.heartbeatMs);
     heartbeat.unref();
 
-    // 매치 인터벌 타이머 설정.
     const cycle = setInterval(runMatchCycle, config.match.cycleMs);
     cycle.unref();
 
@@ -120,10 +117,7 @@ async function handleUpgrade(wss: WebSocketServer, req: IncomingMessage, socket:
         return;
     }
 
-    /** socket error 이벤트에 핸들링 함수를 추가했다 삭제하는 이유는
-     *  인증 도중 error 발생 시, 핸들링 해줄 함수가 없기 때문.
-     *  그래서 임시용으로 추가했다 삭제하는 것.
-    */
+    // 인증(await) 구간에서 socket error가 나면 핸들러가 없어 프로세스가 죽는다 — 임시로 붙였다 뗀다.
     socket.on('error', onSocketError);
     const user = await authenticate(req);
     if (!user)
@@ -239,7 +233,6 @@ async function onMessage(ws: AuthedWs, raw: RawData): Promise<void>
         return;
     }
 
-    /** 메세지 처리 */
     try
     {
         switch (msg.type)
@@ -285,7 +278,6 @@ function onConnection(wss: WebSocketServer, ws: WebSocket, user: AuthedUser): vo
     newSocket.msgCount = 0;
     newSocket.limitNotified = false;
 
-    // 이전 ws 소켓 Cleanup.
     kickThisUserSockets(wss, user.userId, newSocket);
 
     newSocket.on('pong', () =>

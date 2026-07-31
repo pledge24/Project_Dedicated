@@ -205,7 +205,7 @@ void AD1BotController::SteerAlongPath(AD1BomberCharacter* Bot)
 	}
 
 	const FVector Dir = Delta.GetSafeNormal();
-	// 봇 DoMove fallback: Forward→월드 +X, Right→월드 +Y (D1BomberCharacter.cpp:155-159).
+	// 봇은 PlayerCameraManager가 없어 DoMove가 월드축 fallback을 탄다: Forward→+X, Right→+Y.
 	Bot->DoMove(Dir.Y, Dir.X);
 }
 

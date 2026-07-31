@@ -1,5 +1,5 @@
 // 매칭 WebSocket 프로토콜 — 클라/서버 메시지 모양의 단일 출처.
-// 클라(언리얼)는 다음 슬라이스에서 이 계약을 따라 구현한다.
+// 클라(언리얼)의 D1MatchmakingSubsystem이 이 계약을 따른다.
 import type { BackendError } from '../common/types.js';
 
 /** 클라 → 서버 메시지. */

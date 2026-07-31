@@ -25,7 +25,6 @@ namespace
 		});
 	}
 
-	// PlayerStart의 Slot 반환. 태그가 유효 슬롯 범위가 아니라면 DefaultSlot 반환
 	int32 ResolveSlotFromTag(const AActor* Start, int32 DefaultSlot)
 	{
 		if (const APlayerStart* PlayerStart = Cast<APlayerStart>(Start))
@@ -89,7 +88,6 @@ void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 
-	// 플레이어 입장 후속 처리는 매치 흐름 컴포넌트가 담당.
 	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
 	{
 		if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
@@ -238,7 +236,6 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 
 void AD1BomberGameMode::SpawnBots()
 {
-	// 봇 좌석이 없으면 일반 매치 → 봇 스폰 없음.
 	if (MatchConfig.Bots.Num() == 0)
 	{
 		return;
@@ -254,7 +251,6 @@ void AD1BomberGameMode::SpawnBots()
 	int32 Spawned = 0;
 	for (const FD1JoinEntry& Bot : MatchConfig.Bots)
 	{
-		// 봇 생성 시작.
 		AController* BotController = World->SpawnActor<AController>(BotControllerClass);
 		if (!BotController)
 		{

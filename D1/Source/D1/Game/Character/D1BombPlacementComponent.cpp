@@ -41,7 +41,6 @@ void UD1BombPlacementComponent::ServerTryPlaceBomb_Implementation()
 		return;
 	}
 
-	// 폭탄 설치 진행.
 	const FVector SpawnLoc = UD1BomberGridLibrary::CellToWorldCenter(Cell, UD1BomberGridLibrary::CellHalf);
 	FActorSpawnParameters Params;
 	Params.Owner = OwnerChar;

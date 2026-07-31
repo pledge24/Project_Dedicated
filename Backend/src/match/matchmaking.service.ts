@@ -145,7 +145,7 @@ export function queueSize(): number
  *   1) roster에 이 유저가 있는 최신 매치가 있다      — findMatchByUser
  *   2) 그 매치의 결과가 아직 저장되지 않았다          — 저장됐으면 경기가 끝난 것
  *   3) 이 유저가 아직 탈주로 정산되지 않았다          — DS가 KickedUserIds로 재입장을 거절할 대상
- * 008 이전 roster는 주소를 모르므로(server undefined) 대상에서 제외한다.
+ * server 주소가 없는 roster는 재입장 주소를 만들 수 없으므로 대상에서 제외한다.
  */
 export async function findRejoinableMatch(userId: number): Promise<MatchFoundData | null>
 {

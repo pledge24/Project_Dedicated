@@ -59,7 +59,6 @@ void AD1ExplosionHazard::ApplyExplosionDamage()
 
 		for (AD1BomberCharacter* BC : Chars)
 		{
-			// 데미지 이벤트 전달.
 			BC->ReceiveExplosionHit();
 		}
 	}

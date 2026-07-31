@@ -48,7 +48,6 @@ void UD1UWRegister::HandleRegisterCompleted(const FBackendResponse& Response, co
 		return;
 	}
 
-	// 가입 성공 → 로그인 화면 복귀
 	if (LoginWidgetClass)
 	{
 		AD1MenuPlayerController* PC = Cast<AD1MenuPlayerController>(GetOwningPlayer());

@@ -26,7 +26,6 @@ void UD1UWLobby::NativeConstruct()
 
 	UD1GameInstance* GI = GetGameInstance<UD1GameInstance>();
 
-	// 비로그인 진입 방어 — Frontend로 강제 복귀
 	if (!GI || !GI->IsLoggedIn())
 	{
 		UE_LOG(LogD1, Warning, TEXT("[Lobby] 비로그인 상태로 진입 — Frontend로 복귀"));
@@ -57,7 +56,6 @@ void UD1UWLobby::NativeConstruct()
 		MatchStatusPanel->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
-	// 서버 푸시(매칭 성사/큐 입장/에러) 구독
 	if (UD1MatchmakingSubsystem* Matchmaking = GetGameInstance()->GetSubsystem<UD1MatchmakingSubsystem>())
 	{
 		Matchmaking->OnQueueJoined.AddDynamic(this, &UD1UWLobby::HandleQueueJoined);
@@ -115,7 +113,6 @@ void UD1UWLobby::NativeDestruct()
 
 void UD1UWLobby::HandleProfileUpdated()
 {
-	// /api/auth/me 갱신 완료 — 최신 score/level로 라벨 새로고침.
 	ApplyProfileToLabels();
 }
 
@@ -218,7 +215,6 @@ void UD1UWLobby::HandleQueueJoined()
 		MatchStatusLabel->SetText(NSLOCTEXT("Lobby", "MatchSearching", "상대를 찾는 중..."));
 	}
 
-	// 검색 시작 시점부터 경과 시간 1초 간격 갱신.
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(
@@ -320,7 +316,6 @@ void UD1UWLobby::OnRankingClicked()
 		return;
 	}
 
-	// 이미 떠 있으면 중복 생성 방지.
 	if (RankingWidget && RankingWidget->IsInViewport())
 	{
 		return;

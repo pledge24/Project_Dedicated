@@ -77,12 +77,10 @@ void AD1BomberGameState::RemoveSoftBlockCell(const FIntPoint& Cell)
 
 float AD1BomberGameState::GetRemainingTimeSec() const
 {
-	// 시작 전: 풀 시간.
 	if (MatchPhase == EBomberMatchPhase::Waiting)
 	{
 		return MatchDurationSec;
 	}
-	// 종료 후: 0.
 	if (MatchPhase == EBomberMatchPhase::Finished)
 	{
 		return 0.0f;

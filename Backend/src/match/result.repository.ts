@@ -80,7 +80,6 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
 {
     return withTransaction(async (conn) =>
     {
-        // matches 테이블에 결과 저장.
         const [matchRes] = await conn.execute<ResultSetHeader>(
             'INSERT INTO matches ' +
             '(client_match_id, map_name, started_at, ended_at, duration_sec, end_reason, winner_user_id) ' +

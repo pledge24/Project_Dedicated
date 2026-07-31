@@ -31,7 +31,7 @@ struct FD1JoinEntry
 	FString Nickname;
 };
 
-/** 매치 종료 시 한 플레이어의 최종 결과. GameState가 배열로 원자 복제 → UI 표시 + (추후) 백엔드 전송 공용. */
+/** 매치 종료 시 한 플레이어의 최종 결과. GameState가 배열로 원자 복제 → 결과 UI 표시용(백엔드 전송은 FMatchResultPlayer). */
 USTRUCT(BlueprintType)
 struct FD1MatchResultEntry
 {

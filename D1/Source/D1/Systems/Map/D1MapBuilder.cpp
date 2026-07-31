@@ -27,8 +27,7 @@ namespace
 			return false;
 		}
 
-		// 드롭 확정.(아이템 종류가 3개 밖에 없어 if-else 방식 사용.
-		// 종류가 많아지면 lower-bound 사용 고려 중)
+		// 종류가 3개뿐이라 if-else로 충분. 늘어나면 lower-bound 방식 고려.
 		const int32 Roll = FMath::RandRange(0, TotalWeight - 1);
 		if (Roll < Cfg.FireWeight)
 		{
@@ -114,7 +113,6 @@ bool UD1MapBuilder::Build(UWorld* World, AD1BomberGameState* GS, const FD1MapBui
 				UD1BomberGridLibrary::CellToWorldCenter(Cell, Cfg.BlockZ), FRotator::ZeroRotator, Params);
 			if (Block)
 			{
-				// 랜덤으로 아이템 채워넣기.
 				EPowerupType HeldType;
 				if (RollPowerupType(Cfg, HeldType))
 				{

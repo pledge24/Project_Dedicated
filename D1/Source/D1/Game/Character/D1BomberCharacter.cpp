@@ -31,7 +31,6 @@ AD1BomberCharacter::AD1BomberCharacter(const FObjectInitializer& ObjectInitializ
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	// 기본 이동 수치 설정.
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
 		Move->bOrientRotationToMovement = true;
@@ -41,7 +40,6 @@ AD1BomberCharacter::AD1BomberCharacter(const FObjectInitializer& ObjectInitializ
 		Move->BrakingDecelerationWalking = 2000.f;
 	}
 
-	// 캐릭터끼리 충돌 안 함.
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{
 		Capsule->InitCapsuleSize(42.f, 96.f);

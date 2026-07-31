@@ -43,7 +43,6 @@ void AD1PlayerController::BeginPlay()
 		}
 	}
 
-	// 매치 종료 시 결과 위젯을 띄우기 위해 GameState 이벤트 구독.
 	TryBindMatchFinished();
 }
 
@@ -51,7 +50,6 @@ void AD1PlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
-	// 로컬 플레이어 컨트롤러에만 IMC 추가
 	if (IsLocalPlayerController())
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
@@ -86,7 +84,6 @@ void AD1PlayerController::HandleMatchFinished()
 		Result->SetResults(GS->GetFinalResults());
 	}
 
-	// 결과 화면 — 마우스 커서 + UI 입력.
 	bShowMouseCursor = true;
 	SetInputMode(FInputModeUIOnly());
 }
