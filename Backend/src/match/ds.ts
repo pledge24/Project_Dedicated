@@ -23,6 +23,16 @@ interface DsProcess
     committed: boolean;
 }
 
+/** DS에 넘길 매치 설정. 커맨드라인에 두면 안 되는 값(토큰)이 전부 여기 모인다. */
+interface MatchConfigFile
+{
+    matchId: string;
+    matchToken: string;
+    expectedPlayers: number;
+    roster: { joinToken: string; userId: number; nickname: string }[];
+    bots: { userId: number; nickname: string }[];
+}
+
 const ds = config.match.ds;
 const running = new Map<number, DsProcess>(); // port → 프로세스
 // 포트 프로브가 비동기라 "프로브 통과 → running.set" 사이에 다른 allocate가 끼어들 수 있다.
@@ -49,117 +59,6 @@ export async function allocate(matchId: string, serverToken: string, expectedPla
     }
 
     return { host: ds.host, port };
-}
-
-/** 선점된 포트에 실제 DS 프로세스를 띄우고 running에 등재. allocate 전용. */
-function spawnOnPort(port: number, matchId: string, serverToken: string, expectedPlayers: number, roster: { joinToken: string; userId: number; nickname: string }[], bots: { userId: number; nickname: string }[]): void
-{
-    /**
-     * 매치 설정은 파일로 넘기고 커맨드라인에는 경로만 둔다.
-     * 커맨드라인은 같은 사용자 세션의 아무 프로세스나 읽을 수 있는데(작업관리자·Get-Process·WMI),
-     * 거기 실려 있던 serverToken은 결과 위조 권한이고 roster의 joinToken은 남의 신원으로 입장할 권한이다.
-     * 서버 권위 모델 전체가 이 두 값에 걸려 있으므로 노출 창을 "매치 내내"에서 "DS가 읽을 때까지"로 줄인다.
-     * DS는 읽는 즉시 파일을 지우고, 백엔드도 안전망 타이머로 한 번 더 지운다(DS가 못 뜬 경우).
-     *
-     * expectedPlayers: DS가 전원 입장까지 매치 시작을 미루는 게이트용(미충족 시 DS 측 타임아웃으로 시작).
-     *                  총원(휴먼+봇)이라 봇이 PlayerArray를 채우고 휴먼 입장 시 게이트가 충족된다.
-     * roster:          DS가 ?join= 토큰으로 권위 신원(userId·이름)을 매핑. 좌석은 DS가 랜덤 배정.
-     * bots:            봇전(Bot-Fill) 봇 좌석. 토큰 없음(DS가 서버측 스폰). userId는 음수 sentinel.
-     * stdio 'ignore' — DS는 -log로 자체 콘솔/로그파일에 기록. 파이프 미소비로 막히는 것 방지.
-     */
-    const configPath = writeMatchConfig(matchId, {
-        matchId,
-        matchToken: serverToken,
-        expectedPlayers,
-        roster: roster.map((r) => ({ joinToken: r.joinToken, userId: r.userId, nickname: r.nickname })),
-        bots: bots.map((b) => ({ userId: b.userId, nickname: b.nickname })),
-    });
-
-    const args = [ds.map, `-port=${port}`, `-MatchConfig=${configPath}`, '-log'];
-    const child = spawn(ds.exePath, args, { stdio: 'ignore', windowsHide: false });
-    scheduleConfigCleanup(configPath, matchId);
-
-    const killTimer = setTimeout(() =>
-    {
-        logger.warn({ port, matchId }, 'DS 최대 수명 초과 — 회수');
-        killProcess(port);
-    }, ds.maxLifetimeMs);
-    if (typeof killTimer.unref === 'function')
-    {
-        killTimer.unref();
-    }
-
-    running.set(port, { child, matchId, port, killTimer, committed: false });
-
-    child.on('exit', (code) =>
-    {
-        const cur = running.get(port);
-        if (cur && cur.child === child)
-        {
-            clearTimeout(cur.killTimer);
-            running.delete(port);
-        }
-        // 준비 콜백 전에 죽었으면(부팅 중 크래시) 대기 중인 매치를 즉시 실패시켜 타임아웃까지 안 기다림.
-        // 확정/정상종료된 매치는 gate가 이미 소비돼 no-op.
-        readiness.fail(matchId, `DS 프로세스 종료(code=${code}, port=${port})`);
-        logger.info({ port, matchId, code }, 'DS 프로세스 종료');
-    });
-
-    child.on('error', (err) =>
-    {
-        logger.error({ err, port, matchId, exePath: ds.exePath }, 'DS spawn 실패');
-        readiness.fail(matchId, `DS spawn 실패(port=${port})`);
-        killProcess(port);
-    });
-
-    logger.info({ port, matchId, map: ds.map }, 'DS spawn — 준비 콜백 대기');
-}
-
-/** DS에 넘길 매치 설정. 커맨드라인에 두면 안 되는 값(토큰)이 전부 여기 모인다. */
-interface MatchConfigFile
-{
-    matchId: string;
-    matchToken: string;
-    expectedPlayers: number;
-    roster: { joinToken: string; userId: number; nickname: string }[];
-    bots: { userId: number; nickname: string }[];
-}
-
-/**
- * 설정 파일을 임시 디렉터리에 쓰고 경로 반환.
- * mode 0o600 — POSIX에서 소유자 외 읽기 차단. Windows는 mode를 무시하지만 %TEMP%가 이미 사용자별이다.
- * 실패는 throw해 allocate가 매치를 버리게 한다(토큰 없이 뜬 DS는 결과를 보고할 수 없다).
- */
-function writeMatchConfig(matchId: string, cfg: MatchConfigFile): string
-{
-    const filePath = path.join(os.tmpdir(), `d1-match-${matchId}.json`);
-    writeFileSync(filePath, JSON.stringify(cfg), { encoding: 'utf8', mode: 0o600 });
-
-    return filePath;
-}
-
-/**
- * 안전망 삭제 — 정상 경로에서는 DS가 읽자마자 지운다. DS가 못 뜨거나 크래시한 경우를 대비해
- * 백엔드도 한 번 더 지운다. 준비 타임아웃(readyTimeoutMs)보다 넉넉히 뒤에 돌아 정상 부팅을 방해하지 않는다.
- */
-function scheduleConfigCleanup(filePath: string, matchId: string): void
-{
-    const timer = setTimeout(() =>
-    {
-        try
-        {
-            if (existsSync(filePath))
-            {
-                unlinkSync(filePath);
-                logger.warn({ matchId, filePath }, 'DS가 매치 설정 파일을 지우지 않음 — 백엔드가 정리');
-            }
-        }
-        catch (err)
-        {
-            logger.warn({ err, matchId, filePath }, '매치 설정 파일 정리 실패');
-        }
-    }, ds.readyTimeoutMs * 2);
-    timer.unref();
 }
 
 /**
@@ -261,6 +160,107 @@ export async function reapOrphans(): Promise<void>
         logger.warn({ occupied, portMin: ds.portMin, portMax: ds.portMax },
             'DS 포트 점유 감지 — 이전 실행의 고아 프로세스일 수 있음. 해당 포트는 할당에서 제외된다');
     }
+}
+
+/** 선점된 포트에 실제 DS 프로세스를 띄우고 running에 등재. allocate 전용. */
+function spawnOnPort(port: number, matchId: string, serverToken: string, expectedPlayers: number, roster: { joinToken: string; userId: number; nickname: string }[], bots: { userId: number; nickname: string }[]): void
+{
+    /**
+     * 매치 설정은 파일로 넘기고 커맨드라인에는 경로만 둔다.
+     * 커맨드라인은 같은 사용자 세션의 아무 프로세스나 읽을 수 있는데(작업관리자·Get-Process·WMI),
+     * 거기 실려 있던 serverToken은 결과 위조 권한이고 roster의 joinToken은 남의 신원으로 입장할 권한이다.
+     * 서버 권위 모델 전체가 이 두 값에 걸려 있으므로 노출 창을 "매치 내내"에서 "DS가 읽을 때까지"로 줄인다.
+     * DS는 읽는 즉시 파일을 지우고, 백엔드도 안전망 타이머로 한 번 더 지운다(DS가 못 뜬 경우).
+     *
+     * expectedPlayers: DS가 전원 입장까지 매치 시작을 미루는 게이트용(미충족 시 DS 측 타임아웃으로 시작).
+     *                  총원(휴먼+봇)이라 봇이 PlayerArray를 채우고 휴먼 입장 시 게이트가 충족된다.
+     * roster:          DS가 ?join= 토큰으로 권위 신원(userId·이름)을 매핑. 좌석은 DS가 랜덤 배정.
+     * bots:            봇전(Bot-Fill) 봇 좌석. 토큰 없음(DS가 서버측 스폰). userId는 음수 sentinel.
+     * stdio 'ignore' — DS는 -log로 자체 콘솔/로그파일에 기록. 파이프 미소비로 막히는 것 방지.
+     */
+    const configPath = writeMatchConfig(matchId, {
+        matchId,
+        matchToken: serverToken,
+        expectedPlayers,
+        roster: roster.map((r) => ({ joinToken: r.joinToken, userId: r.userId, nickname: r.nickname })),
+        bots: bots.map((b) => ({ userId: b.userId, nickname: b.nickname })),
+    });
+
+    const args = [ds.map, `-port=${port}`, `-MatchConfig=${configPath}`, '-log'];
+    const child = spawn(ds.exePath, args, { stdio: 'ignore', windowsHide: false });
+    scheduleConfigCleanup(configPath, matchId);
+
+    const killTimer = setTimeout(() =>
+    {
+        logger.warn({ port, matchId }, 'DS 최대 수명 초과 — 회수');
+        killProcess(port);
+    }, ds.maxLifetimeMs);
+    if (typeof killTimer.unref === 'function')
+    {
+        killTimer.unref();
+    }
+
+    running.set(port, { child, matchId, port, killTimer, committed: false });
+
+    child.on('exit', (code) =>
+    {
+        const cur = running.get(port);
+        if (cur && cur.child === child)
+        {
+            clearTimeout(cur.killTimer);
+            running.delete(port);
+        }
+        // 준비 콜백 전에 죽었으면(부팅 중 크래시) 대기 중인 매치를 즉시 실패시켜 타임아웃까지 안 기다림.
+        // 확정/정상종료된 매치는 gate가 이미 소비돼 no-op.
+        readiness.fail(matchId, `DS 프로세스 종료(code=${code}, port=${port})`);
+        logger.info({ port, matchId, code }, 'DS 프로세스 종료');
+    });
+
+    child.on('error', (err) =>
+    {
+        logger.error({ err, port, matchId, exePath: ds.exePath }, 'DS spawn 실패');
+        readiness.fail(matchId, `DS spawn 실패(port=${port})`);
+        killProcess(port);
+    });
+
+    logger.info({ port, matchId, map: ds.map }, 'DS spawn — 준비 콜백 대기');
+}
+
+/**
+ * 설정 파일을 임시 디렉터리에 쓰고 경로 반환.
+ * mode 0o600 — POSIX에서 소유자 외 읽기 차단. Windows는 mode를 무시하지만 %TEMP%가 이미 사용자별이다.
+ * 실패는 throw해 allocate가 매치를 버리게 한다(토큰 없이 뜬 DS는 결과를 보고할 수 없다).
+ */
+function writeMatchConfig(matchId: string, cfg: MatchConfigFile): string
+{
+    const filePath = path.join(os.tmpdir(), `d1-match-${matchId}.json`);
+    writeFileSync(filePath, JSON.stringify(cfg), { encoding: 'utf8', mode: 0o600 });
+
+    return filePath;
+}
+
+/**
+ * 안전망 삭제 — 정상 경로에서는 DS가 읽자마자 지운다. DS가 못 뜨거나 크래시한 경우를 대비해
+ * 백엔드도 한 번 더 지운다. 준비 타임아웃(readyTimeoutMs)보다 넉넉히 뒤에 돌아 정상 부팅을 방해하지 않는다.
+ */
+function scheduleConfigCleanup(filePath: string, matchId: string): void
+{
+    const timer = setTimeout(() =>
+    {
+        try
+        {
+            if (existsSync(filePath))
+            {
+                unlinkSync(filePath);
+                logger.warn({ matchId, filePath }, 'DS가 매치 설정 파일을 지우지 않음 — 백엔드가 정리');
+            }
+        }
+        catch (err)
+        {
+            logger.warn({ err, matchId, filePath }, '매치 설정 파일 정리 실패');
+        }
+    }, ds.readyTimeoutMs * 2);
+    timer.unref();
 }
 
 /**
