@@ -37,7 +37,7 @@ protected:
 
 	/** 스크롤 밖 하단 고정 본인 행(WBP_RankingRow 인스턴스). */
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
-	TObjectPtr<UD1UWRankingRow> MyRankRow;
+	TObjectPtr<UD1UWRankingRow> MyRankRowWidget;
 
 	/** 조회 실패 사유 표시. 없으면(BP 미배치) 로그만 남고 빈 목록이 그대로 보인다. */
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))

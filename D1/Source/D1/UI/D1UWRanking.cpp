@@ -86,7 +86,7 @@ void UD1UWRanking::PopulateRows(const FD1RankingResult& Result)
 
 void UD1UWRanking::ApplyMyRankRow(const FD1RankingResult& Result)
 {
-	if (!MyRankRow)
+	if (!MyRankRowWidget)
 	{
 		return;
 	}
@@ -104,7 +104,7 @@ void UD1UWRanking::ApplyMyRankRow(const FD1RankingResult& Result)
 	Mine.UserId   = User.UserId;
 	Mine.Nickname = User.Nickname;
 	Mine.Score    = User.Score;
-	MyRankRow->SetEntry(Mine, /*bIsLocalPlayer=*/true);
+	MyRankRowWidget->SetEntry(Mine, /*bIsLocalPlayer=*/true);
 }
 
 void UD1UWRanking::OnCloseClicked()
