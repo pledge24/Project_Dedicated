@@ -8,14 +8,14 @@
 #include "D1UWLobby.generated.h"
 
 class UButton;
+class UProgressBar;
 class UTextBlock;
+class UUserWidget;
 class UVerticalBox;
 
 /**
- *  로비 위젯.
- *  로그인된 유저의 닉네임/점수 표시. 매칭 버튼은 이번 슬라이스에서 비활성.
- *  비로그인 상태로 들어오면 MP_Frontend로 강제 복귀 (방어 코드).
- *  자식 위젯 디자인 미완 — Bind는 일단 모두 Optional.
+ *  로비 위젯 — 프로필 표시·WS 매칭·랭킹 팝업·세션 heartbeat.
+ *  비로그인 상태로 들어오면 프론트엔드로 강제 복귀(방어 코드).
  */
 UCLASS()
 class UD1UWLobby : public UD1UserWidget
@@ -43,8 +43,15 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> ScoreLabel;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UProgressBar> ExpBar;
+
+	/** EXP 바 중앙 텍스트("현재/최대 EXP"). */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> ExpLabel;
+
 private:
-	/** GameInstance 캐시(GetCurrentUser)의 닉네임/레벨/점수를 라벨에 반영. 캐시·갱신 양쪽에서 호출. */
+	/** GameInstance 캐시(GetCurrentUser)의 닉네임/레벨/점수/경험치를 라벨·바에 반영. 캐시·갱신 양쪽에서 호출. */
 	void ApplyProfileToLabels();
 
 //~ WS 매칭
@@ -90,9 +97,27 @@ private:
 
 	int32 MatchSearchingElapsedSec = 0;
 
-//~ 비로그인 방어
+//~ 랭킹
+protected:
+	UFUNCTION()
+	void OnRankingClicked();
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UButton> RankingButton;
+
 private:
-	/** 비로그인 시 복귀할 맵 — 디테일 패널에서 MP_Frontend 지정. */
+	/** 랭킹 팝업 위젯 클래스 — 디테일 패널에서 WBP_Ranking 지정. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby", meta = (AllowPrivateAccess = "true"))
-	TSoftObjectPtr<UWorld> FrontendMap;
+	TSubclassOf<UUserWidget> RankingWidgetClass;
+
+	/** 열린 팝업 참조 — 중복 오픈 가드. */
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> RankingWidget;
+
+//~ 세션 heartbeat
+private:
+	/** 주기 콜백 — Auth->SendHeartbeat(). 세션이 대체됐으면 SessionSubsystem이 로그인 화면 복귀를 처리. */
+	void SendSessionHeartbeat();
+
+	FTimerHandle SessionHeartbeatTimerHandle;
 };

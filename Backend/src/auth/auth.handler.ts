@@ -49,3 +49,13 @@ export async function me(req: Request, res: Response): Promise<void>
     const data = await service.getMe(userId, nickname);
     res.json(ok(data));
 }
+
+/**
+ * GET /api/auth/heartbeat  (requireAuth 보호)
+ * 로비 클라가 30초마다 호출. requireAuth가 token_version 대조로 대체된 세션을 401 SESSION_SUPERSEDED로 거절한다.
+ * 유효하면 프로필 쿼리 없이 valid만 반환(경량).
+ */
+export function heartbeat(_req: Request, res: Response): void
+{
+    res.json(ok({ valid: true }));
+}

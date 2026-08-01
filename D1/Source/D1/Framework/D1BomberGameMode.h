@@ -3,19 +3,15 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Framework/D1MatchConfig.h"
+#include "Framework/D1MatchTypes.h"
 #include "GameFramework/GameModeBase.h"
 #include "D1BomberGameMode.generated.h"
 
+class AController;
 class APlayerController;
 class AD1PowerupPickup;
 class UD1MapData;
-
-/** -Roster= 로 주입된 입장 토큰 → 권위 신원(userId·닉네임) 매핑. 좌석은 DS가 입장 시 랜덤 배정. */
-struct FD1JoinEntry
-{
-	int64 UserId = 0;
-	FString Nickname;
-};
 
 /** 봄버맨 매치 GameMode(서버 전용) — 맵 빌드·접속 신원 검증·슬롯 배정·시작 게이트. */
 UCLASS(abstract)
@@ -27,6 +23,8 @@ public:
 	AD1BomberGameMode();
 
 	//~ Begin AGameModeBase Interface
+	/** 재입장 거절 — 이미 kick된(다른 기기 로그인) 유저의 연결 거부. */
+	virtual void PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 	/** 예상 인원 다 모이면 매치 시작(시작 게이트). */
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	/** 점유 PlayerStart 해제 — fallback 경로 슬롯 누수 방지. */
@@ -80,17 +78,22 @@ private:
 
 //~ 인증 — 접속 신원 검증
 private:
-	/** -MatchId/-MatchToken 으로 주입. 결과 POST 인증용(비면 스킵). */
-	FString CurrentMatchId;
-	FString CurrentMatchToken;
-
-	/** -Roster= 로 주입(token→userId). InitNewPlayer가 ?join=로 신원 매핑. */
-	TMap<FString, FD1JoinEntry> JoinRoster;
+	/** BeginPlay에서 FD1MatchConfig::Load()로 적재 — 매치 식별자/토큰/명단/봇 좌석. */
+	FD1MatchConfig MatchConfig;
 
 //~ 슬롯 배정
 private:
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> UsedStarts;
+
+//~ 봇 (봇전 서버측 스폰)
+private:
+	/** 봇전: -Bots= 로 주입된 봇 좌석을 서버측 스폰(AI 빙의, 가만히 서 있음). 맵 빌드 후·시작 게이트 전 호출. */
+	void SpawnBots();
+
+	/** 봇 컨트롤러 클래스(기본 AD1BotController, 생성자 지정). PlayerState를 얻어 PlayerArray에 편입. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<AController> BotControllerClass;
 
 //~ 시작 게이트·매치 흐름
 private:
@@ -101,7 +104,4 @@ private:
 	/** 매치 종료 후 이 시간 뒤 DS 강제 종료(하드캡). 클라 복귀보다 길게. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
 	float ShutdownGraceSec = 30.f;
-
-	/** -ExpectedPlayers= 로 주입. 매치 흐름 컴포넌트에 전달할 시작 정원(0/1=즉시). */
-	int32 ExpectedPlayerCount = 0;
 };

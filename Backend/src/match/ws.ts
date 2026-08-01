@@ -1,6 +1,6 @@
-// 매칭 WebSocket 네트워크 레이어.
+// 매칭 WebSocket 네트워크 레이어 — 소켓 수명만 다룬다.
 // 같은 http.Server를 공유(noServer) → upgrade 헤더에서 JWT 인증 후 handleUpgrade.
-import { randomBytes, randomUUID } from 'node:crypto';
+// 매치가 성사된 뒤의 조립(토큰 발급·DS 할당·roster 등록)은 matchFormation.handler가 맡는다.
 import type { Server as HttpServer, IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocket, WebSocketServer } from 'ws';
@@ -9,16 +9,15 @@ import type { RawData } from 'ws';
 import { extractBearerToken } from '../common/bearer.js';
 import { config } from '../common/config.js';
 import { AppError, Codes } from '../common/errors.js';
-import type { ErrorKind } from '../common/errors.js';
 import * as jwtUtil from '../common/jwt.js';
 import { logger } from '../common/logger.js';
 import { getCurrentTokenVersion, onSuperseded } from '../common/session.js';
 import type { AuthedUser } from '../common/types.js';
-import * as ds from './ds.js';
+import { allocator } from './dsAllocator.js';
+import { handleBotMatch, handleMatch } from './matchFormation.handler.js';
 import * as service from './matchmaking.service.js';
-import type { ClientMessage, ServerMessage, ServerMessageType } from './protocol.js';
-import type { MatchGroup } from './queue.js';
-import * as roster from './roster.js';
+import type { ClientMessage } from './protocol.js';
+import { send, sendError } from './wsSend.js';
 
 const WS_PATH = '/ws/match';
 
@@ -39,63 +38,52 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
     // maxPayload: ws 기본값 100MiB → 16KB. 큐 메시지는 수십 바이트라 대형 메시지 flood 차단.
     const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 });
 
-    /** upgrade 이벤트(클라가 요청) 핸들 함수 추가 */
-    server.on('upgrade', async (req: IncomingMessage, socket: Duplex, head: Buffer) =>
+    server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) =>
     {
-        const { pathname } = new URL(req.url ?? '', 'http://localhost');
-        if (pathname !== WS_PATH)
+        // async 리스너를 그대로 등록하면 reject를 아무도 잡지 않아 unhandledRejection → 프로세스 종료다.
+        // 핸드셰이크 1건의 실패는 그 소켓만 버리고 끝나야 한다.
+        handleUpgrade(wss, req, socket, head).catch((err) =>
         {
+            logger.error({ err }, 'WS 업그레이드 처리 실패 — 소켓 종료');
             socket.destroy();
-
-            return;
-        }
-
-        /** socket error 이벤트에 핸들링 함수를 추가했다 삭제하는 이유는
-         *  인증 도중 error 발생 시, 핸들링 해줄 함수가 없기 때문.
-         *  그래서 임시용으로 추가했다 삭제하는 것.
-        */
-        socket.on('error', onSocketError);
-        const user = await authenticate(req);
-        if (!user)
-        {
-            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-            socket.destroy();
-
-            return;
-        }
-        socket.removeListener('error', onSocketError);
-
-        wss.handleUpgrade(req, socket, head, (ws) =>
-        {
-            // 해당 emit은 클라이언트를 향하지 않음. 바로 아래 있는 wss.on('connection')을 향한다.
-            wss.emit('connection', ws, req, user);
         });
     });
 
-    /** 연결 이벤트(이 서버가 요청) 핸들 함수 추가 */
     wss.on('connection', (ws: WebSocket, _req: IncomingMessage, user: AuthedUser) => onConnection(wss, ws, user));
 
     // 재로그인(세션 대체) 알림 구독 — 버전 대조는 핸드셰이크 때뿐이라 이미 연결된 옛 소켓은 여기서 끊는다.
-    const offSuperseded = onSuperseded((userId) => kickThisUserSockets(wss, userId));
+    // 게임중(DS 접속)인 유저면 kick 대기열 표시(service 위임) → DS가 폴링으로 회수(WS는 이미 끊긴 상태라 여기선 안 잡힘).
+    const offSuperseded = onSuperseded((userId) =>
+    {
+        kickThisUserSockets(wss, userId);
+        service.kickUserFromLiveMatch(userId);
+    });
 
     // 죽은 연결 감지 — heartbeat 주기마다 pong 못 받은 소켓은 terminate.
+    // 타이머 콜백에서 새는 예외는 uncaughtException이 되므로 주기 단위로 가둔다.
     const heartbeat = setInterval(() =>
     {
-        for (const client of wss.clients)
+        try
         {
-            const newSocket = client as AuthedWs;
-            if (!newSocket.isAlive)
+            for (const client of wss.clients)
             {
-                newSocket.terminate();
-                continue;
+                const newSocket = client as AuthedWs;
+                if (!newSocket.isAlive)
+                {
+                    newSocket.terminate();
+                    continue;
+                }
+                newSocket.isAlive = false;
+                newSocket.ping();
             }
-            newSocket.isAlive = false;
-            newSocket.ping();
+        }
+        catch (err)
+        {
+            logger.warn({ err }, 'WS heartbeat 실패 — 이번 주기 건너뜀');
         }
     }, config.match.heartbeatMs);
     heartbeat.unref();
 
-    // 매치 인터벌 타이머 설정.
     const cycle = setInterval(runMatchCycle, config.match.cycleMs);
     cycle.unref();
 
@@ -107,7 +95,8 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
             offSuperseded();
             clearInterval(heartbeat);
             clearInterval(cycle);
-            ds.shutdownAll();
+            // 확정 전 DS만 회수한다 — 진행 중인 경기는 백엔드 종료와 무관하게 끝나야 한다.
+            allocator.shutdownUncommitted();
             for (const client of wss.clients)
             {
                 client.terminate();
@@ -115,6 +104,36 @@ export function attachMatchWebSocket(server: HttpServer): { stop: () => void }
             wss.close();
         },
     };
+}
+
+/** 업그레이드 핸드셰이크 본체 — 경로 확인 → JWT 인증 → connection으로 승격. */
+async function handleUpgrade(wss: WebSocketServer, req: IncomingMessage, socket: Duplex, head: Buffer): Promise<void>
+{
+    const { pathname } = new URL(req.url ?? '', 'http://localhost');
+    if (pathname !== WS_PATH)
+    {
+        socket.destroy();
+
+        return;
+    }
+
+    // 인증(await) 구간에서 socket error가 나면 핸들러가 없어 프로세스가 죽는다 — 임시로 붙였다 뗀다.
+    socket.on('error', onSocketError);
+    const user = await authenticate(req);
+    if (!user)
+    {
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.destroy();
+
+        return;
+    }
+    socket.removeListener('error', onSocketError);
+
+    wss.handleUpgrade(req, socket, head, (ws) =>
+    {
+        // 해당 emit은 클라이언트를 향하지 않음. attachMatchWebSocket의 wss.on('connection')을 향한다.
+        wss.emit('connection', ws, req, user);
+    });
 }
 
 /**
@@ -162,22 +181,11 @@ function kickThisUserSockets(wss: WebSocketServer, userId: number, except?: WebS
         if (socket !== except && socket.userId === userId)
         {
             service.leave(userId);
-            socket.terminate();
+            // 조용한 terminate 대신 사유를 실어 보낸 뒤 graceful close(4001) → 클라가 "다른 기기 로그인"으로 구분.
+            send(socket, { type: 'session:invalid', ok: false });
+            socket.close(4001, 'superseded');
         }
     }
-}
-
-function send(ws: WebSocket, msg: ServerMessage): void
-{
-    if (ws.readyState === WebSocket.OPEN)
-    {
-        ws.send(JSON.stringify(msg));
-    }
-}
-
-function sendError(ws: WebSocket, type: ServerMessageType, kind: ErrorKind, message: string): void
-{
-    send(ws, { type, ok: false, error: { code: kind.code, message } });
 }
 
 /** 연결별 고정 윈도우 rate limit — 초과 메시지는 무시(윈도우당 경고 1회). */
@@ -225,7 +233,6 @@ async function onMessage(ws: AuthedWs, raw: RawData): Promise<void>
         return;
     }
 
-    /** 메세지 처리 */
     try
     {
         switch (msg.type)
@@ -271,7 +278,6 @@ function onConnection(wss: WebSocketServer, ws: WebSocket, user: AuthedUser): vo
     newSocket.msgCount = 0;
     newSocket.limitNotified = false;
 
-    // 이전 ws 소켓 Cleanup.
     kickThisUserSockets(wss, user.userId, newSocket);
 
     newSocket.on('pong', () =>
@@ -292,7 +298,7 @@ function onConnection(wss: WebSocketServer, ws: WebSocket, user: AuthedUser): vo
 
     newSocket.on('error', (err) =>
     {
-        logger.warn({ err, userId: newSocket.userId }, 'WS 에러')
+        logger.warn({ err, userId: newSocket.userId }, 'WS 에러');
     });
 
     logger.info({ userId: newSocket.userId }, 'WS 연결 수립');
@@ -301,96 +307,30 @@ function onConnection(wss: WebSocketServer, ws: WebSocket, user: AuthedUser): vo
 /** 1초 사이클: 매칭 시도 → 성사 그룹마다 DS 할당+푸시(비동기). */
 function runMatchCycle(): void
 {
-    // runMatching이 매칭 즉시 큐에서 제거하므로, 비동기 할당 중 재매칭 위험은 없다.
-    const groups = service.runMatching(Date.now());
-    for (const group of groups)
-    {
-        void handleMatch(group);
-    }
-}
-
-/**
- * 한 매치 처리: 확정 창(끊김/재접속/취소) 방어 → DS 할당 → match:found.
- * 성사 즉시 큐에서 빠진 그룹을 begin/end/abortFormation으로 추적한다.
- * 끊김·재접속·취소는 전부 service.leave를 거쳐 inFormation에서 빠지므로 userId 기준으로 포착된다.
- */
-async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
-{
-    const matchId = randomUUID();
-    // DS 인증용 토큰. 커맨드라인으로 넘겨주며, DS -> 백엔드로 매치 결과 전송 시 사용.
-    const serverToken = randomBytes(24).toString('base64url');
-    const joinPlayers = group.entries.map((e) => ({
-        ref: e.ref,
-        userId: e.userId,
-        nickname: e.nickname,
-        // 각 플레이어 DS 입장 토큰. 클라가 DS 입장시 사용.
-        joinToken: randomBytes(16).toString('base64url'),
-    }));
-    const userIds = group.entries.map((e) => e.userId);
-
-    service.beginFormation(userIds);
-
-    // 1) 스폰 전: 이미 닫힌 소켓(같은 틱 onClose 미처리 레이스)이 있으면 스폰 없이 생존자만 재큐.
-    if (group.entries.some((e) => e.ref.readyState !== WebSocket.OPEN))
-    {
-        const requeued = service.abortFormation(group.entries);
-        logger.warn({ matchId, requeued }, '확정 전 소켓 종료 — 스폰 취소, 생존자 재큐');
-
-        return;
-    }
-
-    // 2) 매치를 실행할 DS를 spawn(또는 stub). 할당 실패는 복구 불가라 error 전송.
-    let server: { host: string; port: number };
+    // 이 함수의 예외는 타이머 콜백 밖으로 나가 uncaughtException → 프로세스 종료가 된다.
+    // 매치 하나의 실패가 진행 중인 다른 매치까지 끌고 죽지 않도록 사이클·매치 단위로 가둔다.
     try
     {
-        server = config.match.ds.enabled
-            ? await ds.allocate(matchId, serverToken, group.entries.length,
-                joinPlayers.map((p) => ({ joinToken: p.joinToken, userId: p.userId, nickname: p.nickname })))
-            : config.match.stubServer;
+        // runMatching이 매칭 즉시 큐에서 제거하므로, 비동기 할당 중 재매칭 위험은 없다.
+        const { groups, botFills } = service.runMatching(Date.now());
+        for (const group of groups)
+        {
+            handleMatch(group).catch((err) =>
+            {
+                logger.error({ err, users: group.entries.map((e) => e.userId) }, '매치 처리 실패 — 이 매치만 폐기');
+            });
+        }
+        // 장기 대기자는 봇 3명과 즉시 게임 투입(봇전).
+        for (const entry of botFills)
+        {
+            handleBotMatch(entry).catch((err) =>
+            {
+                logger.error({ err, userId: entry.userId }, '봇전 처리 실패 — 이 매치만 폐기');
+            });
+        }
     }
     catch (err)
     {
-        logger.error({ err, matchId }, 'DS 할당 실패 — 매치 취소');
-        service.endFormation(userIds);
-        for (const e of group.entries)
-        {
-            sendError(e.ref, 'error', Codes.INTERNAL_ERROR, '게임 서버 할당에 실패했습니다.');
-        }
-
-        return;
+        logger.error({ err }, '매칭 사이클 실패 — 다음 주기에 재시도');
     }
-
-    // 3) 부팅(≈5s) 사이 끊김/재접속/취소 포착(userId 기준). 하나라도 이탈 시 스폰한 DS 회수 + 생존자 재큐.
-    if (group.entries.some((e) => !service.isInFormation(e.userId) || e.ref.readyState !== WebSocket.OPEN))
-    {
-        if (config.match.ds.enabled)
-        {
-            ds.release(server.port);
-        }
-        const requeued = service.abortFormation(group.entries);
-        logger.warn({ matchId, requeued }, '확정 창 이탈 — DS 회수, 생존자 재큐');
-
-        return;
-    }
-
-    // 4) 성사 확정: formation 종료 → roster 등록 → 각 클라에 본인 입장 토큰만 실어 push.
-    service.endFormation(userIds);
-    const { data } = service.buildMatchFound(group, matchId, server);
-    roster.register({
-        matchId,
-        serverToken,
-        mapName: config.match.ds.map,
-        startedAt: Date.now(),
-        players: joinPlayers.map((p) => ({
-            userId: p.userId,
-            nickname: p.nickname,
-            joinToken: p.joinToken,
-        })),
-    });
-    // 각 클라에 본인 입장 토큰만 실어 보낸다.
-    for (const p of joinPlayers)
-    {
-        send(p.ref, { type: 'match:found', ok: true, data: { ...data, joinToken: p.joinToken } });
-    }
-    logger.info({ matchId, server, players: joinPlayers.map((p) => p.userId) }, '매치 성사');
 }

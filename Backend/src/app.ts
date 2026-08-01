@@ -9,7 +9,8 @@ import { pingDb } from './common/db.js';
 import { fail, ok } from './common/envelope.js';
 import { AppError, Codes } from './common/errors.js';
 import { logger } from './common/logger.js';
-import resultRouter from './match/result.router.js';
+import dsApiRouter from './match/dsApi.router.js';
+import matchmakingRouter from './match/matchmaking.router.js';
 import rankingRouter from './ranking/ranking.router.js';
 
 export default function buildApp(): Express
@@ -58,9 +59,10 @@ export default function buildApp(): Express
         res.json(ok({ service: 'd1-backend', version: '0.1.0' }));
     });
 
-    // 라우터 마운트
     app.use('/api/auth', authRouter);
-    app.use('/api/match', resultRouter);
+    // 같은 prefix에 인증 주체가 다른 두 라우터 — 플레이어(JWT)용을 먼저, DS(serverToken)용을 뒤에.
+    app.use('/api/match', matchmakingRouter);
+    app.use('/api/match', dsApiRouter);
     app.use('/api/ranking', rankingRouter);
 
     // 라이브니스: 의존성(DB) 검사 금지 — 프로세스 생존만 본다.
@@ -94,8 +96,8 @@ export default function buildApp(): Express
         res.status(Codes.NOT_FOUND.http).json(fail(Codes.NOT_FOUND.code, '요청한 경로를 찾을 수 없습니다.'));
     });
 
-    // 에러 미들웨어 (4-arg 시그니처여야 Express가 에러 핸들러로 인식)
-    app.use((err: unknown, req: Request, res: Response, next: NextFunction) =>
+    // 에러 미들웨어 (4-arg 시그니처여야 Express가 에러 핸들러로 인식 — _next는 그 용도로만 존재)
+    app.use((err: unknown, req: Request, res: Response, _next: NextFunction) =>
     {
         if (err instanceof AppError)
         {

@@ -18,6 +18,8 @@ public:
 	AD1ExplosionHazard();
 
 	void Initialize(const TArray<FIntPoint>& InCells, float InDurationSec);
+	/** 잔류 위험 셀(폭발 후 지속 피해 구간). 봇이 방금 터진 셀을 피하는 데 사용. */
+	const TArray<FIntPoint>& GetHazardCells() const { return HazardCells; }
 
 protected:
 	//~ Begin AActor Interface
@@ -30,7 +32,7 @@ private:
 
 	/** 반복 스윕 간격(초). 셀(100cm)을 한 틱에 못 건너뛸 만큼 촘촘하게. */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
-	float HazardSweepInterval = 0.05f;
+	float HazardSweepIntervalSec = 0.05f;
 
 	/** 피격 박스: 셀보다 약간 작은 가로(45) + 캐릭터 높이(80). */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")

@@ -15,8 +15,12 @@ enum class EBackendErrorCode : uint8
 	DuplicateLoginId,
 	DuplicateNickname,
 	RateLimited,
+	/** 더 최신 로그인이 세션을 대체함(단일 세션). 클라는 로그인 화면으로 복귀. */
+	SessionSuperseded,
 	/** HTTP 자체 실패 (서버 다운 / DNS / 타임아웃). */
 	NetworkError,
+	/** 클라 세션 없음(비로그인) — 요청 전 로컬 판정. 서버 코드 아님. */
+	NotAuthenticated,
 	InternalError,
 	Unknown
 };
@@ -94,6 +98,53 @@ struct FMatchFoundDTO
 	FString JoinToken;
 };
 
+/** 랭킹 한 줄 — GET /api/ranking의 entries[] 한 항목. */
+USTRUCT(BlueprintType)
+struct FD1RankingEntryDTO
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Rank = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 UserId = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	FString Nickname;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Score = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Level = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Wins = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Losses = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 MatchesPlayed = 0;
+};
+
+/** 랭킹 조회 결과 — Top 리스트 + 본인 순위(me.rank). 본인 닉네임/점수는 GameInstance 캐시서 합성. */
+USTRUCT(BlueprintType)
+struct FD1RankingResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	TArray<FD1RankingEntryDTO> Entries;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 MyRank = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Backend")
+	int32 Total = 0;
+};
+
 /** DS가 백엔드에 보고할 매치 결과 한 명분 (서버 내부용 — BP 비노출, USTRUCT 아님). */
 struct FMatchResultPlayer
 {
@@ -101,6 +152,8 @@ struct FMatchResultPlayer
 	int32 SlotIndex = 0;
 	int32 Placement = 0;
 	int32 LivesLeft = 0;
+	/** 게임중 다른 기기 로그인으로 kick된 탈주자 → 백엔드가 최하위 확정값(이미 즉시 정산). */
+	bool Left = false;
 };
 
 /** 회원가입/로그인 완료 콜백 (1회성 pass-in). */
@@ -117,3 +170,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMatchmakingError, const FBackendR
 
 /** 프로필 갱신 완료(/api/auth/me 응답으로 캐시 갱신됨). UI가 라벨 새로고침용으로 구독. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnProfileUpdated);
+
+/** 랭킹 조회 완료 콜백 (1회성 pass-in). */
+DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnRankingCompleted, const FBackendResponse&, Response, const FD1RankingResult&, Result);

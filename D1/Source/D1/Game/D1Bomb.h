@@ -31,10 +31,6 @@ class AD1Bomb : public AActor
 public:
 	AD1Bomb();
 
-	//~ Begin AActor Interface
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-	//~ End AActor Interface
-
 protected:
 	//~ Begin AActor Interface
 	virtual void BeginPlay() override;
@@ -50,16 +46,9 @@ protected:
 	TObjectPtr<UStaticMeshComponent> MeshComp;
 
 //~ 격발 타이밍
-protected:
-	UFUNCTION()
-	void OnRep_DetonationServerTime();
-
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	float FuseSec = 3.f;
-
-	UPROPERTY(ReplicatedUsing = OnRep_DetonationServerTime, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
-	float DetonationServerTime = 0.f;
 
 	FTimerHandle FuseTimerHandle;
 
@@ -69,6 +58,8 @@ private:
 public:
 	/** 서버 전용: 설치자 화력으로 폭발 범위 덮어쓰기(스폰 직후). */
 	void SetRange(int32 InRange);
+	/** 폭발 반경(칸). 봇 위험셀 계산용. */
+	int32 GetRange() const { return Range; }
 
 protected:
 	/** 폭발 이펙트 스폰 Multicast */

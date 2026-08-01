@@ -20,7 +20,8 @@ public class D1 : ModuleRules
 			"WebSockets",
 			"Json",
 			"JsonUtilities",
-			"DeveloperSettings"
+			"DeveloperSettings",
+			"AIModule"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

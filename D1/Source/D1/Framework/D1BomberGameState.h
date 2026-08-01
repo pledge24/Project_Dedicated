@@ -52,32 +52,51 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Bomber")
 	bool IsInsideGrid(const FIntPoint& Cell) const;
 
+	/** 서버 전용: 맵 빌드 결과(그리드·벽·소프트블록·맵 이름) 주입. */
+	void SetGridData(const FIntPoint& InGridSize, const TArray<FIntPoint>& InWallCells,
+		const TArray<FIntPoint>& InSoftBlockCells, const FString& InMapName);
+
 	/** 서버 전용: 파괴된 블록 셀 제거 → 이후 폭발이 통과. */
 	void RemoveSoftBlockCell(const FIntPoint& Cell);
 
+	const FIntPoint& GetGridSize() const { return GridSize; }
+	const FString& GetMapName() const { return MapName; }
+
+private:
 	/** 빌드 시 서버가 세팅. 경계 판정 권위. */
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	FIntPoint GridSize = FIntPoint::ZeroValue;
 
 	/** ~64셀 규모라 TArray로 충분. */
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	TArray<FIntPoint> WallCells;
 
 	/** 폭발에 파괴되면 RemoveSoftBlockCell로 빠진다. */
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber")
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	TArray<FIntPoint> SoftBlockCells;
+
+	/** 선정된 맵의 논리 이름 → 결과 보고(map_name)용. 클라 불필요라 비복제. */
+	UPROPERTY(BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
+	FString MapName;
 
 //~ 매치 타이머
 public:
 	UFUNCTION(BlueprintPure, Category = "Bomber|Match")
 	float GetRemainingTimeSec() const;
 
-	/** GameMode가 Playing 진입 시 기록. */
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Match")
+	/** 서버 전용: Playing 진입 시각 기록. */
+	void SetMatchStartServerTime(float ServerTime);
+
+	float GetMatchStartServerTime() const { return MatchStartServerTime; }
+	float GetMatchDurationSec() const { return MatchDurationSec; }
+
+private:
+	/** Playing 진입 시 서버가 기록. */
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
 	float MatchStartServerTime = 0.0f;
 
 	/** 기본 5분. */
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Match")
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
 	float MatchDurationSec = 300.0f;
 
 //~ 슬롯·플레이어 카드
@@ -89,32 +108,52 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Bomber|Events")
 	void MarkPlayerCardsDirty();
 
+	/** 슬롯이 탈주 상태면 true + 닉네임 반환. 카드가 PS 없는 슬롯을 "탈주"로 렌더. */
+	UFUNCTION(BlueprintPure, Category = "Bomber|Match")
+	bool IsSlotLeft(int32 SlotIndex, FString& OutNickname) const;
+
+	/** 서버 전용: 탈주 발생 시 슬롯 기록 → PS 제거 후에도 카드가 "탈주" 유지(복제). */
+	void MarkSlotLeft(int32 SlotIndex, const FString& Nickname);
+
 	/** UI 카드 재바인딩 필요 시점마다 방송. 컨테이너가 1회 구독 후 전체 재스캔. */
 	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
 	FOnPlayerCardsDirty OnPlayerCardsDirty;
+
+protected:
+	UFUNCTION()
+	void OnRep_LeftPlayerCards();
+
+private:
+	/** 탈주 슬롯 기록(복제). PS와 무관하게 카드가 "탈주"를 매치 끝까지 유지. */
+	UPROPERTY(ReplicatedUsing = OnRep_LeftPlayerCards)
+	TArray<FD1LeftPlayerCard> LeftPlayerCards;
 
 //~ 매치 종료·결과
 public:
 	/** 서버 전용: 결과 스냅샷 설정 + OnMatchFinished 방송(리슨 서버 자기 클라 포함). */
 	void SetFinalResults(const TArray<FD1MatchResultEntry>& InResults);
 
+	/** 서버 전용: 페이즈 전이. */
+	void SetMatchPhase(EBomberMatchPhase NewPhase);
+
+	EBomberMatchPhase GetMatchPhase() const { return MatchPhase; }
+	const TArray<FD1MatchResultEntry>& GetFinalResults() const { return FinalResults; }
+
 	/** 매치 종료+결과 도착 시 1회. PC가 결과 위젯용으로 구독. */
 	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
 	FOnMatchFinished OnMatchFinished;
 
-	UPROPERTY(ReplicatedUsing = OnRep_MatchPhase, BlueprintReadOnly, Category = "Bomber")
+protected:
+	UFUNCTION()
+	void OnRep_FinalResults();
+
+private:
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	EBomberMatchPhase MatchPhase = EBomberMatchPhase::Waiting;
 
 	/** 종료 시 서버가 1회 채움. 단일 배열로 원자 복제. */
-	UPROPERTY(ReplicatedUsing = OnRep_FinalResults, BlueprintReadOnly, Category = "Bomber|Match")
+	UPROPERTY(ReplicatedUsing = OnRep_FinalResults, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
 	TArray<FD1MatchResultEntry> FinalResults;
-
-protected:
-	UFUNCTION()
-	void OnRep_MatchPhase();
-
-	UFUNCTION()
-	void OnRep_FinalResults();
 
 //~ 매치 흐름 컴포넌트
 public:

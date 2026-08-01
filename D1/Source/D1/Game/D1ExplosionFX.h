@@ -36,10 +36,11 @@ protected:
 private:
 	/** 비주얼 수명(초). 게임플레이 피해 지속 AD1Bomb::ExplosionLingerDurationSec과 동일하게 유지. */
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
-	float Lifetime = 0.5f;
+	float LifetimeSec = 0.5f;
 
+	/** 부풀어 오르는 구간 길이(초). */
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
-	float ExpansionTime = 0.2f;
+	float ExpansionTimeSec = 0.2f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
 	float PeakScale = 0.9f;
@@ -48,5 +49,5 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "FX")
 	float InitialScale = 0.05f;
 
-	float Elapsed = 0.f;
+	float ElapsedSec = 0.f;
 };

@@ -18,6 +18,8 @@ void AD1BomberPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 
 	DOREPLIFETIME(AD1BomberPlayerState, Lives);
 	DOREPLIFETIME(AD1BomberPlayerState, bIsAlive);
+	DOREPLIFETIME(AD1BomberPlayerState, bLeft);
+	DOREPLIFETIME(AD1BomberPlayerState, bIsBot);
 	DOREPLIFETIME(AD1BomberPlayerState, Placement);
 	DOREPLIFETIME(AD1BomberPlayerState, PlayerSlotIndex);
 	// 화력·폭탄수는 소유자 HUD 표시용 → 소유 클라에만 복제(대역폭↓). 서버 권위 값은 그대로.
@@ -73,14 +75,45 @@ void AD1BomberPlayerState::OnRep_bIsAlive()
 	OnAliveStateChanged.Broadcast();
 }
 
+void AD1BomberPlayerState::SetLeft()
+{
+	if (!HasAuthority() || bLeft)
+	{
+		return;
+	}
+	bLeft = true;
+	OnRep_bLeft(); // Listen Server 대응
+}
+
+void AD1BomberPlayerState::OnRep_bLeft()
+{
+	OnLeftChanged.Broadcast();
+	NotifyCardsDirty();
+}
+
+void AD1BomberPlayerState::SetIsBot(bool bInIsBot)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	bIsBot = bInIsBot;
+	OnRep_bIsBot(); // Listen Server 대응
+}
+
+void AD1BomberPlayerState::OnRep_bIsBot()
+{
+	NotifyCardsDirty();
+}
+
 void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)
 {
 	if (!HasAuthority())
 	{
 		return;
 	}
-	// -1(미배정 리셋) 또는 0~3만 허용. 범위 밖은 거부 — clamp하면 두 명이 같은 슬롯으로 몰림.
-	if (NewIndex < -1 || NewIndex > 3)
+	// -1(미배정 리셋) 또는 유효 슬롯만 허용. 범위 밖은 거부 — clamp하면 두 명이 같은 슬롯으로 몰림.
+	if (NewIndex < -1 || NewIndex >= D1MaxPlayerSlots)
 	{
 		return;
 	}
@@ -91,15 +124,7 @@ void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)
 void AD1BomberPlayerState::OnRep_PlayerSlotIndex()
 {
 	OnSlotIndexChanged.Broadcast();
-
-	// 컨테이너 위젯이 한 곳에서 카드 전체를 다시 그릴 수 있게 GameState 디스패처도 트리거.
-	if (UWorld* World = GetWorld())
-	{
-		if (AD1BomberGameState* GS = World->GetGameState<AD1BomberGameState>())
-		{
-			GS->MarkPlayerCardsDirty();
-		}
-	}
+	NotifyCardsDirty();
 }
 
 void AD1BomberPlayerState::AddFirePower(int32 Delta)
@@ -151,4 +176,15 @@ void AD1BomberPlayerState::SetBackendUserId(int64 NewUserId)
 		return;
 	}
 	BackendUserId = NewUserId;
+}
+
+void AD1BomberPlayerState::NotifyCardsDirty() const
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (AD1BomberGameState* GS = World->GetGameState<AD1BomberGameState>())
+		{
+			GS->MarkPlayerCardsDirty();
+		}
+	}
 }

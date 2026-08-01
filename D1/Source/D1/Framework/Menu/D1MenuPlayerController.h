@@ -35,6 +35,7 @@ public:
 
 private:
 	void ShowBackground();
+	void ShowQuitButton();
 	void ShowInitialWidgetFromGameMode();
 	void ApplyUiOnlyInputMode();
 	static UWidget* FindFirstFocusableWidget(UUserWidget* Root);
@@ -43,9 +44,16 @@ private:
 	          meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<UUserWidget> BackgroundWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Menu",
+	          meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UUserWidget> QuitButtonWidgetClass;
+
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> CurrentWidget;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> BackgroundWidget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> QuitButtonWidget;
 };

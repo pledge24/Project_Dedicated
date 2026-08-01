@@ -39,12 +39,23 @@ public:
 	/** Rows를 파싱·검증해 OutLayout을 채운다. 실패 시 false + OutError. */
 	bool BuildLayout(FD1MapLayout& OutLayout, FString& OutError) const;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Map")
+	/** 결과 보고용 맵 이름 — MapName이 비어 있으면 애셋 오브젝트명으로 대체(백엔드 non-empty 검증 통과). */
+	FString GetEffectiveMapName() const { return MapName.IsEmpty() ? GetName() : MapName; }
+
+	TSubclassOf<AD1WallBlock> GetWallBlockClass() const { return WallBlockClass; }
+	TSubclassOf<AD1SoftBlock> GetSoftBlockClass() const { return SoftBlockClass; }
+
+private:
+	/** 이 맵의 논리 이름(레벨/쉘 umap 이름과 무관). 매치 결과의 map_name으로 보고. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map", meta = (AllowPrivateAccess = "true"))
+	FString MapName;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map", meta = (AllowPrivateAccess = "true"))
 	TArray<FString> Rows;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Map")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AD1WallBlock> WallBlockClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Map")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<AD1SoftBlock> SoftBlockClass;
 };

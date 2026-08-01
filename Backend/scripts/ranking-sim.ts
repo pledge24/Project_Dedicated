@@ -7,6 +7,7 @@ import { randomBytes } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 
 import buildApp from '../src/app.js';
+import { config } from '../src/common/config.js';
 import { closePool, getPool } from '../src/common/db.js';
 
 const PASSWORD = 'ranktest123';
@@ -133,6 +134,21 @@ async function main(): Promise<void>
             assert.equal(meta.limit, 100, `클램프 실패 limit=${meta.limit}`);
         }],
 
+        ['offset=99999999 → maxOffset 클램프(풀스캔 방지)', async () =>
+        {
+            const r = await get('/api/ranking?offset=99999999', token);
+            assert.equal(r.status, 200, JSON.stringify(r.body));
+            const meta = r.body.data!.meta as { total: number; limit: number; offset: number };
+            assert.equal(meta.offset, config.ranking.maxOffset, `클램프 실패 offset=${meta.offset}`);
+        }],
+
+        ['offset=1e30 → 400 (isInteger를 통과해 SQL로 새어 500이 되던 값)', async () =>
+        {
+            const r = await get('/api/ranking?offset=1e30', token);
+            assert.equal(r.status, 400, JSON.stringify(r.body));
+            assert.equal(r.body.error?.code, 'VALIDATION_FAILED');
+        }],
+
         ['상위 5명 순서 + 동점 tie-break + rank + camelCase 매핑', async () =>
         {
             const r = await get('/api/ranking?limit=5&offset=0', token);
@@ -174,6 +190,46 @@ async function main(): Promise<void>
             assert.ok(meta.total >= 5, `total=${meta.total}`);
             assert.equal(meta.limit, 50, '기본 limit=50 아님');
             assert.equal(meta.offset, 0);
+        }],
+
+        ['me.rank — 본인 전역 순위(총순서 기준 유일 순위)', async () =>
+        {
+            // U0: U1과 동점이나 먼저 도달(가입 순) → 유일 1위.
+            const r0 = await get('/api/ranking?limit=1', token);
+            assert.equal(r0.status, 200, JSON.stringify(r0.body));
+            const me0 = r0.body.data!.me as { rank: number };
+            assert.equal(me0.rank, 1, `U0 me.rank=${me0?.rank} (기대 1)`);
+
+            // U1: U0와 동점이나 U0가 먼저 도달 → 유일 2위(공동 순위였다면 1).
+            const login1 = await post('/api/auth/login', { loginId: users[1].loginId, password: PASSWORD });
+            assert.equal(login1.body.ok, true, `U1 login 실패: ${JSON.stringify(login1.body)}`);
+            const r1 = await get('/api/ranking', login1.body.data!.token as string);
+            const me1 = r1.body.data!.me as { rank: number };
+            assert.equal(me1.rank, 2, `U1 me.rank=${me1?.rank} (기대 2 — 유일 순위)`);
+
+            // U2: 위에 U0·U1 2명 → rank 3.
+            const login2 = await post('/api/auth/login', { loginId: users[2].loginId, password: PASSWORD });
+            assert.equal(login2.body.ok, true, `U2 login 실패: ${JSON.stringify(login2.body)}`);
+            const token2 = login2.body.data!.token as string;
+            const r2 = await get('/api/ranking', token2);
+            const me2 = r2.body.data!.me as { rank: number };
+            assert.equal(me2.rank, 3, `U2 me.rank=${me2?.rank} (기대 3)`);
+        }],
+
+        ['동점 타이브레이크: 갱신 시점이 user_id를 이김', async () =>
+        {
+            // U0·U1 동점(top). 가입 순이면 U0가 상위지만, U1의 score_updated_at을 U0보다
+            // 이르게 바꾸면 시점 우선 규칙으로 U1(높은 user_id)이 상위가 되어야 한다.
+            await getPool().execute(
+                "UPDATE player_profiles SET score_updated_at = '2000-01-01 00:00:00.000' WHERE user_id = ?",
+                [users[1].userId]
+            );
+            const r = await get('/api/ranking?limit=2&offset=0', token);
+            assert.equal(r.status, 200, JSON.stringify(r.body));
+            const entries = r.body.data!.entries as RankEntry[];
+            assert.equal(entries[0].userId, users[1].userId, '시점 이른 U1이 최상위 아님(타이브레이크 실패)');
+            assert.equal(entries[1].userId, users[0].userId, 'U0가 2위 아님');
+            assert.ok(entries[0].userId > entries[1].userId, 'user_id 역전 미확인(높은 user_id가 앞이어야)');
         }],
     ];
 

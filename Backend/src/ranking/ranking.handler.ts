@@ -19,7 +19,7 @@ interface Pagination
 export async function getRanking(req: Request, res: Response): Promise<void>
 {
     const { limit, offset } = parsePagination(req.query);
-    const data = await service.getRanking(limit, offset);
+    const data = await service.getRanking(req.user!.userId, limit, offset);
     res.json(ok(data));
 }
 
@@ -39,7 +39,9 @@ function parseLimit(raw: unknown): number
         return config.ranking.defaultLimit;
     }
     const n = Number(raw);
-    if (!Number.isInteger(n) || n < 1)
+    // isSafeInteger — isInteger는 1e30 같은 값도 통과시키는데, 그게 그대로 SQL에 보간되면
+    // "OFFSET 1e+30" 문법 에러나 BIGINT 범위 초과로 500이 된다(repository가 값을 직접 보간).
+    if (!Number.isSafeInteger(n) || n < 1)
     {
         throw new AppError(Codes.VALIDATION_FAILED, 'limit은 1 이상의 정수여야 합니다.');
     }
@@ -47,7 +49,7 @@ function parseLimit(raw: unknown): number
     return Math.min(n, config.ranking.maxLimit);
 }
 
-/** 미지정 시 0, 지정 시 0 이상 정수만 허용. */
+/** 미지정 시 0, 지정 시 0 이상 정수만 허용하고 maxOffset으로 클램프. */
 function parseOffset(raw: unknown): number
 {
     if (raw === undefined)
@@ -55,10 +57,10 @@ function parseOffset(raw: unknown): number
         return 0;
     }
     const n = Number(raw);
-    if (!Number.isInteger(n) || n < 0)
+    if (!Number.isSafeInteger(n) || n < 0)
     {
         throw new AppError(Codes.VALIDATION_FAILED, 'offset은 0 이상의 정수여야 합니다.');
     }
 
-    return n;
+    return Math.min(n, config.ranking.maxOffset);
 }

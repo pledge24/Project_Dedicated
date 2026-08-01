@@ -55,8 +55,17 @@ score DESC 순위 페이지. `limit` 기본 50·최대 100(초과 시 클램프)
 { "ok": true, "data": { "entries": [ { "rank": 1, "userId": 1, "nickname": "…", "score": 1200, "level": 3, "wins": 5, "losses": 2, "matchesPlayed": 7 } ], "meta": { "total": 42, "limit": 50, "offset": 0 } } }
 ```
 
+### `GET /api/match/current`  · `Authorization: Bearer <token>`
+진행 중인 내 매치의 재입장 주소. `match:found` 푸시는 1회성이라 그 순간 끊기면 복구 수단이 없다 — 클라가 로비 진입 시 1회 호출한다.
+결과가 이미 저장됐거나 본인이 탈주로 정산된 매치는 대상에서 제외한다(끝난 경기·DS가 입장을 거절할 대상으로 되돌려 보내지 않는다).
+```json
+{ "ok": true, "data": { "active": true, "matchId": "…", "server": { "host": "127.0.0.1", "port": 7777 }, "joinToken": "…" } }
+{ "ok": true, "data": { "active": false } }
+```
+
 ### `POST /api/match/result`  · `Authorization: Bearer <serverToken>` (DS 전용)
 매치 결과 보고. **클라이언트 직접 호출 금지** — Dedicated Server가 매치별로 발급된 serverToken으로만 호출. ELO 점수 갱신 + 멱등 처리(`matchId` UNIQUE → 재제출 시 409).
+결과가 끝내 오지 않은 매치는 만료 시 `end_reason='abort'`로 기록만 남는다(등수·점수 변동 없음).
 
 ### `WS /ws/match`  · `Authorization: Bearer <JWT>`
 매칭 큐 WebSocket(같은 host:port에서 업그레이드). 클라 메시지 `queue:join` / `queue:cancel`, 서버 푸시 `queue:joined` / `queue:left` / `match:found` / `error`.

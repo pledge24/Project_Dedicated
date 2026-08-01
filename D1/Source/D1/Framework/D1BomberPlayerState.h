@@ -11,6 +11,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnAliveStateChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerNameChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSlotIndexChanged);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSpeedLevelChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLeftChanged);
 
 /** 플레이어 복제 상태 — 생명·슬롯·파워업·등수·백엔드 신원. */
 UCLASS()
@@ -54,6 +55,43 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_bIsAlive, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	bool bIsAlive = true;
+
+//~ 탈주 (게임중 다른 기기 로그인 kick — 사망과 별개)
+public:
+	/** 탈주 여부. 카드 BP가 "탈주" 배지 토글에 사용(BlueprintPure). */
+	UFUNCTION(BlueprintPure, Category = "Bomber")
+	bool HasLeft() const { return bLeft; }
+
+	/** 서버 전용. 탈주 확정 → 복제되어 캐릭터 사라짐·카드 "탈주" 표시를 트리거. */
+	void SetLeft();
+
+	UPROPERTY(BlueprintAssignable, Category = "Bomber|Events")
+	FOnLeftChanged OnLeftChanged;
+
+protected:
+	UFUNCTION()
+	void OnRep_bLeft();
+
+private:
+	UPROPERTY(ReplicatedUsing = OnRep_bLeft, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
+	bool bLeft = false;
+
+//~ 봇 (봇전 서버측 스폰 봇 — 카드 BOT 배지)
+public:
+	/** 봇 여부. 카드 BP가 "BOT" 배지 토글에 사용(BlueprintPure). */
+	UFUNCTION(BlueprintPure, Category = "Bomber")
+	bool IsBot() const { return bIsBot; }
+
+	/** 서버 전용. 봇전 봇 좌석 표시(스폰 시 1회). 복제되어 카드 배지를 트리거. */
+	void SetIsBot(bool bInIsBot);
+
+protected:
+	UFUNCTION()
+	void OnRep_bIsBot();
+
+private:
+	UPROPERTY(ReplicatedUsing = OnRep_bIsBot, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
+	bool bIsBot = false;
 
 //~ 슬롯 배정
 public:
@@ -128,4 +166,9 @@ private:
 	/** DS가 ?join= 토큰을 권위 roster로 해석해 설정. 결과 POST에 사용, 복제 안 함. */
 	UPROPERTY(BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	int64 BackendUserId = 0;
+
+//~ 공용 헬퍼
+private:
+	/** GameState 카드 디스패처 트리거 — 컨테이너 위젯이 카드 전체를 재스캔(탈주·봇·슬롯 공용). */
+	void NotifyCardsDirty() const;
 };

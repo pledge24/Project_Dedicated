@@ -7,6 +7,7 @@
 #include "Components/Widget.h"
 #include "Core/D1LogChannels.h"
 #include "Framework/Menu/D1MenuGameMode.h"
+#include "UI/D1UILayers.h"
 #include "Widgets/SWidget.h"
 
 AD1MenuPlayerController::AD1MenuPlayerController()
@@ -25,6 +26,7 @@ void AD1MenuPlayerController::BeginPlay()
 	}
 
 	ShowBackground();
+	ShowQuitButton();
 	// 입력 모드는 SwitchToWidget 끝에서 적용됨 (여기서 중복 호출 안 함)
 	ShowInitialWidgetFromGameMode();
 }
@@ -46,7 +48,7 @@ void AD1MenuPlayerController::SwitchToWidget(TSubclassOf<UUserWidget> NewWidgetC
 	CurrentWidget = CreateWidget<UUserWidget>(this, NewWidgetClass);
 	if (CurrentWidget)
 	{
-		CurrentWidget->AddToViewport();
+		CurrentWidget->AddToViewport(D1UILayer::Content);
 	}
 
 	ApplyUiOnlyInputMode();
@@ -62,8 +64,21 @@ void AD1MenuPlayerController::ShowBackground()
 	BackgroundWidget = CreateWidget<UUserWidget>(this, BackgroundWidgetClass);
 	if (BackgroundWidget)
 	{
-		// ZOrder = -1: 어떤 콘텐츠 위젯보다도 항상 뒤에 그려짐
-		BackgroundWidget->AddToViewport(-1);
+		BackgroundWidget->AddToViewport(D1UILayer::Background);
+	}
+}
+
+void AD1MenuPlayerController::ShowQuitButton()
+{
+	if (!QuitButtonWidgetClass || QuitButtonWidget)
+	{
+		return;
+	}
+
+	QuitButtonWidget = CreateWidget<UUserWidget>(this, QuitButtonWidgetClass);
+	if (QuitButtonWidget)
+	{
+		QuitButtonWidget->AddToViewport(D1UILayer::QuitButton);
 	}
 }
 

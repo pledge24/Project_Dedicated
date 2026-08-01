@@ -1,7 +1,7 @@
 // 랭킹 도메인의 DB 쿼리만 담당 (repository 레이어)
 import type { RowDataPacket } from 'mysql2';
 
-import { getPool } from '../common/db.js';
+import { getPool, queryOne } from '../common/db.js';
 
 /** DB player_profiles JOIN users 행 (랭킹 페이지 쿼리). */
 export interface RankingRow extends RowDataPacket
@@ -22,7 +22,8 @@ interface CountRow extends RowDataPacket
 }
 
 /**
- * score DESC, user_id ASC 정렬로 한 페이지 조회. idx_pp_score_desc 활용.
+ * score DESC → score_updated_at ASC(먼저 도달한 순) → user_id ASC 정렬로 한 페이지 조회.
+ * idx_pp_score_desc(score DESC, score_updated_at ASC) + InnoDB가 붙이는 PK(user_id)로 filesort 회피.
  * limit/offset은 핸들러에서 정수 검증·클램프된 값이라 SQL에 직접 보간한다.
  * (mysql2 prepared-stmt의 LIMIT ? 바인딩은 버전 편차가 있어 query()로 우회 —
  *  result.repository.ts의 동적 IN(...) 선례와 동일 전략. 주입 위험 0.)
@@ -33,7 +34,7 @@ export async function findRankingPage(limit: number, offset: number): Promise<Ra
         'SELECT pp.user_id, u.nickname, pp.score, pp.level, pp.wins, pp.losses, pp.matches_played ' +
         'FROM player_profiles AS pp ' +
         'JOIN users AS u ON u.id = pp.user_id ' +
-        `ORDER BY pp.score DESC, pp.user_id ASC LIMIT ${limit} OFFSET ${offset}`
+        `ORDER BY pp.score DESC, pp.score_updated_at ASC, pp.user_id ASC LIMIT ${limit} OFFSET ${offset}`
     );
 
     return rows;
@@ -47,4 +48,23 @@ export async function countProfiles(): Promise<number>
     );
 
     return Number(rows[0].total);
+}
+
+/**
+ * 순위 = 자기보다 앞선(총순서상 상위) 프로필 수 + 1 (유일 순위 — 리스트 위치와 일치).
+ * 총순서: score DESC → score_updated_at ASC → user_id ASC. 동점자는 갱신 시점, 그다음 user_id로 갈린다.
+ * 모든 가입 유저는 등록 트랜잭션에서 player_profiles 행을 갖고 score_updated_at은 NOT NULL이라 비교가 안전하다.
+ */
+export async function findRankByUserId(userId: number): Promise<number>
+{
+    const row = await queryOne<CountRow>(
+        'SELECT COUNT(*) + 1 AS total FROM player_profiles AS pp ' +
+        'JOIN player_profiles AS me ON me.user_id = ? ' +
+        'WHERE pp.score > me.score ' +
+        'OR (pp.score = me.score AND pp.score_updated_at < me.score_updated_at) ' +
+        'OR (pp.score = me.score AND pp.score_updated_at = me.score_updated_at AND pp.user_id < me.user_id)',
+        [userId]
+    );
+
+    return row ? Number(row.total) : 1;
 }

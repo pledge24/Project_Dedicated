@@ -34,7 +34,7 @@ protected:
 	void OnRegisterClicked();
 
 	UFUNCTION()
-	void OnRegisterCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User);
+	void HandleRegisterCompleted(const FBackendResponse& Response, const FAuthUserDTO& User);
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UEditableTextBox> NicknameTextBox;

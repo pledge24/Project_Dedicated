@@ -59,12 +59,8 @@ private:
 	/** 1초마다 카운트다운 감소·라벨 갱신, 0이면 복귀. */
 	void OnCountdownTick();
 
-	/** DS 연결을 끊고 MP_Lobby로 Travel. 중복 호출 가드. */
+	/** SessionSubsystem 경유로 DS 연결을 끊고 로비로 Travel. 중복 호출 가드. */
 	void ReturnToLobby();
-
-	/** 복귀할 로비 맵 — 디테일 패널에서 MP_Lobby 지정. */
-	UPROPERTY(EditDefaultsOnly, Category = "MatchResult", meta = (AllowPrivateAccess = "true"))
-	TSoftObjectPtr<UWorld> LobbyMap;
 
 	/** 결과 표시 후 자동 복귀까지의 시간(초). */
 	UPROPERTY(EditDefaultsOnly, Category = "MatchResult", meta = (AllowPrivateAccess = "true"))
