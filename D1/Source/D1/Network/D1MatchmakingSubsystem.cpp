@@ -18,40 +18,6 @@ void UD1MatchmakingSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-void UD1MatchmakingSubsystem::CheckRejoinableMatch()
-{
-	// 매칭 중이면 확인하지 않는다 — 큐/확정 흐름이 진행 중인데 travel을 끼워 넣으면 상태가 어긋난다.
-	if (MatchmakingState != EMatchmakingState::Idle)
-	{
-		return;
-	}
-
-	if (D1BackendHttp::GetSessionJwt(GetGameInstance()).IsEmpty())
-	{
-		return;
-	}
-
-	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(
-		GetGameInstance(), TEXT("/api/match/current"), D1BackendHttp::EBackendAuth::SessionJwt);
-	D1BackendHttp::SendAsync(this, Request,
-		[this](const FHttpResponsePtr& Res, bool bSucceeded)
-		{
-			// 로비 진입 직후는 첫 heartbeat 전이라 이 요청이 세션 대체를 감지할 유일한 창이다.
-			if (D1BackendHttp::HandleSupersededIfAny(GetGameInstance(), Res))
-			{
-				return;
-			}
-
-			// 실패는 조용히 무시한다 — 재입장은 있으면 좋은 복구 경로지 로비 진입을 막을 이유가 아니다.
-			if (!bSucceeded || !Res.IsValid() || Res->GetResponseCode() != 200)
-			{
-				return;
-			}
-
-			HandleRejoinResponse(Res->GetContentAsString());
-		});
-}
-
 void UD1MatchmakingSubsystem::StartMatchmaking()
 {
 	// 직전 매치에서 Matched로 남은 잔류 상태 — Subsystem이 travel을 가로질러 살아남아
@@ -287,6 +253,40 @@ void UD1MatchmakingSubsystem::HandleSocketClosed(int32 StatusCode, const FString
 	Err.ErrorCode = EBackendErrorCode::NetworkError;
 	Err.ErrorMessage = TEXT("매칭 서버 연결이 끊겼습니다.");
 	OnMatchmakingError.Broadcast(Err);
+}
+
+void UD1MatchmakingSubsystem::CheckRejoinableMatch()
+{
+	// 매칭 중이면 확인하지 않는다 — 큐/확정 흐름이 진행 중인데 travel을 끼워 넣으면 상태가 어긋난다.
+	if (MatchmakingState != EMatchmakingState::Idle)
+	{
+		return;
+	}
+
+	if (D1BackendHttp::GetSessionJwt(GetGameInstance()).IsEmpty())
+	{
+		return;
+	}
+
+	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(
+		GetGameInstance(), TEXT("/api/match/current"), D1BackendHttp::EBackendAuth::SessionJwt);
+	D1BackendHttp::SendAsync(this, Request,
+		[this](const FHttpResponsePtr& Res, bool bSucceeded)
+		{
+			// 로비 진입 직후는 첫 heartbeat 전이라 이 요청이 세션 대체를 감지할 유일한 창이다.
+			if (D1BackendHttp::HandleSupersededIfAny(GetGameInstance(), Res))
+			{
+				return;
+			}
+
+			// 실패는 조용히 무시한다 — 재입장은 있으면 좋은 복구 경로지 로비 진입을 막을 이유가 아니다.
+			if (!bSucceeded || !Res.IsValid() || Res->GetResponseCode() != 200)
+			{
+				return;
+			}
+
+			HandleRejoinResponse(Res->GetContentAsString());
+		});
 }
 
 void UD1MatchmakingSubsystem::HandleRejoinResponse(const FString& Body)

@@ -28,38 +28,6 @@ void UD1AuthSubsystem::Login(const FString& LoginId, const FString& Password, co
 	SendAuthRequest(TEXT("/api/auth/login"), Body, OnCompleted);
 }
 
-void UD1AuthSubsystem::RefreshMyProfile()
-{
-	if (D1BackendHttp::GetSessionJwt(GetGameInstance()).IsEmpty())
-	{
-		return;
-	}
-
-	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(
-		GetGameInstance(), TEXT("/api/auth/me"), D1BackendHttp::EBackendAuth::SessionJwt);
-	D1BackendHttp::SendAsync(this, Request,
-		[this](const FHttpResponsePtr& Res, bool bSucceeded)
-		{
-			HandleProfileResponse(Res, bSucceeded);
-		});
-}
-
-void UD1AuthSubsystem::SendHeartbeat()
-{
-	if (D1BackendHttp::GetSessionJwt(GetGameInstance()).IsEmpty())
-	{
-		return;
-	}
-
-	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(
-		GetGameInstance(), TEXT("/api/auth/heartbeat"), D1BackendHttp::EBackendAuth::SessionJwt);
-	D1BackendHttp::SendAsync(this, Request,
-		[this](const FHttpResponsePtr& Res, bool bSucceeded)
-		{
-			HandleHeartbeatResponse(Res, bSucceeded);
-		});
-}
-
 void UD1AuthSubsystem::SendAuthRequest(const FString& Path, const TSharedRef<FJsonObject>& Body, const FOnAuthCompleted& OnCompleted)
 {
 	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildPostJson(
@@ -105,6 +73,22 @@ void UD1AuthSubsystem::HandleAuthResponse(const FHttpResponsePtr& Res, bool bSuc
 	Forward.ExecuteIfBound(Out, User);
 }
 
+void UD1AuthSubsystem::RefreshMyProfile()
+{
+	if (D1BackendHttp::GetSessionJwt(GetGameInstance()).IsEmpty())
+	{
+		return;
+	}
+
+	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(
+		GetGameInstance(), TEXT("/api/auth/me"), D1BackendHttp::EBackendAuth::SessionJwt);
+	D1BackendHttp::SendAsync(this, Request,
+		[this](const FHttpResponsePtr& Res, bool bSucceeded)
+		{
+			HandleProfileResponse(Res, bSucceeded);
+		});
+}
+
 void UD1AuthSubsystem::HandleProfileResponse(const FHttpResponsePtr& Res, bool bSucceeded)
 {
 	FBackendResponse Out;
@@ -126,6 +110,22 @@ void UD1AuthSubsystem::HandleProfileResponse(const FHttpResponsePtr& Res, bool b
 
 	OnProfileUpdated.Broadcast();
 	UE_LOG(LogD1, Log, TEXT("[Profile] 갱신 완료 score=%d level=%d"), User.Score, User.Level);
+}
+
+void UD1AuthSubsystem::SendHeartbeat()
+{
+	if (D1BackendHttp::GetSessionJwt(GetGameInstance()).IsEmpty())
+	{
+		return;
+	}
+
+	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(
+		GetGameInstance(), TEXT("/api/auth/heartbeat"), D1BackendHttp::EBackendAuth::SessionJwt);
+	D1BackendHttp::SendAsync(this, Request,
+		[this](const FHttpResponsePtr& Res, bool bSucceeded)
+		{
+			HandleHeartbeatResponse(Res, bSucceeded);
+		});
 }
 
 void UD1AuthSubsystem::HandleHeartbeatResponse(const FHttpResponsePtr& Res, bool bSucceeded)
