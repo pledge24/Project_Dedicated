@@ -29,7 +29,7 @@ void AD1ExplosionHazard::Initialize(const TArray<FIntPoint>& InCells, float InDu
 
 	// 일정 간격마다(t=0 포함) 데미지 적용 로직 실행
 	ApplyExplosionDamage();
-	GetWorldTimerManager().SetTimer(HazardSweepTimerHandle, this, &AD1ExplosionHazard::TickHazard, HazardSweepInterval, true);
+	GetWorldTimerManager().SetTimer(HazardSweepTimerHandle, this, &AD1ExplosionHazard::TickHazard, HazardSweepIntervalSec, true);
 }
 
 void AD1ExplosionHazard::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -40,7 +40,7 @@ void AD1ExplosionHazard::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AD1ExplosionHazard::TickHazard()
 {
-	ElapsedSec += HazardSweepInterval;
+	ElapsedSec += HazardSweepIntervalSec;
 	ApplyExplosionDamage();
 
 	if (ElapsedSec >= HazardDurationSec)
@@ -55,11 +55,10 @@ void AD1ExplosionHazard::ApplyExplosionDamage()
 	{
 		const FVector Center = UD1BomberGridLibrary::CellToWorldCenter(Cell, UD1BomberGridLibrary::CellHalf);
 		TArray<AD1BomberCharacter*> Chars;
-		AD1BomberCharacter::OverlapBomberCharacters(this, Center, ExplosionHitExtent, Chars);
+		UD1BomberGridLibrary::OverlapBomberCharacters(this, Center, ExplosionHitExtent, Chars);
 
 		for (AD1BomberCharacter* BC : Chars)
 		{
-			// 데미지 이벤트 전달.
 			BC->ReceiveExplosionHit();
 		}
 	}

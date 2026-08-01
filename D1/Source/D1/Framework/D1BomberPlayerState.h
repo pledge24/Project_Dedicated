@@ -166,4 +166,9 @@ private:
 	/** DS가 ?join= 토큰을 권위 roster로 해석해 설정. 결과 POST에 사용, 복제 안 함. */
 	UPROPERTY(BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	int64 BackendUserId = 0;
+
+//~ 공용 헬퍼
+private:
+	/** GameState 카드 디스패처 트리거 — 컨테이너 위젯이 카드 전체를 재스캔(탈주·봇·슬롯 공용). */
+	void NotifyCardsDirty() const;
 };

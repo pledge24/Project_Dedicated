@@ -32,11 +32,8 @@ protected:
 
 //~ 입력 매핑
 protected:
-	UPROPERTY(EditAnywhere, Category ="Input|Input Mappings")
-	TArray<UInputMappingContext*> DefaultMappingContexts;
-
-	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")
-	TArray<UInputMappingContext*> MobileExcludedMappingContexts;
+	UPROPERTY(EditAnywhere, Category = "Input|Input Mappings")
+	TArray<TObjectPtr<UInputMappingContext>> DefaultMappingContexts;
 
 //~ 인게임 HUD
 protected:

@@ -196,7 +196,10 @@ const scenarios: Array<[string, () => void]> = [
     ['봇전 수집 — 실 매칭 우선(runCycle 먼저): 매치된 인원은 봇전 대상서 제외', () =>
     {
         const q = makeQueue();
-        for (let i = 1; i <= 4; i++) { add(q, i, 1000, 0); }
+        for (let i = 1; i <= 4; i++)
+        {
+            add(q, i, 1000, 0);
+        }
         add(q, 5, 4000, 0); // 고립 아웃라이어(윈도우 밖) — 못 묶임
         assert.equal(q.runCycle(60_000).length, 1); // 1~4 매치되어 큐에서 제거
         const timedOut = q.collectBotFillTimeouts(60_000, 30_000);

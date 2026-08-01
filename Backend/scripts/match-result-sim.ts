@@ -1,5 +1,7 @@
 // 매치 결과 엔드포인트 통합 하네스(인프로세스). 앱을 같은 프로세스에 띄워 roster를 직접 시드한다
-// (roster는 인메모리라 별도 프로세스에선 못 건드림). 언리얼 DS 없이 F5a를 끝까지 검증.
+// (roster 캐시는 인메모리라 별도 프로세스에선 못 건드림). 언리얼 DS 없이 F5a를 끝까지 검증.
+// 시드한 match_rosters 행은 다른 시드 데이터(users·matches)와 마찬가지로 남긴다 — roster.sweep이
+// DS 최대 수명 경과분을 자동 청소하므로 별도 정리가 필요 없다.
 // 실행: npm run match:result-sim   (MySQL 가동 + Backend/.env 필요. 임의 빈 포트로 listen.)
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import assert from 'node:assert/strict';
@@ -9,7 +11,7 @@ import type { AddressInfo } from 'node:net';
 import buildApp from '../src/app.js';
 import { config } from '../src/common/config.js';
 import { closePool, getPool } from '../src/common/db.js';
-import * as roster from '../src/match/roster.js';
+import * as roster from '../src/match/roster.service.js';
 
 const PASSWORD = 'resulttest123';
 const MAP = 'default map'; // DS가 보고하는 논리 맵 이름(레벨 경로 아님)과 동일 형태
@@ -55,7 +57,7 @@ async function main(): Promise<void>
     // 2. roster 시드(같은 프로세스라 서버가 보는 그 Map) + 결과 본문
     const matchId = `sim-${suffix}-${randomBytes(4).toString('hex')}`;
     const serverToken = randomBytes(24).toString('base64url');
-    roster.register({
+    await roster.register({
         matchId,
         serverToken,
         mapName: MAP,
@@ -159,7 +161,7 @@ async function main(): Promise<void>
             const us = await seedUsers('lv', s, 4); // 모두 1000점
             const mid = `lv-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            roster.register({
+            await roster.register({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `lj${i}` })),
             });
@@ -203,7 +205,7 @@ async function main(): Promise<void>
             const us = await seedUsers('esc', s, 4); // 모두 1000점
             const mid = `esc-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            roster.register({
+            await roster.register({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `ej${i}` })),
             });
@@ -229,13 +231,54 @@ async function main(): Promise<void>
             assert.equal(flags.get(us[3].userId), 1, '탈주자2 abandoned=1 아님');
         }],
 
+        ['미입장자 — 4인 매치에 3명만 보고돼도 결과 저장(나머지는 최하위 미참가)', async () =>
+        {
+            const s = randomBytes(3).toString('hex');
+            const us = await seedUsers('ns', s, 4); // 모두 1000점
+            const mid = `ns-${s}-${randomBytes(4).toString('hex')}`;
+            const stk = randomBytes(24).toString('base64url');
+            await roster.register({
+                matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
+                players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `nj${i}` })),
+            });
+
+            // us[3]은 travel 실패로 한 번도 입장하지 않아 DS 결과에 아예 없다.
+            // 이전엔 인원 등호(!== 4)에 걸려 400 → 정상 플레이한 3명의 점수까지 통째로 유실됐다.
+            const body = {
+                matchId: mid, mapName: MAP, durationSec: 60, endReason: 'winner',
+                results: us.slice(0, 3).map((u, i) => ({ userId: u.userId, slotIndex: i, placement: i + 1, livesLeft: i === 0 ? 2 : 0 })),
+            };
+            const r = await post('/api/match/result', body, stk);
+            assert.equal(r.status, 200, JSON.stringify(r.body));
+
+            // roster 전원(4명)이 저장 — 미입장자는 최하위·abandoned=1. 200 자체가 slotIndex 중복 없음의 증거(DB UNIQUE).
+            assert.equal(await countParticipants(mid), 4, 'match_participants가 roster 인원(4)과 다름');
+            const flags = await selectAbandoned(us.map((u) => u.userId));
+            assert.equal(flags.get(us[3].userId), 1, '미입장자 abandoned=1 아님');
+            assert.equal(flags.get(us[0].userId), 0, '완주자 abandoned=0 아님');
+
+            // 보고된 3명의 점수가 실제로 갱신됐는가(= 유실되지 않았는가)가 이 케이스의 핵심.
+            const ps = r.body.data!.participants as Array<{ userId: number; placement: number; scoreDelta: number }>;
+            assert.equal(ps.length, 4, '응답 참가자 수가 4가 아님');
+            assert.ok(ps.find((p) => p.userId === us[0].userId)!.scoreDelta > 0, '완주 1위 delta 양수 아님');
+            assert.equal(ps.find((p) => p.userId === us[3].userId)!.placement, 4, '미입장자 placement가 최하위(4) 아님');
+            const scores = await selectScore(us.map((u) => u.userId));
+            assert.notEqual(scores.get(us[0].userId), 1000, '완주 1위 점수가 갱신되지 않음(결과 유실)');
+            assert.equal(scores.get(us[3].userId), 1000 + (-35 - config.match.leaverPenalty), '미입장자가 최하위로 정산되지 않음');
+
+            // 재제출 멱등은 그대로.
+            const dup = await post('/api/match/result', body, stk);
+            assert.equal(dup.status, 409, JSON.stringify(dup.body));
+            assert.equal(dup.body.error?.code, 'RESULT_ALREADY_SUBMITTED');
+        }],
+
         ['탈주 경합 — /leaver 다수와 /result 동시 발사해도 각 탈주자 정확히 1회 정산', async () =>
         {
             const s = randomBytes(3).toString('hex');
             const us = await seedUsers('rc', s, 4); // 모두 1000점
             const mid = `rc-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            roster.register({
+            await roster.register({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `rj${i}` })),
             });
@@ -281,7 +324,7 @@ async function main(): Promise<void>
 
             const mid = `zsim-${s2}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            roster.register({
+            await roster.register({
                 matchId: mid,
                 serverToken: stk,
                 mapName: MAP,
@@ -313,7 +356,7 @@ async function main(): Promise<void>
             const hu = (await seedUsers('bf', s, 1))[0]; // 1000점
             const mid = `bf-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            roster.register({
+            await roster.register({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: [
                     { userId: hu.userId, nickname: hu.nickname, joinToken: 'bfjoin' },
@@ -349,7 +392,7 @@ async function main(): Promise<void>
             const hu = (await seedUsers('bw', s, 1))[0];
             const mid = `bw-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            roster.register({
+            await roster.register({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: [
                     { userId: hu.userId, nickname: hu.nickname, joinToken: 'bwjoin' },
@@ -370,6 +413,48 @@ async function main(): Promise<void>
             const r = await post('/api/match/result', body, stk);
             assert.equal(r.status, 200, JSON.stringify(r.body));
             assert.equal(await selectWinner(mid), null, '봇 단독승인데 winner_user_id가 NULL 아님');
+        }],
+
+        ['결과 미보고 만료 매치 → abort 기록(참가자·점수 변동 없음)', async () =>
+        {
+            const s = randomBytes(3).toString('hex');
+            const u = (await seedUsers('ab', s, 1))[0];
+            const mid = `ab-${s}-${randomBytes(4).toString('hex')}`;
+            await roster.register({
+                matchId: mid, serverToken: randomBytes(24).toString('base64url'), mapName: MAP,
+                startedAt: Date.now(),
+                players: [{ userId: u.userId, nickname: u.nickname, joinToken: 'abjoin' }],
+            });
+
+            const scoreBefore = (await selectScore([u.userId])).get(u.userId)!;
+            // 등록 시각을 과거로 두면 register 자신의 sweep과 경합한다 — 대신 "시간이 흘렀다"를 인자로 준다.
+            await roster.settleExpired(Date.now() + config.match.ds.maxLifetimeMs + 1000);
+
+            assert.equal(await selectEndReason(mid), 'abort', '결과가 안 온 매치가 기록되지 않음');
+            assert.equal(await countParticipants(mid), 0, '아무도 모르는 등수를 지어내면 안 된다');
+            assert.equal((await selectScore([u.userId])).get(u.userId), scoreBefore, '서버 사고로 점수가 변하면 안 된다');
+            assert.equal(roster.get(mid), undefined, '만료 roster가 남아 있으면 늦은 결과가 인증을 통과한다');
+        }],
+
+        ['결과가 이미 저장된 매치는 abort로 덮이지 않는다', async () =>
+        {
+            const s = randomBytes(3).toString('hex');
+            const u = (await seedUsers('nd', s, 1))[0];
+            const mid = `nd-${s}-${randomBytes(4).toString('hex')}`;
+            const stk = randomBytes(24).toString('base64url');
+            await roster.register({
+                matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
+                players: [{ userId: u.userId, nickname: u.nickname, joinToken: 'ndjoin' }],
+            });
+
+            const r = await post('/api/match/result', {
+                matchId: mid, mapName: MAP, durationSec: 77, endReason: 'winner',
+                results: [{ userId: u.userId, slotIndex: 0, placement: 1, livesLeft: 3 }],
+            }, stk);
+            assert.equal(r.status, 200, JSON.stringify(r.body));
+
+            await roster.settleExpired(Date.now() + config.match.ds.maxLifetimeMs + 1000);
+            assert.equal(await selectEndReason(mid), 'winner', '정상 종료 기록이 abort로 덮였다');
         }],
     ];
 
@@ -476,6 +561,17 @@ async function selectWinner(matchId: string): Promise<number | null>
     );
 
     return rows.length > 0 && rows[0].winner_user_id !== null ? Number(rows[0].winner_user_id) : null;
+}
+
+/** 해당 매치의 end_reason(행이 없으면 null) — abort 기록 검증용. */
+async function selectEndReason(matchId: string): Promise<string | null>
+{
+    const [rows] = await getPool().query<RowDataPacket[]>(
+        'SELECT end_reason FROM matches WHERE client_match_id = ?',
+        [matchId]
+    );
+
+    return rows.length > 0 ? String(rows[0].end_reason) : null;
 }
 
 /** 여러 유저의 match_participants.abandoned(=left) 플래그 조회(각 유저가 매치 1개뿐인 시나리오 전제). */

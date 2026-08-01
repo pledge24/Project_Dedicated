@@ -4,11 +4,14 @@ import { WebSocket } from 'ws';
 
 import { config } from '../common/config.js';
 import { AppError, Codes } from '../common/errors.js';
+import * as dsApiState from './dsApi.state.js';
 import { selectRequeue } from './formation.js';
 import * as repo from './matchmaking.repository.js';
 import type { MatchFoundData } from './protocol.js';
 import { MatchQueue } from './queue.js';
 import type { MatchGroup, QueueEntry } from './queue.js';
+import * as resultRepo from './result.repository.js';
+import * as roster from './roster.service.js';
 
 // ref = 그 유저의 WS 소켓. 매칭 성사 시 여기로 푸시한다.
 const queue = new MatchQueue<WebSocket>({
@@ -101,6 +104,16 @@ export function abortFormation(entries: QueueEntry<WebSocket>[]): number
     return survivors.length;
 }
 
+/** 세션 대체로 끊긴 유저가 게임중이면 kick 대기열에 표시 — DS가 폴링으로 회수한다. */
+export function kickUserFromLiveMatch(userId: number): void
+{
+    const matchId = roster.findMatchByUser(userId);
+    if (matchId)
+    {
+        dsApiState.markKick(matchId, userId);
+    }
+}
+
 /** runMatching 결과 — 실 매치 그룹 + 봇전 대상(장기 대기자 1명씩). */
 export interface MatchingResult
 {
@@ -124,18 +137,40 @@ export function queueSize(): number
     return queue.size;
 }
 
-/** 매치 그룹 + 할당된 서버 주소 → match:found payload + 푸시 대상 소켓. */
-export function buildMatchFound(
-    group: MatchGroup<WebSocket>,
-    matchId: string,
-    server: { host: string; port: number }
-): { data: MatchFoundData; targets: WebSocket[] }
+/**
+ * 재입장 대상 매치 조회 — 클라가 match:found를 놓친(끊김·크래시·재실행) 경우의 유일한 복구 경로.
+ *
+ * "진행 중"은 roster 존재만으로 판정할 수 없다. roster는 결과 재제출 멱등을 위해 종료 후에도
+ * sweep(DS 최대 수명)까지 남기 때문이다. 그래서 세 가지를 모두 통과해야 주소를 준다:
+ *   1) roster에 이 유저가 있는 최신 매치가 있다      — findMatchByUser
+ *   2) 그 매치의 결과가 아직 저장되지 않았다          — 저장됐으면 경기가 끝난 것
+ *   3) 이 유저가 아직 탈주로 정산되지 않았다          — DS가 KickedUserIds로 재입장을 거절할 대상
+ * server 주소가 없는 roster는 재입장 주소를 만들 수 없으므로 대상에서 제외한다.
+ */
+export async function findRejoinableMatch(userId: number): Promise<MatchFoundData | null>
 {
-    const data: MatchFoundData = {
-        matchId,
-        server: { host: server.host, port: server.port },
-        joinToken: '', // per-recipient — ws.handleMatch가 수신자별로 채움
-    };
+    const matchId = roster.findMatchByUser(userId);
+    if (!matchId)
+    {
+        return null;
+    }
 
-    return { data, targets: group.entries.map((e) => e.ref) };
+    const found = roster.get(matchId);
+    if (!found?.server)
+    {
+        return null;
+    }
+
+    const player = found.players.find((p) => p.userId === userId);
+    if (!player || !player.joinToken)
+    {
+        return null;
+    }
+
+    if (await resultRepo.hasResult(matchId) || await resultRepo.isLeaverSettled(matchId, userId))
+    {
+        return null;
+    }
+
+    return { matchId, server: { host: found.server.host, port: found.server.port }, joinToken: player.joinToken };
 }

@@ -3,10 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EngineUtils.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "Templates/Function.h"
 #include "D1BomberGridLibrary.generated.h"
 
+class AD1BomberCharacter;
 class AD1BomberGameState;
 
 /**
@@ -45,7 +47,36 @@ public:
 		TFunctionRef<bool(FIntPoint)> IsPassable,
 		TArray<FIntPoint>& OutPath);
 
+	/** 박스 안의 봄버 캐릭터 수집(Pawn 오버랩 질의 공용화 — 폭탄/폭발 피격 판정용). */
+	static void OverlapBomberCharacters(const UObject* WorldContext, const FVector& Center, const FVector& Extent, TArray<AD1BomberCharacter*>& OutChars);
+
+	/** Cells에 포함된 셀 위의 T 액터 순회 — "월드 전수 → 셀 변환 → 포함 검사" 패턴 공용화. */
+	template <typename T>
+	static void ForEachActorInCells(UWorld* World, const TArray<FIntPoint>& Cells, TFunctionRef<void(T*)> Visit)
+	{
+		if (!World || Cells.Num() == 0)
+		{
+			return;
+		}
+
+		for (T* Actor : TActorRange<T>(World))
+		{
+			if (IsValid(Actor) && Cells.Contains(WorldToCell(Actor->GetActorLocation())))
+			{
+				Visit(Actor);
+			}
+		}
+	}
+
 	static constexpr float CellSize = 100.f;
 	/** 셀 중심 높이·블록 반폭·폭탄칸 풋프린트 공용(=50). */
 	static constexpr float CellHalf = CellSize * 0.5f;
+
+	/** 4방향 이웃(우/좌/하/상). 폭발 추적·BFS·봇 인접 판정 공용. */
+	inline static const FIntPoint NeighborDirs[4] = {
+		FIntPoint( 1,  0),
+		FIntPoint(-1,  0),
+		FIntPoint( 0,  1),
+		FIntPoint( 0, -1)
+	};
 };

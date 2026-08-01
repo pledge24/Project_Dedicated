@@ -5,10 +5,6 @@
 #include "Framework/D1MatchFlowComponent.h"
 #include "Net/UnrealNetwork.h"
 
-namespace
-{
-	constexpr int32 BomberMaxSlots = 4;
-}
 
 AD1BomberGameState::AD1BomberGameState()
 {
@@ -60,6 +56,20 @@ bool AD1BomberGameState::IsInsideGrid(const FIntPoint& Cell) const
 	return Cell.X >= 0 && Cell.X < GridSize.X && Cell.Y >= 0 && Cell.Y < GridSize.Y;
 }
 
+void AD1BomberGameState::SetGridData(const FIntPoint& InGridSize, const TArray<FIntPoint>& InWallCells,
+	const TArray<FIntPoint>& InSoftBlockCells, const FString& InMapName)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	GridSize = InGridSize;
+	WallCells = InWallCells;
+	SoftBlockCells = InSoftBlockCells;
+	MapName = InMapName;
+}
+
 void AD1BomberGameState::RemoveSoftBlockCell(const FIntPoint& Cell)
 {
 	SoftBlockCells.Remove(Cell);
@@ -67,12 +77,10 @@ void AD1BomberGameState::RemoveSoftBlockCell(const FIntPoint& Cell)
 
 float AD1BomberGameState::GetRemainingTimeSec() const
 {
-	// 시작 전: 풀 시간.
 	if (MatchPhase == EBomberMatchPhase::Waiting)
 	{
 		return MatchDurationSec;
 	}
-	// 종료 후: 0.
 	if (MatchPhase == EBomberMatchPhase::Finished)
 	{
 		return 0.0f;
@@ -82,10 +90,19 @@ float AD1BomberGameState::GetRemainingTimeSec() const
 	return FMath::Clamp(MatchDurationSec - Elapsed, 0.0f, MatchDurationSec);
 }
 
+void AD1BomberGameState::SetMatchStartServerTime(float ServerTime)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	MatchStartServerTime = ServerTime;
+}
+
 TArray<AD1BomberPlayerState*> AD1BomberGameState::GetPlayerStatesBySlot() const
 {
 	TArray<AD1BomberPlayerState*> BySlot;
-	BySlot.Init(nullptr, BomberMaxSlots);
+	BySlot.Init(nullptr, D1MaxPlayerSlots);
 
 	for (APlayerState* PS : PlayerArray)
 	{
@@ -155,18 +172,25 @@ void AD1BomberGameState::OnRep_LeftPlayerCards()
 
 void AD1BomberGameState::SetFinalResults(const TArray<FD1MatchResultEntry>& InResults)
 {
+	// 복제 배열 쓰기 자체를 서버 권위로 가드(브로드캐스트만 가드하면 클라 로컬 사본이 오염될 수 있다).
+	if (!HasAuthority())
+	{
+		return;
+	}
+
 	FinalResults = InResults;
 
 	// OnRep은 서버 자신에게 안 불리므로(리슨 서버) 수동 브로드캐스트.
-	if (HasAuthority())
-	{
-		OnMatchFinished.Broadcast();
-	}
+	OnMatchFinished.Broadcast();
 }
 
-void AD1BomberGameState::OnRep_MatchPhase()
+void AD1BomberGameState::SetMatchPhase(EBomberMatchPhase NewPhase)
 {
-	// 클라측 반응 자리 (UI, 입력 차단 등).
+	if (!HasAuthority())
+	{
+		return;
+	}
+	MatchPhase = NewPhase;
 }
 
 void AD1BomberGameState::OnRep_FinalResults()

@@ -1,0 +1,15 @@
+{
+  "name": "d1-backend-mcp",
+  "version": "0.1.0",
+  "description": "D1 백엔드 상태 조회용 MCP 서버 (읽기 전용)",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "dotenv": "^17.4.2",
+    "mysql2": "^3.22.3"
+  }
+}

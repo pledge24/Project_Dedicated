@@ -2,7 +2,6 @@
 import type { Request, Response } from 'express';
 
 import { extractBearerToken } from '../common/bearer.js';
-import { config } from '../common/config.js';
 import { ok } from '../common/envelope.js';
 import { AppError, Codes } from '../common/errors.js';
 import type { MatchEndReason, MatchResultEntryInput, MatchResultRequest } from '../common/types.js';
@@ -105,13 +104,15 @@ function parseResultBody(raw: unknown): MatchResultRequest
     {
         throw new AppError(Codes.INVALID_RESULT, `endReason은 ${END_REASONS.join('/')} 중 하나여야 합니다.`);
     }
-    if (!Array.isArray(body.results) || body.results.length !== config.match.playersPerMatch)
+    // 인원수·범위 검증은 여기서 하지 않는다 — 판정 기준이 전역 상수가 아니라 그 매치의 roster이고,
+    // roster는 service만 안다. 여기선 "결과가 하나라도 있는 배열인가"까지만 본다.
+    // (부분 보고를 400으로 막으면 정상 플레이한 나머지 인원의 점수까지 함께 버려진다.)
+    if (!Array.isArray(body.results) || body.results.length === 0)
     {
-        throw new AppError(Codes.INVALID_RESULT, `results는 ${config.match.playersPerMatch}명이어야 합니다.`);
+        throw new AppError(Codes.INVALID_RESULT, 'results는 비어있지 않은 배열이어야 합니다.');
     }
 
-    const n = body.results.length;
-    const results = body.results.map((r) => parseEntry(r, n));
+    const results = body.results.map((r) => parseEntry(r));
 
     return {
         matchId,
@@ -122,7 +123,8 @@ function parseResultBody(raw: unknown): MatchResultRequest
     };
 }
 
-function parseEntry(raw: unknown, n: number): MatchResultEntryInput
+/** 항목의 타입·부호만 본다. roster 크기에 의존하는 상한 검증은 service가 한다. */
+function parseEntry(raw: unknown): MatchResultEntryInput
 {
     const e = (raw ?? {}) as Record<string, unknown>;
     const userId = e.userId;
@@ -136,13 +138,13 @@ function parseEntry(raw: unknown, n: number): MatchResultEntryInput
     {
         throw new AppError(Codes.INVALID_RESULT, 'userId는 0이 아닌 정수여야 합니다.');
     }
-    if (!isInt(slotIndex, 0, n - 1))
+    if (!isInt(slotIndex, 0))
     {
-        throw new AppError(Codes.INVALID_RESULT, `slotIndex는 0~${n - 1} 정수여야 합니다.`);
+        throw new AppError(Codes.INVALID_RESULT, 'slotIndex는 0 이상의 정수여야 합니다.');
     }
-    if (!isInt(placement, 1, n))
+    if (!isInt(placement, 1))
     {
-        throw new AppError(Codes.INVALID_RESULT, `placement는 1~${n} 정수여야 합니다.`);
+        throw new AppError(Codes.INVALID_RESULT, 'placement는 1 이상의 정수여야 합니다.');
     }
     if (!isInt(livesLeft, 0))
     {

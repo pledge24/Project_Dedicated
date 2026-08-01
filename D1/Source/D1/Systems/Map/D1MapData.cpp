@@ -2,11 +2,7 @@
 
 #include "Systems/Map/D1MapData.h"
 
-namespace
-{
-	// 4인 게임 — 스폰 슬롯 0~3만 유효.
-	constexpr int32 MaxPlayerSlots = 4;
-}
+#include "Framework/D1MatchTypes.h"
 
 bool UD1MapData::BuildLayout(FD1MapLayout& OutLayout, FString& OutError) const
 {
@@ -28,7 +24,7 @@ bool UD1MapData::BuildLayout(FD1MapLayout& OutLayout, FString& OutError) const
 
 	OutLayout.GridSize = FIntPoint(Width, Height);
 
-	bool bSlotUsed[MaxPlayerSlots] = {};
+	bool bSlotUsed[D1MaxPlayerSlots] = {};
 
 	for (int32 Y = 0; Y < Height; ++Y)
 	{
@@ -64,9 +60,9 @@ bool UD1MapData::BuildLayout(FD1MapLayout& OutLayout, FString& OutError) const
 				if (C >= TEXT('1') && C <= TEXT('9'))
 				{
 					const int32 Slot = static_cast<int32>(C - TEXT('1'));
-					if (Slot >= MaxPlayerSlots)
+					if (Slot >= D1MaxPlayerSlots)
 					{
-						OutError = FString::Printf(TEXT("스폰 문자 '%c'가 슬롯 범위 초과(0~%d만 허용) @ (%d,%d)"), C, MaxPlayerSlots - 1, X, Y);
+						OutError = FString::Printf(TEXT("스폰 문자 '%c'가 슬롯 범위 초과(0~%d만 허용) @ (%d,%d)"), C, D1MaxPlayerSlots - 1, X, Y);
 						return false;
 					}
 					if (bSlotUsed[Slot])

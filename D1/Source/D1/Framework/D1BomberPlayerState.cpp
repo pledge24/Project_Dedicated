@@ -88,15 +88,7 @@ void AD1BomberPlayerState::SetLeft()
 void AD1BomberPlayerState::OnRep_bLeft()
 {
 	OnLeftChanged.Broadcast();
-
-	// 카드 컨테이너가 "탈주" 표시로 다시 그리도록 GameState 디스패처도 트리거.
-	if (UWorld* World = GetWorld())
-	{
-		if (AD1BomberGameState* GS = World->GetGameState<AD1BomberGameState>())
-		{
-			GS->MarkPlayerCardsDirty();
-		}
-	}
+	NotifyCardsDirty();
 }
 
 void AD1BomberPlayerState::SetIsBot(bool bInIsBot)
@@ -111,14 +103,7 @@ void AD1BomberPlayerState::SetIsBot(bool bInIsBot)
 
 void AD1BomberPlayerState::OnRep_bIsBot()
 {
-	// 카드 컨테이너가 "BOT" 배지로 다시 그리도록 GameState 디스패처 트리거(bLeft와 동일 방식).
-	if (UWorld* World = GetWorld())
-	{
-		if (AD1BomberGameState* GS = World->GetGameState<AD1BomberGameState>())
-		{
-			GS->MarkPlayerCardsDirty();
-		}
-	}
+	NotifyCardsDirty();
 }
 
 void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)
@@ -127,8 +112,8 @@ void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)
 	{
 		return;
 	}
-	// -1(미배정 리셋) 또는 0~3만 허용. 범위 밖은 거부 — clamp하면 두 명이 같은 슬롯으로 몰림.
-	if (NewIndex < -1 || NewIndex > 3)
+	// -1(미배정 리셋) 또는 유효 슬롯만 허용. 범위 밖은 거부 — clamp하면 두 명이 같은 슬롯으로 몰림.
+	if (NewIndex < -1 || NewIndex >= D1MaxPlayerSlots)
 	{
 		return;
 	}
@@ -139,15 +124,7 @@ void AD1BomberPlayerState::SetPlayerSlotIndex(int32 NewIndex)
 void AD1BomberPlayerState::OnRep_PlayerSlotIndex()
 {
 	OnSlotIndexChanged.Broadcast();
-
-	// 컨테이너 위젯이 한 곳에서 카드 전체를 다시 그릴 수 있게 GameState 디스패처도 트리거.
-	if (UWorld* World = GetWorld())
-	{
-		if (AD1BomberGameState* GS = World->GetGameState<AD1BomberGameState>())
-		{
-			GS->MarkPlayerCardsDirty();
-		}
-	}
+	NotifyCardsDirty();
 }
 
 void AD1BomberPlayerState::AddFirePower(int32 Delta)
@@ -199,4 +176,15 @@ void AD1BomberPlayerState::SetBackendUserId(int64 NewUserId)
 		return;
 	}
 	BackendUserId = NewUserId;
+}
+
+void AD1BomberPlayerState::NotifyCardsDirty() const
+{
+	if (UWorld* World = GetWorld())
+	{
+		if (AD1BomberGameState* GS = World->GetGameState<AD1BomberGameState>())
+		{
+			GS->MarkPlayerCardsDirty();
+		}
+	}
 }

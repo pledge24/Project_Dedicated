@@ -7,6 +7,7 @@
 #include "Components/Widget.h"
 #include "Core/D1LogChannels.h"
 #include "Framework/Menu/D1MenuGameMode.h"
+#include "UI/D1UILayers.h"
 #include "Widgets/SWidget.h"
 
 AD1MenuPlayerController::AD1MenuPlayerController()
@@ -47,7 +48,7 @@ void AD1MenuPlayerController::SwitchToWidget(TSubclassOf<UUserWidget> NewWidgetC
 	CurrentWidget = CreateWidget<UUserWidget>(this, NewWidgetClass);
 	if (CurrentWidget)
 	{
-		CurrentWidget->AddToViewport();
+		CurrentWidget->AddToViewport(D1UILayer::Content);
 	}
 
 	ApplyUiOnlyInputMode();
@@ -63,8 +64,7 @@ void AD1MenuPlayerController::ShowBackground()
 	BackgroundWidget = CreateWidget<UUserWidget>(this, BackgroundWidgetClass);
 	if (BackgroundWidget)
 	{
-		// ZOrder = -1: 어떤 콘텐츠 위젯보다도 항상 뒤에 그려짐
-		BackgroundWidget->AddToViewport(-1);
+		BackgroundWidget->AddToViewport(D1UILayer::Background);
 	}
 }
 
@@ -78,8 +78,7 @@ void AD1MenuPlayerController::ShowQuitButton()
 	QuitButtonWidget = CreateWidget<UUserWidget>(this, QuitButtonWidgetClass);
 	if (QuitButtonWidget)
 	{
-		// ZOrder 5: 콘텐츠(0)·배경(-1) 위, 랭킹 팝업(10) 아래 — 모달 팝업엔 가려짐
-		QuitButtonWidget->AddToViewport(5);
+		QuitButtonWidget->AddToViewport(D1UILayer::QuitButton);
 	}
 }
 

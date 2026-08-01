@@ -58,31 +58,52 @@ private:
 	/** 첫 Think에서 1회: 봇별 난수 시드 → 사고주기 지터·공격성 편향(움직임 다양성). */
 	void EnsureSeeded(const AD1BomberPlayerState* PS);
 
-	/** d1.BotDebug 켜지면 위험셀(빨강)·경로(초록)·현재 웨이포인트(노랑)·상태명을 서버 월드에 그림(=PIE 뷰포트). */
-	void DrawDebug(const AD1BomberCharacter* Bot) const;
-
-	/** 사고 주기(초). 도화선 3s·잔류 0.5s 대비 충분한 반응성, 매 프레임 부담 회피. */
+	/** 사고 주기(초). 도화선 3s·잔류 0.5s 대비 충분한 반응성, 매 프레임 부담 회피. 봇별 지터 적용 전 기준값. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bot")
 	float ThinkIntervalSec = 0.15f;
 
-	/** 셀 중심 도달 판정 반경(cm). 봄버맨 자유이동이라 정확 중심 불필요. */
+	/** 중간 웨이포인트 도착 판정 반경(cm). 넉넉히 잡아 부드러운 이동. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bot")
 	float ArrivalToleranceCm = 20.f;
 
+	/** 경로 최종 목적지 도착 판정 반경(cm). 작게 잡아 안전셀 중앙에 붙게 → 폭발 경계 걸침 사망 방지. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bot")
+	float FinalArrivalToleranceCm = 8.f;
+
 	/** 봇별 사고주기 지터 비율(±). lockstep 군집 이동 해소. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bot")
 	float ThinkIntervalJitter = 0.2f;
 
 	/** SEEK/HUNT goal 확률적 수락(최근접 대신 차선 정착 → 경로 다양성). 낮을수록 우회 잦음. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bot")
 	float GoalAcceptProb = 0.65f;
 
-	/** 폭탄 설치 허용 탈출 경로 최대 길이(셀). 체인격발로 도화선 단축돼도 빠져나갈 안전마진. */
-	int32 MaxEscapePathCells = 6;
+	/** 폭탄 설치 허용 탈출 경로 최대 길이(셀). 클수록 과감(더 긴 탈출도 감수). */
+	UPROPERTY(EditDefaultsOnly, Category = "Bot")
+	int32 MaxEscapePathCells = 8;
+
+	/** 아이템 추적 최대 거리(셀). 이보다 멀면 무시 — 멀리 있는 아이템 추격 방지. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bot")
+	int32 MaxItemSeekCells = 5;
+
+	/** 도주 정착 재시도 한도. 넘으면 Flee를 풀어 (b)·(c)로 내려보낸다 — 무한 래치 방지. */
+	UPROPERTY(EditDefaultsOnly, Category = "Bot")
+	int32 MaxFleeSettleAttempts = 6;
 
 	EBotState State = EBotState::Idle;
 	TArray<FIntPoint> CurrentPath;
 	int32 PathIndex = 0;
 	float ThinkAccumulatorSec = 0.f;
+	/** 지터 적용된 실제 사고 주기(EnsureSeeded에서 1회 산출) — 설정값(ThinkIntervalSec)은 덮어쓰지 않는다. */
+	float EffectiveThinkIntervalSec = 0.15f;
+	/** 연속 도주 정착 시도 횟수(MaxFleeSettleAttempts 대조용). */
+	int32 FleeSettleAttempts = 0;
 	TSet<FIntPoint> DangerCells;
 	TSet<FIntPoint> BombCells;
 	TSet<FIntPoint> EnemyCells;
+	TSet<FIntPoint> HazardCells;
+	TSet<FIntPoint> ItemCells;
+	/** 이 봇이 설치해 아직 안 터진 폭탄 수 — 용량(GetBombCapacity) 초과 설치 차단용. */
 	int32 OwnActiveBombCount = 0;
 
 	/** 봇별 개성(EnsureSeeded에서 1회 설정). */

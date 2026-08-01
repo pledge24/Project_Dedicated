@@ -4,8 +4,10 @@
 
 #include "Components/Button.h"
 #include "Components/ScrollBox.h"
+#include "Components/TextBlock.h"
 #include "Core/D1LogChannels.h"
 #include "Framework/D1GameInstance.h"
+#include "Network/BackendErrorMessages.h"
 #include "Network/D1RankingSubsystem.h"
 #include "UI/D1UWRankingRow.h"
 
@@ -18,12 +20,10 @@ void UD1UWRanking::NativeConstruct()
 		CloseButton->OnClicked.AddDynamic(this, &UD1UWRanking::OnCloseClicked);
 	}
 
-	// 팝업이 열릴 때마다 최신 랭킹 조회.
 	if (UD1RankingSubsystem* Ranking = GetGameInstance()->GetSubsystem<UD1RankingSubsystem>())
 	{
 		FOnRankingCompleted OnCompleted;
 		OnCompleted.BindDynamic(this, &UD1UWRanking::HandleRankingCompleted);
-		// 가져오는 랭킹은 TOP 50 + 본인 랭크로 고정.
 		Ranking->FetchRanking(RankRowCount, 0, OnCompleted);
 	}
 }
@@ -32,10 +32,22 @@ void UD1UWRanking::HandleRankingCompleted(const FBackendResponse& Response, cons
 {
 	if (!Response.bOk)
 	{
-		// 실패해도 빈 슬롯으로 채워 레이아웃은 유지.
-		UE_LOG(LogD1, Warning, TEXT("[Ranking] 조회 실패 — 빈 목록 표시"));
+		// 실패를 빈 목록으로만 보여주면 "아무도 없음"과 구분이 안 된다 — 사유를 표면화한다.
+		const FString Msg = FBackendErrorMessages::Resolve(Response);
+		UE_LOG(LogD1, Warning, TEXT("[Ranking] 조회 실패 — %s"), *Msg);
+
+		if (ErrorLabel)
+		{
+			ErrorLabel->SetText(FText::FromString(Msg));
+			ErrorLabel->SetVisibility(ESlateVisibility::Visible);
+		}
+	}
+	else if (ErrorLabel)
+	{
+		ErrorLabel->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
+	// 실패해도 빈 슬롯으로 채워 레이아웃은 유지.
 	PopulateRows(Result);
 	ApplyMyRankRow(Result);
 }
@@ -74,7 +86,7 @@ void UD1UWRanking::PopulateRows(const FD1RankingResult& Result)
 
 void UD1UWRanking::ApplyMyRankRow(const FD1RankingResult& Result)
 {
-	if (!MyRankRow)
+	if (!MyRankRowWidget)
 	{
 		return;
 	}
@@ -92,7 +104,7 @@ void UD1UWRanking::ApplyMyRankRow(const FD1RankingResult& Result)
 	Mine.UserId   = User.UserId;
 	Mine.Nickname = User.Nickname;
 	Mine.Score    = User.Score;
-	MyRankRow->SetEntry(Mine, /*bIsLocalPlayer=*/true);
+	MyRankRowWidget->SetEntry(Mine, /*bIsLocalPlayer=*/true);
 }
 
 void UD1UWRanking::OnCloseClicked()

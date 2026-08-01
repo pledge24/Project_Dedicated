@@ -19,31 +19,35 @@ class UD1AuthSubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
 
+//~ 인증
 public:
-	//~ 외부 API — 인증 (BP에서 위젯이 호출)
 	UFUNCTION(BlueprintCallable, Category = "Backend|Auth")
 	void Register(const FString& LoginId, const FString& Password, const FString& Nickname, const FOnAuthCompleted& OnCompleted);
 
 	UFUNCTION(BlueprintCallable, Category = "Backend|Auth")
 	void Login(const FString& LoginId, const FString& Password, const FOnAuthCompleted& OnCompleted);
 
-	//~ 외부 API — 프로필
+private:
+	void SendAuthRequest(const FString& Path, const TSharedRef<FJsonObject>& Body, const FOnAuthCompleted& OnCompleted);
+	void HandleAuthResponse(const FHttpResponsePtr& Res, bool bSucceeded, FOnAuthCompleted Forward);
+
+//~ 프로필
+public:
 	/** GET /api/auth/me로 최신 프로필을 받아 GameInstance 캐시 갱신 후 OnProfileUpdated 방송. */
 	UFUNCTION(BlueprintCallable, Category = "Backend|Profile")
 	void RefreshMyProfile();
 
-	//~ 외부 API — 세션 heartbeat
-	/** GET /api/auth/heartbeat — 로비가 주기 호출. 401 SESSION_SUPERSEDED면 SessionSubsystem에 통지. */
-	void SendHeartbeat();
-
-	//~ 프로필 이벤트 (갱신 완료 구독용)
 	UPROPERTY(BlueprintAssignable, Category = "Backend|Profile")
 	FOnProfileUpdated OnProfileUpdated;
 
 private:
-	//~ 내부 헬퍼
-	void SendAuthRequest(const FString& Path, const TSharedRef<FJsonObject>& Body, const FOnAuthCompleted& OnCompleted);
-	void HandleAuthResponse(FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded, FOnAuthCompleted Forward);
-	void HandleProfileResponse(FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded);
-	void HandleHeartbeatResponse(FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded);
+	void HandleProfileResponse(const FHttpResponsePtr& Res, bool bSucceeded);
+
+//~ 세션 heartbeat
+public:
+	/** GET /api/auth/heartbeat — 로비가 주기 호출. 401 SESSION_SUPERSEDED면 SessionSubsystem에 통지. */
+	void SendHeartbeat();
+
+private:
+	void HandleHeartbeatResponse(const FHttpResponsePtr& Res, bool bSucceeded);
 };

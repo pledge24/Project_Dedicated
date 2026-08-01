@@ -25,5 +25,5 @@ public:
 	void FetchRanking(int32 Limit, int32 Offset, const FOnRankingCompleted& OnCompleted);
 
 private:
-	void HandleRankingResponse(FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded, FOnRankingCompleted Forward);
+	void HandleRankingResponse(const FHttpResponsePtr& Res, bool bSucceeded, FOnRankingCompleted Forward);
 };

@@ -37,18 +37,17 @@ void UD1UWRegister::OnRegisterClicked()
 	BeginAuthSubmit();
 
 	FOnAuthCompleted Cb;
-	Cb.BindDynamic(this, &UD1UWRegister::OnRegisterCompletedInternal);
+	Cb.BindDynamic(this, &UD1UWRegister::HandleRegisterCompleted);
 	AuthSubsystem->Register(LoginId, Password, Nickname, Cb);
 }
 
-void UD1UWRegister::OnRegisterCompletedInternal(const FBackendResponse& Response, const FAuthUserDTO& User)
+void UD1UWRegister::HandleRegisterCompleted(const FBackendResponse& Response, const FAuthUserDTO& User)
 {
 	if (!FinishAuthSubmit(Response))
 	{
 		return;
 	}
 
-	// 가입 성공 → 로그인 화면 복귀
 	if (LoginWidgetClass)
 	{
 		AD1MenuPlayerController* PC = Cast<AD1MenuPlayerController>(GetOwningPlayer());

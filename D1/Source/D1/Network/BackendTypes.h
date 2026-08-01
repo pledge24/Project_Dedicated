@@ -19,6 +19,8 @@ enum class EBackendErrorCode : uint8
 	SessionSuperseded,
 	/** HTTP 자체 실패 (서버 다운 / DNS / 타임아웃). */
 	NetworkError,
+	/** 클라 세션 없음(비로그인) — 요청 전 로컬 판정. 서버 코드 아님. */
+	NotAuthenticated,
 	InternalError,
 	Unknown
 };

@@ -9,12 +9,13 @@
 #include "Components/VerticalBox.h"
 #include "Core/D1LogChannels.h"
 #include "Framework/D1GameInstance.h"
-#include "Kismet/GameplayStatics.h"
 #include "Network/BackendErrorMessages.h"
 #include "Network/D1AuthSubsystem.h"
 #include "Network/D1MatchmakingSubsystem.h"
 #include "Network/D1OnlineSettings.h"
+#include "Network/D1SessionSubsystem.h"
 #include "TimerManager.h"
+#include "UI/D1UILayers.h"
 
 // 매치 정원(백엔드 playersPerMatch와 동일). match:found가 개수를 싣지 않아 클라 상수로 표기.
 static constexpr int32 MatchPlayerCount = 4;
@@ -25,13 +26,12 @@ void UD1UWLobby::NativeConstruct()
 
 	UD1GameInstance* GI = GetGameInstance<UD1GameInstance>();
 
-	// 비로그인 진입 방어 — Frontend로 강제 복귀
 	if (!GI || !GI->IsLoggedIn())
 	{
 		UE_LOG(LogD1, Warning, TEXT("[Lobby] 비로그인 상태로 진입 — Frontend로 복귀"));
-		if (!FrontendMap.IsNull())
+		if (UD1SessionSubsystem* Session = GI ? GI->GetSubsystem<UD1SessionSubsystem>() : nullptr)
 		{
-			UGameplayStatics::OpenLevelBySoftObjectPtr(this, FrontendMap);
+			Session->TravelToFrontend();
 		}
 		return;
 	}
@@ -56,12 +56,15 @@ void UD1UWLobby::NativeConstruct()
 		MatchStatusPanel->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
-	// 서버 푸시(매칭 성사/큐 입장/에러) 구독
 	if (UD1MatchmakingSubsystem* Matchmaking = GetGameInstance()->GetSubsystem<UD1MatchmakingSubsystem>())
 	{
 		Matchmaking->OnQueueJoined.AddDynamic(this, &UD1UWLobby::HandleQueueJoined);
 		Matchmaking->OnMatchFound.AddDynamic(this, &UD1UWLobby::HandleMatchFound);
 		Matchmaking->OnMatchmakingError.AddDynamic(this, &UD1UWLobby::HandleMatchmakingError);
+
+		// 구독 뒤에 확인 — 진행 중 매치가 있으면 응답이 OnMatchFound를 태우고 그대로 DS로 들어간다.
+		// (끊긴 채 로비로 돌아온 클라의 유일한 복구 경로. 없으면 조용히 아무 일도 안 일어난다.)
+		Matchmaking->CheckRejoinableMatch();
 	}
 
 	if (UD1AuthSubsystem* Auth = GetGameInstance()->GetSubsystem<UD1AuthSubsystem>())
@@ -110,7 +113,6 @@ void UD1UWLobby::NativeDestruct()
 
 void UD1UWLobby::HandleProfileUpdated()
 {
-	// /api/auth/me 갱신 완료 — 최신 score/level로 라벨 새로고침.
 	ApplyProfileToLabels();
 }
 
@@ -213,7 +215,6 @@ void UD1UWLobby::HandleQueueJoined()
 		MatchStatusLabel->SetText(NSLOCTEXT("Lobby", "MatchSearching", "상대를 찾는 중..."));
 	}
 
-	// 검색 시작 시점부터 경과 시간 1초 간격 갱신.
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(
@@ -229,6 +230,16 @@ void UD1UWLobby::HandleMatchFound(const FMatchFoundDTO& Match)
 
 	StopMatchSearchingElapsed();
 
+	// 재입장 경로(CheckRejoinableMatch)는 버튼 클릭 없이 도착 — 패널·버튼 상태를 직접 맞춘다.
+	if (MatchStatusPanel)
+	{
+		MatchStatusPanel->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+	if (StartMatchingButton)
+	{
+		StartMatchingButton->SetIsEnabled(false);
+	}
+
 	if (MatchStatusLabel)
 	{
 		MatchStatusLabel->SetText(FText::Format(
@@ -236,19 +247,21 @@ void UD1UWLobby::HandleMatchFound(const FMatchFoundDTO& Match)
 			FText::AsNumber(MatchPlayerCount)
 		));
 	}
-	// 매칭 완료 → 검색 패널을 즉시 접어 타이머/상태 UI를 숨긴다(취소 경로와 동일).
-	// travel 지연/실패와 무관하게 UI가 잔존하지 않게 함. 실제 DS 입장(ClientTravel)은 Matchmaking Subsystem이 처리.
-	if (MatchStatusPanel)
+	// 매칭 완료 → 타이머·취소 버튼만 숨기고 상태 라벨('입장 중')은 남긴다.
+	// 실제 DS 입장(ClientTravel)은 Matchmaking Subsystem이 처리.
+	if (MatchSearchingElapsedLabel)
 	{
-		MatchStatusPanel->SetVisibility(ESlateVisibility::Collapsed);
+		MatchSearchingElapsedLabel->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	if (CancelMatchingButton)
+	{
+		CancelMatchingButton->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 
 void UD1UWLobby::HandleMatchmakingError(const FBackendResponse& Error)
 {
-	const FString Msg = Error.ErrorMessage.IsEmpty()
-		? FBackendErrorMessages::Lookup(Error.ErrorCode)
-		: Error.ErrorMessage;
+	const FString Msg = FBackendErrorMessages::Resolve(Error);
 
 	UE_LOG(LogD1, Warning, TEXT("[Lobby] 매칭 에러: %s"), *Msg);
 
@@ -262,6 +275,16 @@ void UD1UWLobby::HandleMatchmakingError(const FBackendResponse& Error)
 	{
 		// 에러 문구는 패널에 남겨두고 다시 시도 가능하게 Start 재활성
 		StartMatchingButton->SetIsEnabled(true);
+	}
+
+	// HandleMatchFound가 접은 위젯 원복 — travel 실패 후 재검색 UI가 온전하도록.
+	if (MatchSearchingElapsedLabel)
+	{
+		MatchSearchingElapsedLabel->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+	if (CancelMatchingButton)
+	{
+		CancelMatchingButton->SetVisibility(ESlateVisibility::Visible);
 	}
 }
 
@@ -293,17 +316,16 @@ void UD1UWLobby::OnRankingClicked()
 		return;
 	}
 
-	// 이미 떠 있으면 중복 생성 방지.
 	if (RankingWidget && RankingWidget->IsInViewport())
 	{
 		return;
 	}
 
-	// ZOrder 10 → 로비 위, 배경(-1) 위. SwitchToWidget 경유 금지(로비 파괴됨).
+	// SwitchToWidget 경유 금지(로비 파괴됨) — 팝업층에 직접 띄운다.
 	RankingWidget = CreateWidget<UUserWidget>(GetOwningPlayer(), RankingWidgetClass);
 	if (RankingWidget)
 	{
-		RankingWidget->AddToViewport(10);
+		RankingWidget->AddToViewport(D1UILayer::Popup);
 	}
 }
 

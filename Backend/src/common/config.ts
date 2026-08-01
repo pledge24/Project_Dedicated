@@ -24,6 +24,7 @@ export const config = Object.freeze({
         resultMax: asNumber('RATE_LIMIT_RESULT_MAX', 30),    // DS 결과 보고(/api/match/result)
         pollMax:   asNumber('RATE_LIMIT_POLL_MAX', 300),     // DS kick 폴링(/api/match/:id/kicks) — 매치당 12/분 × 다수 매치가 같은 host IP
         rankingMax: asNumber('RATE_LIMIT_RANKING_MAX', 60),  // 랭킹 조회(/api/ranking)
+        sessionMax: asNumber('RATE_LIMIT_SESSION_MAX', 60),  // 세션 조회(/me·/heartbeat) — requireAuth가 매번 DB SELECT라 무제한이면 증폭됨
         wsMax: asNumber('RATE_LIMIT_WS_MAX', 100),           // 매칭 WS 메시지(연결당) — OWASP 시작점
     }),
     match: Object.freeze({
@@ -52,7 +53,7 @@ export const config = Object.freeze({
         ds: Object.freeze({
             enabled:       process.env.MATCH_DS_ENABLED === 'true',
             exePath:       process.env.MATCH_DS_EXE || '',  // 머신별 절대경로 — DS 사용 시 .env에서 지정
-            map:           process.env.MATCH_DS_MAP || '/Game/D1/Maps/MP_Ingame', // 미쿡 시 임시로 /Game/Maps/MP_Test
+            map:           process.env.MATCH_DS_MAP || '/Game/D1/Maps/MP_Ingame', // 쿡되지 않은 빌드에선 /Game/Maps/MP_Test로 임시 교체
             host:          process.env.MATCH_DS_HOST || '127.0.0.1',
             portMin:       asNumber('MATCH_DS_PORT_MIN', 7777),
             portMax:       asNumber('MATCH_DS_PORT_MAX', 7787),
@@ -64,6 +65,8 @@ export const config = Object.freeze({
     ranking: Object.freeze({
         defaultLimit: asNumber('RANKING_DEFAULT_LIMIT', 50),
         maxLimit:     asNumber('RANKING_MAX_LIMIT', 100),
+        // offset 상한 — MySQL은 OFFSET N을 N행 스캔 후 버리므로 큰 값이 그대로 인덱스 풀스캔이 된다.
+        maxOffset:    asNumber('RANKING_MAX_OFFSET', 10_000),
     }),
 });
 

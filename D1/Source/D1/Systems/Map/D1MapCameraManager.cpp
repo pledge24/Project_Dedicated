@@ -8,11 +8,6 @@
 #include "Kismet/GameplayStatics.h"
 #include "UnrealClient.h"
 
-AD1MapCameraManager::AD1MapCameraManager()
-{
-	// APlayerCameraManager 기본값 그대로.
-}
-
 void AD1MapCameraManager::UpdateViewTarget(FTViewTarget& OutVT, float DeltaTime)
 {
 	AActor* MapCam = ResolveMapCamera();
@@ -57,7 +52,7 @@ void AD1MapCameraManager::ApplyGridFraming(FMinimalViewInfo& POV) const
 		return;
 	}
 
-	const FIntPoint Grid = GS->GridSize;
+	const FIntPoint Grid = GS->GetGridSize();
 	if (Grid.X <= 0 || Grid.Y <= 0)
 	{
 		// 아직 GridSize 복제 전 → 태그 액터 그대로(폴백).
@@ -82,7 +77,7 @@ void AD1MapCameraManager::ApplyGridFraming(FMinimalViewInfo& POV) const
 		}
 	}
 
-	// 작가 회전 축. 그리드 코너(중심 기준 ±HalfW, ±HalfH, 0)를 right/up에 투영해
+	// 그리드 코너(중심 기준 ±HalfW, ±HalfH, 0)를 right/up에 투영해
 	// 화면 가로/세로로 필요한 반경을 구한다(회전 각도에 무관).
 	const FRotationMatrix RotM(POV.Rotation);
 	const FVector Forward = RotM.GetUnitAxis(EAxis::X);

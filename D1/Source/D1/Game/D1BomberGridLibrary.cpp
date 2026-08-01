@@ -3,6 +3,8 @@
 #include "Game/D1BomberGridLibrary.h"
 #include "Algo/Reverse.h"
 #include "Framework/D1BomberGameState.h"
+#include "Game/Character/D1BomberCharacter.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 FIntPoint UD1BomberGridLibrary::WorldToCell(const FVector& WorldLocation)
 {
@@ -33,17 +35,9 @@ void UD1BomberGridLibrary::TraceExplosionCells(
 		return;	
 	}
 	
-	// 원점(Origin) 추가.
 	OutCells.Insert(Origin, 0);
-	
-	static const FIntPoint Directions[4] = {
-		FIntPoint( 1,  0),
-		FIntPoint(-1,  0),
-		FIntPoint( 0,  1),
-		FIntPoint( 0, -1)
-	};
 
-	for (const FIntPoint& Dir : Directions)
+	for (const FIntPoint& Dir : NeighborDirs)
 	{
 		for (int32 Step = 1; Step <= Range; ++Step)
 		{
@@ -83,13 +77,6 @@ bool UD1BomberGridLibrary::FindNearestReachable(
 		return false;
 	}
 
-	static const FIntPoint Directions[4] = {
-		FIntPoint( 1,  0),
-		FIntPoint(-1,  0),
-		FIntPoint( 0,  1),
-		FIntPoint( 0, -1)
-	};
-
 	// TArray + Head 인덱스로 FIFO 큐 대용(거리순 확장 → 첫 goal이 최근접).
 	TArray<FIntPoint> Frontier;
 	Frontier.Add(Start);
@@ -111,7 +98,7 @@ bool UD1BomberGridLibrary::FindNearestReachable(
 			break;
 		}
 
-		for (const FIntPoint& Dir : Directions)
+		for (const FIntPoint& Dir : NeighborDirs)
 		{
 			const FIntPoint Next = Cur + Dir;
 			if (Visited.Contains(Next))
@@ -144,4 +131,24 @@ bool UD1BomberGridLibrary::FindNearestReachable(
 	}
 	Algo::Reverse(OutPath);
 	return true;
+}
+
+void UD1BomberGridLibrary::OverlapBomberCharacters(const UObject* WorldContext, const FVector& Center, const FVector& Extent, TArray<AD1BomberCharacter*>& OutChars)
+{
+	OutChars.Reset();
+
+	TArray<TEnumAsByte<EObjectTypeQuery>> ObjectTypes;
+	ObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
+
+	TArray<AActor*> Found;
+	UKismetSystemLibrary::BoxOverlapActors(WorldContext, Center, Extent, ObjectTypes,
+		AD1BomberCharacter::StaticClass(), TArray<AActor*>(), Found);
+
+	for (AActor* A : Found)
+	{
+		if (AD1BomberCharacter* BC = Cast<AD1BomberCharacter>(A))
+		{
+			OutChars.Add(BC);
+		}
+	}
 }

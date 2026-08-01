@@ -1,6 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-
 #include "Framework/D1PlayerController.h"
 #include "EnhancedInputSubsystems.h"
 #include "Engine/GameInstance.h"
@@ -13,7 +12,6 @@
 #include "Systems/Map/D1MapCameraManager.h"
 #include "TimerManager.h"
 #include "UI/InGame/D1UWMatchResult.h"
-#include "Widgets/Input/SVirtualJoystick.h"
 
 AD1PlayerController::AD1PlayerController()
 {
@@ -45,7 +43,6 @@ void AD1PlayerController::BeginPlay()
 		}
 	}
 
-	// 매치 종료 시 결과 위젯을 띄우기 위해 GameState 이벤트 구독.
 	TryBindMatchFinished();
 }
 
@@ -53,17 +50,11 @@ void AD1PlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
-	// 로컬 플레이어 컨트롤러에만 IMC 추가
 	if (IsLocalPlayerController())
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
 		{
 			for (UInputMappingContext* CurrentContext : DefaultMappingContexts)
-			{
-				Subsystem->AddMappingContext(CurrentContext, 0);
-			}
-
-			for (UInputMappingContext* CurrentContext : MobileExcludedMappingContexts)
 			{
 				Subsystem->AddMappingContext(CurrentContext, 0);
 			}
@@ -90,10 +81,9 @@ void AD1PlayerController::HandleMatchFinished()
 
 	if (UD1UWMatchResult* Result = Cast<UD1UWMatchResult>(ResultWidget))
 	{
-		Result->SetResults(GS->FinalResults);
+		Result->SetResults(GS->GetFinalResults());
 	}
 
-	// 결과 화면 — 마우스 커서 + UI 입력.
 	bShowMouseCursor = true;
 	SetInputMode(FInputModeUIOnly());
 }
@@ -113,7 +103,7 @@ void AD1PlayerController::TryBindMatchFinished()
 	GS->OnMatchFinished.AddDynamic(this, &AD1PlayerController::HandleMatchFinished);
 
 	// 이미 끝난 매치에 늦게 구독한 경우(재접속 등) 즉시 표시.
-	if (GS->FinalResults.Num() > 0)
+	if (GS->GetFinalResults().Num() > 0)
 	{
 		HandleMatchFinished();
 	}

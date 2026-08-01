@@ -86,4 +86,26 @@ export default tseslint.config(
             ],
         },
     },
+
+    // 정합성 규칙(타입 정보 필요) — src만. 지금까지는 사람이 주석으로 방어하던
+    // floating promise/미사용 심볼을 도구가 잡는다. scripts는 수동 sim이라 스타일만 적용.
+    {
+        files: ['src/**/*.ts'],
+        languageOptions:
+        {
+            parser: tseslint.parser,
+            parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+        },
+        plugins:
+        {
+            '@typescript-eslint': tseslint.plugin,
+        },
+        rules:
+        {
+            '@typescript-eslint/no-floating-promises': 'error',
+            '@typescript-eslint/no-misused-promises': 'error',
+            '@typescript-eslint/await-thenable': 'error',
+            '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+        },
+    },
 );

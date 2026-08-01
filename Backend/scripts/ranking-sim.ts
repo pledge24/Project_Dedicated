@@ -7,6 +7,7 @@ import { randomBytes } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 
 import buildApp from '../src/app.js';
+import { config } from '../src/common/config.js';
 import { closePool, getPool } from '../src/common/db.js';
 
 const PASSWORD = 'ranktest123';
@@ -131,6 +132,21 @@ async function main(): Promise<void>
             assert.equal(r.status, 200, JSON.stringify(r.body));
             const meta = r.body.data!.meta as { total: number; limit: number; offset: number };
             assert.equal(meta.limit, 100, `클램프 실패 limit=${meta.limit}`);
+        }],
+
+        ['offset=99999999 → maxOffset 클램프(풀스캔 방지)', async () =>
+        {
+            const r = await get('/api/ranking?offset=99999999', token);
+            assert.equal(r.status, 200, JSON.stringify(r.body));
+            const meta = r.body.data!.meta as { total: number; limit: number; offset: number };
+            assert.equal(meta.offset, config.ranking.maxOffset, `클램프 실패 offset=${meta.offset}`);
+        }],
+
+        ['offset=1e30 → 400 (isInteger를 통과해 SQL로 새어 500이 되던 값)', async () =>
+        {
+            const r = await get('/api/ranking?offset=1e30', token);
+            assert.equal(r.status, 400, JSON.stringify(r.body));
+            assert.equal(r.body.error?.code, 'VALIDATION_FAILED');
         }],
 
         ['상위 5명 순서 + 동점 tie-break + rank + camelCase 매핑', async () =>

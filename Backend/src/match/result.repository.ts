@@ -4,7 +4,7 @@ import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 import type { PoolConnection } from 'mysql2/promise';
 
 import { config } from '../common/config.js';
-import { withTransaction } from '../common/db.js';
+import { getPool, withTransaction } from '../common/db.js';
 import type { MatchEndReason } from '../common/types.js';
 import { computeFfaEloDeltas } from './elo.js';
 
@@ -80,7 +80,6 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
 {
     return withTransaction(async (conn) =>
     {
-        // matches 테이블에 결과 저장.
         const [matchRes] = await conn.execute<ResultSetHeader>(
             'INSERT INTO matches ' +
             '(client_match_id, map_name, started_at, ended_at, duration_sec, end_reason, winner_user_id) ' +
@@ -208,6 +207,56 @@ export async function settleLeaverProfile(clientMatchId: string, userId: number)
 
         return applyLeaverPenalty(conn, clientMatchId, userId, profileByUser.get(userId)!.score, new Date());
     });
+}
+
+/**
+ * 이 매치의 결과가 이미 저장됐는가. 재입장 판정용 — 결과가 있으면 경기는 끝난 것이다.
+ * roster는 재제출 멱등을 위해 종료 후에도 sweep 전까지 남으므로, roster 존재만으로는 진행 중을 알 수 없다.
+ */
+export async function hasResult(clientMatchId: string): Promise<boolean>
+{
+    const [rows] = await getPool().execute<RowDataPacket[]>(
+        'SELECT 1 FROM matches WHERE client_match_id = ? LIMIT 1',
+        [clientMatchId]
+    );
+
+    return rows.length > 0;
+}
+
+/**
+ * 결과가 끝내 오지 않은 매치를 abort로 남긴다. 기록만 — 점수·참가자는 건드리지 않는다.
+ *
+ * 왜 참가자 행을 쓰지 않나: 무슨 일이 있었는지 아는 주체는 DS뿐이고 그 DS는 죽었다.
+ * 등수를 지어내면 감사 기록이 거짓이 되고, 이미 탈주로 정산된 사람의 원장과도 어긋난다.
+ * 왜 점수를 건드리지 않나: 서버 측 사고인데 유저 점수를 깎을 근거가 없다.
+ * 이미 기록된 매치면 아무 일도 하지 않는다(늦게 도착한 진짜 결과를 덮지 않기 위해 IGNORE).
+ */
+export async function recordAbortedMatch(matchId: string, mapName: string, startedAt: Date, endedAt: Date): Promise<boolean>
+{
+    const durationSec = Math.max(0, Math.round((endedAt.getTime() - startedAt.getTime()) / 1000));
+    const [res] = await getPool().execute<ResultSetHeader>(
+        'INSERT IGNORE INTO matches ' +
+        '(client_match_id, map_name, started_at, ended_at, duration_sec, end_reason, winner_user_id) ' +
+        "VALUES (?, ?, ?, ?, ?, 'abort', NULL)",
+        [matchId, mapName, startedAt, endedAt, durationSec]
+    );
+
+    return res.affectedRows > 0;
+}
+
+/**
+ * 이 유저가 이 매치에서 이미 탈주로 정산됐는가. 재입장 판정용.
+ * DS는 매치 시작 후 이탈자를 KickedUserIds에 넣어 재입장을 거절하므로(D1MatchFlowComponent),
+ * 정산된 유저에게 주소를 주면 DS가 튕겨낸다 — 백엔드에서 미리 거른다.
+ */
+export async function isLeaverSettled(clientMatchId: string, userId: number): Promise<boolean>
+{
+    const [rows] = await getPool().execute<RowDataPacket[]>(
+        'SELECT 1 FROM match_leaver_settlements WHERE client_match_id = ? AND user_id = ? LIMIT 1',
+        [clientMatchId, userId]
+    );
+
+    return rows.length > 0;
 }
 
 /**
