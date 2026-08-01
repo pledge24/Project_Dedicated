@@ -84,32 +84,31 @@ bool UD1MapBuilder::Build(UWorld* World, AD1BomberGameState* GS, const FD1MapBui
 		return false;
 	}
 
-	// 폭발/경계 판정 권위 데이터(클라에도 복제). 맵 논리 이름은 결과 보고용 —
-	// 빈 값이면 애셋 오브젝트명으로 대체(백엔드 non-empty 검증 통과).
+	// 폭발/경계 판정 권위 데이터(클라에도 복제). 맵 논리 이름은 결과 보고용.
 	GS->SetGridData(Layout.GridSize, Layout.WallCells, Layout.SoftBlockCells,
-		MapToUse->MapName.IsEmpty() ? MapToUse->GetName() : MapToUse->MapName);
+		MapToUse->GetEffectiveMapName());
 
 	// 3. 맵 스폰
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 	// 벽(복제) — 메시·콜리전은 액터 생성자에 있어 클라도 동일 구성.
-	if (MapToUse->WallBlockClass)
+	if (MapToUse->GetWallBlockClass())
 	{
 		for (const FIntPoint& Cell : Layout.WallCells)
 		{
-			World->SpawnActor<AD1WallBlock>(MapToUse->WallBlockClass,
+			World->SpawnActor<AD1WallBlock>(MapToUse->GetWallBlockClass(),
 				UD1BomberGridLibrary::CellToWorldCenter(Cell, Cfg.BlockZ), FRotator::ZeroRotator, Params);
 		}
 	}
 
 	// 소프트블록(복제) — 파괴 중 상태는 자체 복제.
 	int32 AssignedItems = 0;
-	if (MapToUse->SoftBlockClass)
+	if (MapToUse->GetSoftBlockClass())
 	{
 		for (const FIntPoint& Cell : Layout.SoftBlockCells)
 		{
-			AD1SoftBlock* Block = World->SpawnActor<AD1SoftBlock>(MapToUse->SoftBlockClass,
+			AD1SoftBlock* Block = World->SpawnActor<AD1SoftBlock>(MapToUse->GetSoftBlockClass(),
 				UD1BomberGridLibrary::CellToWorldCenter(Cell, Cfg.BlockZ), FRotator::ZeroRotator, Params);
 			if (Block)
 			{
