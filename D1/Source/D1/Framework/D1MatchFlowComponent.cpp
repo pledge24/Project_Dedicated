@@ -8,15 +8,15 @@
 #include "EngineUtils.h"
 #include "Framework/D1BomberGameState.h"
 #include "Framework/D1BomberPlayerState.h"
+#include "Framework/D1MatchSettlement.h"
 #include "Framework/D1MatchTypes.h"
-#include "Framework/D1PlayerController.h"
+#include "Framework/D1PlayerRemovalComponent.h"
 #include "Game/Character/D1BomberCharacter.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Network/BackendTypes.h"
 #include "Network/D1DedicatedServerSubsystem.h"
 #include "Network/D1MatchResultSubsystem.h"
-#include "Network/D1OnlineSettings.h"
 #include "TimerManager.h"
 
 namespace
@@ -52,9 +52,6 @@ void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayers, float InWai
 	CurrentMatchId           = InMatchId;
 	CurrentMatchToken        = InMatchToken;
 	ExpectedRoster           = InExpectedRoster;
-
-	// 게임중 강제 회수(다른 기기 로그인) 폴링 시작 — 토큰 있는 실 DS에서만.
-	StartKickPolling();
 
 	// 맵 빌드·시작 게이트 준비 완료 → 백엔드에 "플레이어 받을 준비됨" 통지(토큰 있는 실 DS만).
 	// 백엔드는 이 콜백을 받고 클라에 match:found(입장 패킷) 전송. PIE/standalone은 토큰 없어 스킵.
@@ -182,6 +179,19 @@ void UD1MatchFlowComponent::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 	RequestEndEvaluation();
 }
 
+void UD1MatchFlowComponent::NotifyPlayerLeft(AD1BomberPlayerState* LeftPS)
+{
+	if (!HasServerAuthority() || IsMatchEnded() || !LeftPS)
+	{
+		return;
+	}
+
+	// 탈주자는 이미 최하위 등수가 부여된 상태(Placement>0) — 목록 초기화 시점과 무관하게 생존에서 빠진다.
+	EnsureAliveListInitialized();
+	AlivePlayerStates.Remove(LeftPS);
+	RequestEndEvaluation();
+}
+
 void UD1MatchFlowComponent::EnsureAliveListInitialized()
 {
 	if (AlivePlayerStates.Num() > 0)
@@ -292,14 +302,20 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 
 	FlushPendingDeaths(); // 시간만료/탈주 등 다른 경로 종료 시에도 대기 사망자 등수 확정
 
-	StopKickPolling();
+	AD1BomberGameState* GS = GetBomberGameState();
+	UD1PlayerRemovalComponent* Removal = GS ? GS->GetPlayerRemoval() : nullptr;
+
+	// 종료 확정 — 이후 kick은 재입장 거절·통지만 남도록 폴링 중지(킥·탈주 소유는 RemovalComp).
+	if (Removal)
+	{
+		Removal->StopKickPolling();
+	}
 
 	if (WinnerPS && WinnerPS->GetPlacement() <= 0)
 	{
 		WinnerPS->SetPlacement(1);
 	}
 
-	AD1BomberGameState* GS = GetBomberGameState();
 	if (GS)
 	{
 		GS->SetMatchPhase(EBomberMatchPhase::Finished);
@@ -322,50 +338,29 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 		}
 	}
 
-	if (!GS)
+	if (!GS || !Removal)
 	{
 		return;
 	}
 
-	// 최종 결과 스냅샷(UI 원자 복제) + 백엔드 보고용 수집을 한 번에.
-	TArray<FD1MatchResultEntry> Entries;
-	TArray<FMatchResultPlayer> ResultPlayers;
-	Entries.Reserve(GS->PlayerArray.Num() + LeftEntries.Num());
-	ResultPlayers.Reserve(GS->PlayerArray.Num() + LeftPlayers.Num());
+	// 미배정 생존자(시간 만료/무승부)는 공동 1위로 보정 — 백엔드는 placement 1~N만 허용.
+	// 탈주·kick 처리자는 ProcessLeaver가 이미 최하위를 부여해 여기 걸리지 않는다.
 	for (APlayerState* PS : GS->PlayerArray)
 	{
-		if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
+		AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS);
+		if (B && B->GetPlacement() <= 0)
 		{
-			// 탈주 유저는 이미 LeftPlayers/Entries로 캡처됨 — PlayerArray쪽 중복 방지.
-			// (Logout 지연으로 아직 PlayerArray에 남아있을 수 있다.)
-			if (KickedUserIds.Contains(B->GetBackendUserId()))
-			{
-				continue;
-			}
-
-			// 미배정 생존자(시간 만료/무승부)는 공동 1위로 보정 — 백엔드는 placement 1~N만 허용.
-			if (B->GetPlacement() <= 0)
-			{
-				B->SetPlacement(1);
-			}
-
-			AppendResultPair(Entries, ResultPlayers, B->GetBackendUserId(), B->GetPlayerSlotIndex(),
-				B->GetPlacement(), B->GetLives(), B->GetPlayerName(), /*bLeft=*/false);
+			B->SetPlacement(1);
 		}
 	}
 
-	// 탈주자 병합 — 결과 인원이 roster와 정확히 일치해야 백엔드 검증 통과.
-	Entries.Append(LeftEntries);
-	ResultPlayers.Append(LeftPlayers);
-
-	// 한 번도 입장하지 않은 인원까지 채워야 그 "정확히 일치"가 성립한다.
-	AppendNoShowResults(Entries, ResultPlayers);
-
-	// UI 표시용 결정적 순서: 등수 오름차순, 동률은 슬롯 순. (PlayerArray 순서는 비결정)
-	Entries.Sort([](const FD1MatchResultEntry& A, const FD1MatchResultEntry& B)
-	{
-		return A.Placement != B.Placement ? A.Placement < B.Placement : A.SlotIndex < B.SlotIndex;
-	});
+	// 최종 결과 스냅샷(UI 원자 복제) + 백엔드 보고 페이로드 — 조립은 정산 헬퍼에 위임.
+	// 탈주 캡처·kick 명단은 RemovalComp 소유 — 여기서 병합만 한다.
+	TArray<FD1MatchResultEntry> Entries;
+	TArray<FMatchResultPlayer> ResultPlayers;
+	D1MatchSettlement::BuildFinalResults(*GS, Removal->GetKickedUserIds(),
+		Removal->GetLeftEntries(), Removal->GetLeftPlayers(),
+		ExpectedRoster, ExpectedPlayerCount, Entries, ResultPlayers);
 
 	GS->SetFinalResults(Entries);
 
@@ -401,74 +396,6 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 		ResultReportHardCapSec, /*bLoop=*/false);
 }
 
-void UD1MatchFlowComponent::AppendNoShowResults(TArray<FD1MatchResultEntry>& InOutEntries,
-	TArray<FMatchResultPlayer>& InOutPlayers) const
-{
-	// PIE/standalone은 백엔드가 준 명단이 없어 보정할 기준 자체가 없다.
-	if (ExpectedRoster.Num() == 0)
-	{
-		return;
-	}
-
-	const AD1BomberGameState* GS = GetBomberGameState();
-	const int32 SeatCount = FMath::Max3(ExpectedPlayerCount,
-		GS ? GS->PlayerArray.Num() : 0, ExpectedRoster.Num());
-
-	// 이미 결과에 오른 신원과 좌석(봇이 쓴 좌석도 여기 포함되므로 그대로 피하면 된다).
-	TSet<int64> ReportedUsers;
-	TSet<int32> UsedSlots;
-	for (const FMatchResultPlayer& RP : InOutPlayers)
-	{
-		ReportedUsers.Add(RP.UserId);
-		UsedSlots.Add(RP.SlotIndex);
-	}
-
-	int32 NextFreeSlot = 0;
-	for (const FD1JoinEntry& Expected : ExpectedRoster)
-	{
-		if (ReportedUsers.Contains(Expected.UserId))
-		{
-			continue;
-		}
-
-		// 좌석이 배정된 적이 없다(ChoosePlayerStart는 PostLogin에서 돈다) → 빈 자리를 하나 준다.
-		// 백엔드가 slotIndex 유일성을 검증하고 DB에도 UNIQUE가 걸려 있다.
-		while (UsedSlots.Contains(NextFreeSlot))
-		{
-			++NextFreeSlot;
-		}
-		UsedSlots.Add(NextFreeSlot);
-
-		// Left=true로 보고하는 이유: 완주자 ELO 계산에서 빠져 정상 플레이한 사람들끼리만 점수가 오간다.
-		// (Left=false면 미입장자가 실참가자로 ELO에 섞인다.) 입장 직후 나간 탈주자와 동일 취급이라
-		// "안 들어오는 편이 이득"인 비대칭도 생기지 않는다.
-		AppendResultPair(InOutEntries, InOutPlayers, Expected.UserId, NextFreeSlot,
-			SeatCount, /*LivesLeft=*/0, Expected.Nickname, /*bLeft=*/true);
-
-		UE_LOG(LogD1, Warning, TEXT("[Match] 미입장자 결과 보정 userId=%lld nickname=%s slot=%d placement=%d"),
-			Expected.UserId, *Expected.Nickname, NextFreeSlot, SeatCount);
-	}
-}
-
-void UD1MatchFlowComponent::AppendResultPair(TArray<FD1MatchResultEntry>& InOutEntries, TArray<FMatchResultPlayer>& InOutPlayers,
-	int64 UserId, int32 SlotIndex, int32 Placement, int32 LivesLeft, const FString& Nickname, bool bLeft)
-{
-	FD1MatchResultEntry Entry;
-	Entry.Placement = Placement;
-	Entry.Nickname  = Nickname;
-	Entry.SlotIndex = SlotIndex;
-	Entry.LivesLeft = LivesLeft;
-	InOutEntries.Add(Entry);
-
-	FMatchResultPlayer Player;
-	Player.UserId    = UserId;
-	Player.SlotIndex = SlotIndex;
-	Player.Placement = Placement;
-	Player.LivesLeft = LivesLeft;
-	Player.Left      = bLeft;
-	InOutPlayers.Add(Player);
-}
-
 void UD1MatchFlowComponent::BeginShutdownAfterReport()
 {
 	UWorld* World = GetWorld();
@@ -484,176 +411,6 @@ void UD1MatchFlowComponent::BeginShutdownAfterReport()
 	{
 		DS->BeginShutdownWatch(ShutdownGraceSec);
 	}
-}
-
-void UD1MatchFlowComponent::NotifyPlayerDisconnected(AController* Exiting)
-{
-	if (!HasServerAuthority() || !Exiting)
-	{
-		return;
-	}
-
-	AD1BomberPlayerState* PS = Exiting->GetPlayerState<AD1BomberPlayerState>();
-	if (!PS)
-	{
-		return;
-	}
-
-	const int64 UserId = PS->GetBackendUserId();
-
-	// 봇·이미 탈주·이미 kick 처리·매치 미시작/종료는 제외 — 진행 중 실유저 이탈만 탈주로.
-	if (PS->IsBot() || PS->HasLeft() || UserId <= 0 || KickedUserIds.Contains(UserId)
-		|| !HasMatchStarted() || IsMatchEnded())
-	{
-		return;
-	}
-
-	KickedUserIds.Add(UserId); // 재입장 거절 + 중복 방지
-	ProcessLeaver(PS, /*bNotifyClient=*/false);
-}
-
-void UD1MatchFlowComponent::StartKickPolling()
-{
-	// 백엔드가 띄운 DS(토큰 보유)에서만 — PIE/standalone은 폴링 없음.
-	if (CurrentMatchToken.IsEmpty())
-	{
-		return;
-	}
-
-	if (UWorld* World = GetWorld())
-	{
-		const float Interval = FMath::Max(1.f, GetDefault<UD1OnlineSettings>()->KickPollIntervalSec);
-		World->GetTimerManager().SetTimer(
-			KickPollTimerHandle, this, &UD1MatchFlowComponent::PollKicks, Interval, /*bLoop=*/true);
-	}
-}
-
-void UD1MatchFlowComponent::StopKickPolling()
-{
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(KickPollTimerHandle);
-	}
-}
-
-void UD1MatchFlowComponent::PollKicks()
-{
-	UD1MatchResultSubsystem* Result = GetResultClient();
-	if (CurrentMatchId.IsEmpty() || !Result)
-	{
-		return;
-	}
-
-	TWeakObjectPtr<UD1MatchFlowComponent> WeakThis(this);
-	Result->FetchKicks(CurrentMatchId, CurrentMatchToken,
-		[WeakThis](const TArray<int64>& UserIds)
-		{
-			UD1MatchFlowComponent* Self = WeakThis.Get();
-			if (!Self)
-			{
-				return;
-			}
-
-			for (const int64 UserId : UserIds)
-			{
-				Self->HandleKickUser(UserId);
-			}
-		});
-}
-
-void UD1MatchFlowComponent::HandleKickUser(int64 UserId)
-{
-	if (!HasServerAuthority() || UserId <= 0 || KickedUserIds.Contains(UserId))
-	{
-		return;
-	}
-
-	AD1BomberGameState* GS = GetBomberGameState();
-	if (!GS)
-	{
-		return;
-	}
-
-	AD1BomberPlayerState* Target = nullptr;
-	for (APlayerState* PS : GS->PlayerArray)
-	{
-		if (AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
-		{
-			if (B->GetBackendUserId() == UserId)
-			{
-				Target = B;
-				break;
-			}
-		}
-	}
-
-	// 표시(중복·재입장 방어). 미접속 유저면 접속 시 PreLogin이 거절.
-	KickedUserIds.Add(UserId);
-
-	if (!Target)
-	{
-		return;
-	}
-
-	// 매치가 이미 끝났으면 결과는 확정 — 통지만(로그인 복귀).
-	if (IsMatchEnded())
-	{
-		if (AD1PlayerController* PC = Cast<AD1PlayerController>(Target->GetOwningController()))
-		{
-			PC->ClientNotifySessionSuperseded();
-		}
-		return;
-	}
-
-	ProcessLeaver(Target, /*bNotifyClient=*/true);
-}
-
-void UD1MatchFlowComponent::ProcessLeaver(AD1BomberPlayerState* Target, bool bNotifyClient)
-{
-	AD1BomberGameState* GS = GetBomberGameState();
-	if (!GS || !Target)
-	{
-		return;
-	}
-
-	const int64 UserId = Target->GetBackendUserId();
-
-	// 탈주 처리(사망과 별개). 전원 꼴등(정원 고정), 캐릭터 사라짐, 결과 캡처(Logout로 빠지기 전).
-	EnsureAliveListInitialized();
-	const int32 LastPlacement = FMath::Max(ExpectedPlayerCount, GS->PlayerArray.Num());
-	Target->SetPlacement(LastPlacement);
-	Target->SetLeft(); // bLeft 복제 → 캐릭터 사라짐 + 카드 "탈주"
-
-	// PS가 제거돼도(끊김/kick 후 disconnect) 카드가 "탈주"를 매치 끝까지 유지하도록 슬롯을 GameState에 복제 기록.
-	GS->MarkSlotLeft(Target->GetPlayerSlotIndex(), Target->GetPlayerName());
-
-	AlivePlayerStates.Remove(Target);
-
-	AppendResultPair(LeftEntries, LeftPlayers, UserId, Target->GetPlayerSlotIndex(),
-		LastPlacement, Target->GetLives(), Target->GetPlayerName(), /*bLeft=*/true);
-
-	// 탈주 즉시 정산 — 백엔드가 최하위 확정값을 바로 반영(로비 즉시 반영). 토큰 있는 실 DS만.
-	if (UD1MatchResultSubsystem* ResultClient = GetResultClient())
-	{
-		ResultClient->ReportLeaver(CurrentMatchId, CurrentMatchToken, UserId);
-	}
-
-	// 클라 통지(팝업 + 로그인 복귀) + 남은 시간 입력 차단. 끊김(disconnect)은 이미 떠나 생략.
-	if (bNotifyClient)
-	{
-		if (AD1PlayerController* PC = Cast<AD1PlayerController>(Target->GetOwningController()))
-		{
-			PC->ClientNotifySessionSuperseded();
-			PC->DisableInput(PC);
-		}
-	}
-
-	UE_LOG(LogD1, Log, TEXT("[Match] 탈주 처리 userId=%lld placement=%d"), UserId, LastPlacement);
-
-	// 종료 판정은 다음 틱으로 미룬다(사망 파이프라인과 동일). 한 배치(kick 폴링 응답)·한 프레임의
-	// 탈주자를 모두 캡처한 뒤 EvaluateEndCondition이 한 번만 판정 → 앞 탈주가 매치를 끝내
-	// 뒤 탈주가 IsMatchEnded 가드에 스킵되던 순서 의존 제거. 전원 탈주는 생존 0 → Draw로 정확 판정.
-	RequestEndEvaluation();
 }
 
 bool UD1MatchFlowComponent::HasMatchStarted() const
