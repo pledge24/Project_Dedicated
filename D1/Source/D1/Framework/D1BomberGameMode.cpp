@@ -5,6 +5,7 @@
 #include "Framework/D1BomberPlayerState.h"
 #include "Framework/D1BotController.h"
 #include "Framework/D1MatchFlowComponent.h"
+#include "Framework/D1PlayerRemovalComponent.h"
 #include "Systems/Map/D1MapBuilder.h"
 #include "Systems/Map/D1MapData.h"
 #include "Framework/D1MatchTypes.h"
@@ -73,9 +74,9 @@ void AD1BomberGameMode::PreLogin(const FString& Options, const FString& Address,
 
 	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
 	{
-		if (const UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
+		if (const UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval())
 		{
-			if (Flow->IsUserKicked(Entry->UserId))
+			if (Removal->IsUserKicked(Entry->UserId))
 			{
 				ErrorMessage = TEXT("세션이 다른 기기 로그인으로 종료되어 재입장할 수 없습니다.");
 				UE_LOG(LogD1, Warning, TEXT("[Match] PreLogin 거절 — kick된 유저 재입장 시도 userId=%lld"), Entry->UserId);
@@ -102,9 +103,9 @@ void AD1BomberGameMode::Logout(AController* Exiting)
 	// 매치 진행 중 이탈(접속 끊김/나가기)은 탈주로 처리 — Super가 PS를 제거하기 전에 캡처.
 	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
 	{
-		if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
+		if (UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval())
 		{
-			Flow->NotifyPlayerDisconnected(Exiting);
+			Removal->NotifyPlayerDisconnected(Exiting);
 		}
 	}
 
@@ -145,10 +146,15 @@ void AD1BomberGameMode::BeginPlay()
 	// 봇전: PlayerStart가 준비된(맵 빌드 후) 다음, 시작 게이트 전에 봇을 스폰해 PlayerArray를 채운다.
 	SpawnBots();
 
-	// 매치 흐름은 GameState의 컴포넌트가 소유. 설정을 넘기고 시작 게이트를 위임.
+	// 매치 흐름·킥·탈주는 GameState의 컴포넌트가 소유. 설정을 push하고 시작 게이트를 위임.
 	// 명단도 함께 넘긴다 — 끝까지 입장하지 않은 유저를 결과에 채우려면 "와야 할 사람"을 알아야 한다.
 	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
 	{
+		if (UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval())
+		{
+			Removal->InitializeRemoval(MatchConfig.ExpectedPlayers, MatchConfig.MatchId, MatchConfig.MatchToken);
+		}
+
 		if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
 		{
 			TArray<FD1JoinEntry> ExpectedRoster;

@@ -3,6 +3,7 @@
 #include "Framework/D1BomberGameState.h"
 #include "Framework/D1BomberPlayerState.h"
 #include "Framework/D1MatchFlowComponent.h"
+#include "Framework/D1PlayerRemovalComponent.h"
 #include "Net/UnrealNetwork.h"
 
 
@@ -11,8 +12,9 @@ AD1BomberGameState::AD1BomberGameState()
 	// 서버시간 복제 주기 기본 5초 → 0.5초. HUD 타이머 클라간 드리프트 완화.
 	ServerWorldTimeSecondsUpdateFrequency = 0.5f;
 
-	// 매치 흐름 로직은 컴포넌트로 위임(서버 전용 실행). GameState 수명과 동일.
-	MatchFlowComp = CreateDefaultSubobject<UD1MatchFlowComponent>(TEXT("MatchFlow"));
+	// 매치 흐름·킥·탈주 로직은 컴포넌트로 위임(서버 전용 실행). GameState 수명과 동일.
+	MatchFlowComp     = CreateDefaultSubobject<UD1MatchFlowComponent>(TEXT("MatchFlow"));
+	PlayerRemovalComp = CreateDefaultSubobject<UD1PlayerRemovalComponent>(TEXT("PlayerRemoval"));
 }
 
 void AD1BomberGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

@@ -10,6 +10,7 @@
 class APlayerState;
 class AD1BomberPlayerState;
 class UD1MatchFlowComponent;
+class UD1PlayerRemovalComponent;
 
 /** 매치 진행 단계. */
 UENUM(BlueprintType)
@@ -155,13 +156,20 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_FinalResults, BlueprintReadOnly, Category = "Bomber|Match", meta = (AllowPrivateAccess = "true"))
 	TArray<FD1MatchResultEntry> FinalResults;
 
-//~ 매치 흐름 컴포넌트
+//~ 서버 로직 컴포넌트
 public:
-	/** 매치 흐름 컴포넌트(서버 로직). 생성자에서 항상 생성 → non-null. */
+	/** 매치 흐름 컴포넌트(시작 게이트·등수·종료 판정). 생성자에서 항상 생성 → non-null. */
 	UD1MatchFlowComponent* GetMatchFlow() const { return MatchFlowComp; }
+
+	/** 킥·탈주 처리 컴포넌트. 생성자에서 항상 생성 → non-null. */
+	UD1PlayerRemovalComponent* GetPlayerRemoval() const { return PlayerRemovalComp; }
 
 private:
 	/** 매치 흐름 로직 소유(서버 전용 실행). 복제 없음. */
 	UPROPERTY()
 	TObjectPtr<UD1MatchFlowComponent> MatchFlowComp;
+
+	/** 게임중 kick·탈주 처리 소유(서버 전용 실행). 복제 없음. */
+	UPROPERTY()
+	TObjectPtr<UD1PlayerRemovalComponent> PlayerRemovalComp;
 };
