@@ -13,7 +13,7 @@ struct FD1MatchConfig
 {
 	/** 결과 POST 인증용(비면 스킵 = PIE/standalone). */
 	FString MatchId;
-	FString MatchToken;
+	FString ServerToken;
 
 	/** 시작 정원(0/1=즉시). */
 	int32 ExpectedPlayerCount = 0;
@@ -35,6 +35,6 @@ private:
 	/** 설정 파일(JSON) 파싱. 성공 시 true. 읽은 파일은 즉시 지운다 — 토큰이 디스크에 남는 창을 줄인다. */
 	bool LoadFromFile(const FString& FilePath);
 
-	/** -MatchConfig= 파일이 없을 때의 폴백(PIE·수동 실행) — -MatchId/-MatchToken/-Roster/-Bots 스위치에서 직접 파싱. */
+	/** -MatchConfig= 파일이 없을 때의 폴백(PIE·수동 실행) — -MatchId/-ServerToken/-Roster/-Bots 스위치에서 직접 파싱. */
 	void LoadFromCommandLine();
 };

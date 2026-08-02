@@ -12,7 +12,7 @@
 #include "Network/D1BackendHttp.h"
 #include "TimerManager.h"
 
-void UD1MatchResultSubsystem::ReportDSReady(const FString& MatchId, const FString& MatchToken)
+void UD1MatchResultSubsystem::ReportDSReady(const FString& MatchId, const FString& ServerToken)
 {
 	FD1ReportPolicy Policy;
 	Policy.Label = TEXT("준비");
@@ -22,10 +22,10 @@ void UD1MatchResultSubsystem::ReportDSReady(const FString& MatchId, const FStrin
 
 	// 빈 바디({}) — matchId는 경로, 인증은 매치별 서버 토큰. 백엔드는 이 도착만으로 "DS 준비됨" 판정.
 	const FString Path = FString::Printf(TEXT("/api/match/%s/ready"), *MatchId);
-	SendReport(Path, MatchToken, MakeShared<FJsonObject>(), /*Attempt=*/0, Policy, ServerReadyRetryTimerHandle);
+	SendReport(Path, ServerToken, MakeShared<FJsonObject>(), /*Attempt=*/0, Policy, ServerReadyRetryTimerHandle);
 }
 
-void UD1MatchResultSubsystem::ReportMatchResult(const FString& MatchId, const FString& MatchToken, const FString& MapName,
+void UD1MatchResultSubsystem::ReportMatchResult(const FString& MatchId, const FString& ServerToken, const FString& MapName,
 	int32 DurationSec, const FString& EndReason, const TArray<FMatchResultPlayer>& Players,
 	const FSimpleDelegate& OnSettled)
 {
@@ -60,17 +60,17 @@ void UD1MatchResultSubsystem::ReportMatchResult(const FString& MatchId, const FS
 	Policy.OnSettled = OnSettled;
 
 	UE_LOG(LogD1, Log, TEXT("[Match] 결과 POST 시작 matchId=%s reason=%s players=%d"), *MatchId, *EndReason, Players.Num());
-	SendReport(TEXT("/api/match/result"), MatchToken, Body, /*Attempt=*/0, Policy, MatchResultRetryTimerHandle);
+	SendReport(TEXT("/api/match/result"), ServerToken, Body, /*Attempt=*/0, Policy, MatchResultRetryTimerHandle);
 }
 
-void UD1MatchResultSubsystem::ReportLeaver(const FString& MatchId, const FString& MatchToken, int64 UserId)
+void UD1MatchResultSubsystem::ReportLeaver(const FString& MatchId, const FString& ServerToken, int64 UserId)
 {
 	const TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
 	Body->SetNumberField(TEXT("userId"), static_cast<double>(UserId));
 
 	const FString Path = FString::Printf(TEXT("/api/match/%s/leaver"), *MatchId);
 	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildPostJson(
-		GetGameInstance(), Path, Body, D1BackendHttp::EBackendAuth::ServerToken, MatchToken);
+		GetGameInstance(), Path, Body, D1BackendHttp::EBackendAuth::ServerToken, ServerToken);
 
 	Request->OnProcessRequestComplete().BindLambda(
 		[UserId](FHttpRequestPtr Req, FHttpResponsePtr Res, bool bSucceeded)
@@ -87,12 +87,12 @@ void UD1MatchResultSubsystem::ReportLeaver(const FString& MatchId, const FString
 	UE_LOG(LogD1, Log, TEXT("[Match] 탈주 즉시 정산 POST userId=%lld matchId=%s"), UserId, *MatchId);
 }
 
-void UD1MatchResultSubsystem::FetchKicks(const FString& MatchId, const FString& MatchToken,
+void UD1MatchResultSubsystem::FetchKicks(const FString& MatchId, const FString& ServerToken,
 	TFunction<void(const TArray<int64>&)> OnKicked)
 {
 	const FString Path = FString::Printf(TEXT("/api/match/%s/kicks"), *MatchId);
 	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildGet(
-		GetGameInstance(), Path, D1BackendHttp::EBackendAuth::ServerToken, MatchToken);
+		GetGameInstance(), Path, D1BackendHttp::EBackendAuth::ServerToken, ServerToken);
 
 	D1BackendHttp::SendAsync(this, Request,
 		[OnKicked = MoveTemp(OnKicked)](const FHttpResponsePtr& Res, bool bSucceeded)
@@ -133,16 +133,16 @@ void UD1MatchResultSubsystem::FetchKicks(const FString& MatchId, const FString& 
 		});
 }
 
-void UD1MatchResultSubsystem::SendReport(const FString& Path, const FString& MatchToken,
+void UD1MatchResultSubsystem::SendReport(const FString& Path, const FString& ServerToken,
 	const TSharedRef<FJsonObject>& Body, int32 Attempt, const FD1ReportPolicy& Policy, FTimerHandle& RetryTimerHandle)
 {
 	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildPostJson(
-		GetGameInstance(), Path, Body, D1BackendHttp::EBackendAuth::ServerToken, MatchToken);
+		GetGameInstance(), Path, Body, D1BackendHttp::EBackendAuth::ServerToken, ServerToken);
 
 	TWeakObjectPtr<UD1MatchResultSubsystem> WeakThis(this);
 	FTimerHandle* TimerHandlePtr = &RetryTimerHandle;
 	Request->OnProcessRequestComplete().BindLambda(
-		[WeakThis, Path, MatchToken, Body, Attempt, Policy, TimerHandlePtr](FHttpRequestPtr, FHttpResponsePtr Res, bool bSucceeded)
+		[WeakThis, Path, ServerToken, Body, Attempt, Policy, TimerHandlePtr](FHttpRequestPtr, FHttpResponsePtr Res, bool bSucceeded)
 		{
 			const int32 Code = (bSucceeded && Res.IsValid()) ? Res->GetResponseCode() : 0;
 
@@ -200,9 +200,9 @@ void UD1MatchResultSubsystem::SendReport(const FString& Path, const FString& Mat
 			UE_LOG(LogD1, Warning, TEXT("[Match] %s POST 일시 실패 code=%d — %.0fs 후 재시도(%d/%d)"),
 				*Policy.Label, Code, RetryDelaySec, NextAttempt, Policy.RetryDelaysSec.Num());
 			World->GetTimerManager().SetTimer(*TimerHandlePtr,
-				FTimerDelegate::CreateWeakLambda(Self, [Self, Path, MatchToken, Body, NextAttempt, Policy, TimerHandlePtr]()
+				FTimerDelegate::CreateWeakLambda(Self, [Self, Path, ServerToken, Body, NextAttempt, Policy, TimerHandlePtr]()
 				{
-					Self->SendReport(Path, MatchToken, Body, NextAttempt, Policy, *TimerHandlePtr);
+					Self->SendReport(Path, ServerToken, Body, NextAttempt, Policy, *TimerHandlePtr);
 				}),
 				RetryDelaySec, /*bLoop=*/false);
 		});

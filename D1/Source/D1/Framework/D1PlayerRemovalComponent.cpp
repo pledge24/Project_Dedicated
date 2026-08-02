@@ -19,7 +19,7 @@ UD1PlayerRemovalComponent::UD1PlayerRemovalComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UD1PlayerRemovalComponent::InitializeRemoval(int32 InExpectedPlayerCount, const FString& InMatchId, const FString& InMatchToken)
+void UD1PlayerRemovalComponent::InitializeRemoval(int32 InExpectedPlayerCount, const FString& InMatchId, const FString& InServerToken)
 {
 	if (!HasServerAuthority())
 	{
@@ -28,7 +28,7 @@ void UD1PlayerRemovalComponent::InitializeRemoval(int32 InExpectedPlayerCount, c
 
 	ExpectedPlayerCount = InExpectedPlayerCount;
 	CurrentMatchId      = InMatchId;
-	CurrentMatchToken   = InMatchToken;
+	CurrentServerToken   = InServerToken;
 
 	// 게임중 강제 회수(다른 기기 로그인) 폴링 시작 — 토큰 있는 실 DS에서만.
 	StartKickPolling();
@@ -63,7 +63,7 @@ void UD1PlayerRemovalComponent::NotifyPlayerDisconnected(AController* Exiting)
 void UD1PlayerRemovalComponent::StartKickPolling()
 {
 	// 백엔드가 띄운 DS(토큰 보유)에서만 — PIE/standalone은 폴링 없음.
-	if (CurrentMatchToken.IsEmpty())
+	if (CurrentServerToken.IsEmpty())
 	{
 		return;
 	}
@@ -93,7 +93,7 @@ void UD1PlayerRemovalComponent::PollKicks()
 	}
 
 	TWeakObjectPtr<UD1PlayerRemovalComponent> WeakThis(this);
-	Result->FetchKicks(CurrentMatchId, CurrentMatchToken,
+	Result->FetchKicks(CurrentMatchId, CurrentServerToken,
 		[WeakThis](const TArray<int64>& UserIds)
 		{
 			UD1PlayerRemovalComponent* Self = WeakThis.Get();
@@ -180,7 +180,7 @@ void UD1PlayerRemovalComponent::RemoveLeaver(AD1BomberPlayerState* Target, bool 
 	// 탈주 즉시 정산 — 백엔드가 최하위 확정값을 바로 반영(로비 즉시 반영). 토큰 있는 실 DS만.
 	if (UD1MatchResultSubsystem* ResultClient = GetResultClient())
 	{
-		ResultClient->ReportLeaver(CurrentMatchId, CurrentMatchToken, UserId);
+		ResultClient->ReportLeaver(CurrentMatchId, CurrentServerToken, UserId);
 	}
 
 	// 클라 통지(팝업 + 로그인 복귀) + 남은 시간 입력 차단. 끊김(disconnect)은 이미 떠나 생략.
@@ -223,7 +223,7 @@ AD1BomberGameState* UD1PlayerRemovalComponent::GetBomberGameState() const
 
 UD1MatchResultSubsystem* UD1PlayerRemovalComponent::GetResultClient() const
 {
-	if (CurrentMatchToken.IsEmpty())
+	if (CurrentServerToken.IsEmpty())
 	{
 		return nullptr;
 	}

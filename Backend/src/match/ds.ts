@@ -27,7 +27,7 @@ interface DsProcess
 interface MatchConfigFile
 {
     matchId: string;
-    matchToken: string;
+    serverToken: string;
     expectedPlayers: number;
     roster: { joinToken: string; userId: number; nickname: string }[];
     bots: { userId: number; nickname: string }[];
@@ -180,7 +180,7 @@ function spawnOnPort(port: number, matchId: string, serverToken: string, expecte
      */
     const configPath = writeMatchConfig(matchId, {
         matchId,
-        matchToken: serverToken,
+        serverToken,
         expectedPlayers,
         roster: roster.map((r) => ({ joinToken: r.joinToken, userId: r.userId, nickname: r.nickname })),
         bots: bots.map((b) => ({ userId: b.userId, nickname: b.nickname })),

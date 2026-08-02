@@ -29,7 +29,7 @@ public:
 public:
 	/** 서버 전용: GameMode::BeginPlay가 cmdline 파싱·맵빌드 후 호출. 설정을 받고 시작 게이트를 arm. */
 	void InitializeMatch(int32 InExpectedPlayerCount, float InWaitTimeoutSec, float InShutdownGraceSec,
-		const FString& InMatchId, const FString& InMatchToken, const TArray<FD1JoinEntry>& InExpectedRoster);
+		const FString& InMatchId, const FString& InServerToken, const TArray<FD1JoinEntry>& InExpectedRoster);
 
 	/** 서버 전용: GameMode::PostLogin이 호출. 예상 인원 도달 시 매치 시작. */
 	void NotifyPlayerJoined();
@@ -92,7 +92,7 @@ private:
 	/** GameMode가 InitializeMatch로 주입. 셧다운 유예와 결과 POST 인증값. */
 	float ShutdownGraceSec = 30.f;
 	FString CurrentMatchId;
-	FString CurrentMatchToken;
+	FString CurrentServerToken;
 
 	/**
 	 * 결과 보고 확정을 기다리는 상한. 넘으면 보고를 포기하고 종료한다.
