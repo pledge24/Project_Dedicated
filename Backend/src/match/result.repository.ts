@@ -35,7 +35,7 @@ export interface SaveResultInput
 }
 
 /** ELO 계산 결과 반환 구조체 */
-export interface ParticipantScoreResult
+export interface PlayerScoreResult
 {
     userId: number;
     placement: number;
@@ -70,13 +70,13 @@ const PLACEMENT_EXP = [100, 70, 40, 20];
 
 // 등수별 기본 배점(1~4등). 1·2위 양수, 4위 음수 → 매치 총합이 순양수(인플레이션).
 // 3위는 0이라 ELO항이 부호를 결정(소폭 +/−). 순수 ELO(elo.ts)에 이 값을 더해 clamp한다.
-const PLACEMENT_BASE_POINTS = [45, 20, 0, -35];
+const PLACEMENT_BASE_SCORE_DELTAS = [45, 20, 0, -35];
 
 // 레벨당 필요 경험치(전 구간 균일). level = floor(exp / EXP_PER_LEVEL) + 1.
 const EXP_PER_LEVEL = 1000;
 
 /** 결과를 원자적으로 기록하고 ELO로 점수를 갱신한다. matchId 중복 시 ER_DUP_ENTRY를 throw. */
-export async function saveResult(input: SaveResultInput): Promise<ParticipantScoreResult[]>
+export async function saveResult(input: SaveResultInput): Promise<PlayerScoreResult[]>
 {
     return withTransaction(async (conn) =>
     {
@@ -119,7 +119,7 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
                 {
                     return; // 봇: 점수 누적처 없음 → row 생성·프로필 갱신 안 함(delta는 계산에만 기여)
                 }
-                const c = computeParticipantResult(p.placement, ratings[i], deltas[i],
+                const c = computePlayerResult(p.placement, ratings[i], deltas[i],
                     config.match.scoreFloor, config.match.scoreCeiling, profileByUser.get(p.userId)!.exp);
                 rows.push({ p, c, updateProfile: true });
             });
@@ -128,7 +128,7 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
         // ── 탈주자: 원장에 이미 정산됐으면(/leaver 즉시정산) 그 값 재사용, 없으면 지금 정산(escape 방지) ──
         for (const p of leavers)
         {
-            const existing = await selectSettlement(conn, input.matchId, p.userId);
+            const existing = await findSettlement(conn, input.matchId, p.userId);
             const info = existing
                 ?? await applyLeaverPenalty(conn, input.matchId, p.userId, profileByUser.get(p.userId)!.score, input.endedAt);
             rows.push({
@@ -152,7 +152,7 @@ export async function saveResult(input: SaveResultInput): Promise<ParticipantSco
         );
 
         // player_profiles는 행마다 값이 달라 개별 UPDATE. 정산 완료 탈주자(updateProfile=false)는 skip.
-        const saved: ParticipantScoreResult[] = [];
+        const saved: PlayerScoreResult[] = [];
         for (const { p, c, updateProfile } of rows)
         {
             if (updateProfile)
@@ -199,7 +199,7 @@ export async function settleLeaverProfile(clientMatchId: string, userId: number)
     return withTransaction(async (conn) =>
     {
         const profileByUser = await lockAndFetchProfiles(conn, [userId]);
-        const existing = await selectSettlement(conn, clientMatchId, userId);
+        const existing = await findSettlement(conn, clientMatchId, userId);
         if (existing)
         {
             return existing;
@@ -292,7 +292,7 @@ async function applyLeaverPenalty(conn: PoolConnection, clientMatchId: string, u
  * 다중 동시 탈주에서 데드락. 호출부의 프로필 FOR UPDATE가 선행하므로, 이 평문 SELECT의 read-view는
  * 잠금 획득 후 형성되어 경쟁 트랜잭션의 커밋된 정산을 관측한다(원장 조회 앞에 다른 SELECT 금지).
  */
-async function selectSettlement(conn: PoolConnection, clientMatchId: string, userId: number): Promise<SettledLeaver | null>
+async function findSettlement(conn: PoolConnection, clientMatchId: string, userId: number): Promise<SettledLeaver | null>
 {
     const [rows] = await conn.query<SettlementRow[]>(
         'SELECT score_delta, score_after FROM match_leaver_settlements WHERE client_match_id = ? AND user_id = ?',
@@ -325,10 +325,10 @@ async function lockAndFetchProfiles(conn: PoolConnection, userIds: number[]): Pr
 }
 
 /** 완주자 한 명의 점수·레벨 파생값(순수). floor·ceiling 적용 후 실제 변화량을 scoreDelta로 반환 → before+delta=after 보장. */
-function computeParticipantResult(placement: number, before: number, delta: number, scoreFloor: number, scoreCeiling: number, expBefore: number)
+function computePlayerResult(placement: number, before: number, delta: number, scoreFloor: number, scoreCeiling: number, expBefore: number)
 {
     // delta는 순수 ELO항. 등수 기본배점을 더한 뒤 상·하한으로 clamp.
-    const after = Math.min(scoreCeiling, Math.max(scoreFloor, before + delta + basePointsForPlacement(placement)));
+    const after = Math.min(scoreCeiling, Math.max(scoreFloor, before + delta + baseScoreDeltaForPlacement(placement)));
     const expGained = expForPlacement(placement);
 
     return {
@@ -346,7 +346,7 @@ function computeLeaverAfter(before: number, scoreFloor: number, scoreCeiling: nu
 {
     const lastPlacement = config.match.playersPerMatch;
 
-    return Math.min(scoreCeiling, Math.max(scoreFloor, before + basePointsForPlacement(lastPlacement) - leaverPenalty));
+    return Math.min(scoreCeiling, Math.max(scoreFloor, before + baseScoreDeltaForPlacement(lastPlacement) - leaverPenalty));
 }
 
 /** 등수별 획득 경험치. 범위를 벗어나면 최저값. */
@@ -356,9 +356,9 @@ function expForPlacement(placement: number): number
 }
 
 /** 등수별 기본 배점. 범위를 벗어나면 최저값(꼴찌 취급). */
-function basePointsForPlacement(placement: number): number
+function baseScoreDeltaForPlacement(placement: number): number
 {
-    return PLACEMENT_BASE_POINTS[placement - 1] ?? PLACEMENT_BASE_POINTS[PLACEMENT_BASE_POINTS.length - 1];
+    return PLACEMENT_BASE_SCORE_DELTAS[placement - 1] ?? PLACEMENT_BASE_SCORE_DELTAS[PLACEMENT_BASE_SCORE_DELTAS.length - 1];
 }
 
 /** 누적 경험치로 레벨 산출. 전 구간 EXP_PER_LEVEL당 1레벨 (Lv.1 = exp 0~999). */

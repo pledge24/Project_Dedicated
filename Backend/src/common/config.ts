@@ -14,7 +14,7 @@ export const config = Object.freeze({
         name: process.env.DB_NAME || 'd1',
     }),
     jwt: Object.freeze({
-        secret: required('JWT_SECRET', validateJwtSecret),
+        secret: required('JWT_SECRET', assertJwtSecret),
         ttl: process.env.JWT_TTL || '24h',
     }),
     rateLimit: Object.freeze({
@@ -112,7 +112,7 @@ function asNumber(name: string, def: number): number
     return n;
 }
 
-function validateJwtSecret(v: string, name: string): void
+function assertJwtSecret(v: string, name: string): void
 {
     if (v.length < 16)
     {

@@ -15,7 +15,7 @@ void UD1DedicatedServerSubsystem::BeginShutdownWatch(float InGraceSec)
 		return;
 	}
 
-	// 재호출로 Elapsed를 되돌리면 하드캡이 무한 연장된다 — 첫 호출의 유예만 유효.
+	// 재호출로 ElapsedSec를 되돌리면 하드캡이 무한 연장된다 — 첫 호출의 유예만 유효.
 	if (bWatchStarted)
 	{
 		return;
@@ -23,7 +23,7 @@ void UD1DedicatedServerSubsystem::BeginShutdownWatch(float InGraceSec)
 	bWatchStarted = true;
 
 	GraceSec = InGraceSec;
-	Elapsed = 0.f;
+	ElapsedSec = 0.f;
 	GetWorld()->GetTimerManager().SetTimer(
 		WatchTimerHandle, this, &UD1DedicatedServerSubsystem::TickWatch, 1.f, /*bLoop=*/true);
 	UE_LOG(LogD1, Log, TEXT("[Match] 종료 감시 시작 — 전원 퇴장 또는 %.0fs 후 DS 종료"), GraceSec);
@@ -48,8 +48,8 @@ void UD1DedicatedServerSubsystem::TickWatch()
 		return;
 	}
 
-	Elapsed += 1.f;
-	if (Elapsed >= GraceSec)
+	ElapsedSec += 1.f;
+	if (ElapsedSec >= GraceSec)
 	{
 		UE_LOG(LogD1, Warning, TEXT("[Match] 종료 하드캡(%.0fs) 도달 — 잔류 클라 무시하고 DS 종료"), GraceSec);
 		RequestExit();

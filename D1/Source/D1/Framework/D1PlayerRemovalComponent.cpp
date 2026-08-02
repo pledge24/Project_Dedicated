@@ -57,7 +57,7 @@ void UD1PlayerRemovalComponent::NotifyPlayerDisconnected(AController* Exiting)
 	}
 
 	KickedUserIds.Add(UserId); // 재입장 거절 + 중복 방지
-	ProcessLeaver(PS, /*bNotifyClient=*/false);
+	RemoveLeaver(PS, /*bNotifyClient=*/false);
 }
 
 void UD1PlayerRemovalComponent::StartKickPolling()
@@ -104,12 +104,12 @@ void UD1PlayerRemovalComponent::PollKicks()
 
 			for (const int64 UserId : UserIds)
 			{
-				Self->HandleKickUser(UserId);
+				Self->KickUser(UserId);
 			}
 		});
 }
 
-void UD1PlayerRemovalComponent::HandleKickUser(int64 UserId)
+void UD1PlayerRemovalComponent::KickUser(int64 UserId)
 {
 	if (!HasServerAuthority() || UserId <= 0 || KickedUserIds.Contains(UserId))
 	{
@@ -153,10 +153,10 @@ void UD1PlayerRemovalComponent::HandleKickUser(int64 UserId)
 		return;
 	}
 
-	ProcessLeaver(Target, /*bNotifyClient=*/true);
+	RemoveLeaver(Target, /*bNotifyClient=*/true);
 }
 
-void UD1PlayerRemovalComponent::ProcessLeaver(AD1BomberPlayerState* Target, bool bNotifyClient)
+void UD1PlayerRemovalComponent::RemoveLeaver(AD1BomberPlayerState* Target, bool bNotifyClient)
 {
 	AD1BomberGameState* GS = GetBomberGameState();
 	if (!GS || !Target)

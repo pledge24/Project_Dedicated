@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response } from 'express';
 
 import { extractBearerToken } from './bearer.js';
 import { AppError, Codes } from './errors.js';
-import * as jwtUtil from './jwt.js';
+import * as jwt from './jwt.js';
 import { getCurrentTokenVersion } from './session.js';
 
 /**
@@ -23,7 +23,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     let payload;
     try
     {
-        payload = jwtUtil.verify(token);
+        payload = jwt.verify(token);
     }
     catch (err)
     {

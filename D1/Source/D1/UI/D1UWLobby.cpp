@@ -261,15 +261,15 @@ void UD1UWLobby::HandleMatchFound(const FMatchFoundDTO& Match)
 
 void UD1UWLobby::HandleMatchmakingError(const FBackendResponse& Error)
 {
-	const FString Msg = FBackendErrorMessages::Resolve(Error);
+	const FString ErrorMessage = FBackendErrorMessages::Resolve(Error);
 
-	UE_LOG(LogD1, Warning, TEXT("[Lobby] 매칭 에러: %s"), *Msg);
+	UE_LOG(LogD1, Warning, TEXT("[Lobby] 매칭 에러: %s"), *ErrorMessage);
 
 	StopMatchSearchingElapsed();
 
 	if (MatchStatusLabel)
 	{
-		MatchStatusLabel->SetText(FText::FromString(Msg));
+		MatchStatusLabel->SetText(FText::FromString(ErrorMessage));
 	}
 	if (StartMatchingButton)
 	{

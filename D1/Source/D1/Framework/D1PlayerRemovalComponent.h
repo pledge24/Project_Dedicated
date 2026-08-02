@@ -53,9 +53,9 @@ private:
 	void StartKickPolling();
 	void PollKicks();
 	/** 대상 유저를 kick — 온라인이면 탈주 처리·통지, 종료 후면 통지만. */
-	void HandleKickUser(int64 UserId);
+	void KickUser(int64 UserId);
 	/** 탈주 공용부(최하위·SetLeft·GameState 슬롯기록·결과 캡처·즉시정산·심판 통지). bNotifyClient=false면 클라 통지 생략(끊김). */
-	void ProcessLeaver(AD1BomberPlayerState* Target, bool bNotifyClient);
+	void RemoveLeaver(AD1BomberPlayerState* Target, bool bNotifyClient);
 
 	FTimerHandle KickPollTimerHandle;
 

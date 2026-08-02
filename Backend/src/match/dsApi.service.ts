@@ -29,7 +29,7 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
 
     assertResultsMatchRoster(roster.players, req.results);
 
-    const participants = buildParticipants(roster, req.results);
+    const participants = buildPlayers(roster, req.results);
 
     try
     {
@@ -123,13 +123,13 @@ function tokensEqual(given: string, expected: string): boolean
 /**
  * 보고된 항목이 roster의 부분집합인지(외부인·중복 없음) + 값이 정원 범위인지 검증.
  * 누락을 허용하는 이유: DS가 미입장자를 못 실어 보내도 정상 플레이한 나머지 인원의 결과는 남아야 한다.
- * 빠진 인원은 buildParticipants가 최하위 미참가자로 채운다.
+ * 빠진 인원은 buildPlayers가 최하위 미참가자로 채운다.
  */
 function assertResultsMatchRoster(players: rosters.RosterPlayer[], results: MatchResultRequest['results']): void
 {
     const expected = new Set(players.map((p) => p.userId));
-    const seatCount = players.length;
-    if (results.length > seatCount)
+    const slotCount = players.length;
+    if (results.length > slotCount)
     {
         throw new AppError(Codes.INVALID_RESULT, '참가자 수가 매치 정원을 넘습니다.');
     }
@@ -149,13 +149,13 @@ function assertResultsMatchRoster(players: rosters.RosterPlayer[], results: Matc
         seen.add(r.userId);
 
         // 상한은 전역 상수가 아니라 이 매치의 정원 — handler는 roster를 모르므로 여기서 본다.
-        if (r.slotIndex > seatCount - 1)
+        if (r.slotIndex > slotCount - 1)
         {
-            throw new AppError(Codes.INVALID_RESULT, `slotIndex는 0~${seatCount - 1} 정수여야 합니다.`);
+            throw new AppError(Codes.INVALID_RESULT, `slotIndex는 0~${slotCount - 1} 정수여야 합니다.`);
         }
-        if (r.placement > seatCount)
+        if (r.placement > slotCount)
         {
-            throw new AppError(Codes.INVALID_RESULT, `placement는 1~${seatCount} 정수여야 합니다.`);
+            throw new AppError(Codes.INVALID_RESULT, `placement는 1~${slotCount} 정수여야 합니다.`);
         }
 
         // 좌석(slotIndex)은 DS가 배정한 권위값 — 매치 내 유일해야 한다(DB UNIQUE와 일치).
@@ -172,7 +172,7 @@ function assertResultsMatchRoster(players: rosters.RosterPlayer[], results: Matc
  * DS도 같은 보정을 하므로(AppendNoShowResults) 정상 경로에서는 발동하지 않는 안전망이다 —
  * 구버전 DS나 DS 측 roster 파싱 실패까지 덮는다.
  */
-function buildParticipants(roster: rosters.MatchRoster, results: MatchResultRequest['results']): repo.SaveResultParticipant[]
+function buildPlayers(roster: rosters.MatchRoster, results: MatchResultRequest['results']): repo.SaveResultParticipant[]
 {
     const reported = new Map(results.map((r) => [r.userId, r]));
     const usedSlots = new Set(results.map((r) => r.slotIndex));

@@ -222,13 +222,13 @@ void UD1MatchFlowComponent::EnsureAliveListInitialized()
 
 void UD1MatchFlowComponent::RequestEndEvaluation()
 {
-	if (bEndEvalPending)
+	if (bEndEvaluationPending)
 	{
 		return; // 프레임 내 다중 사망 → 타이머 1개만
 	}
 	if (UWorld* World = GetWorld())
 	{
-		bEndEvalPending = true;
+		bEndEvaluationPending = true;
 		World->GetTimerManager().SetTimerForNextTick(
 			this, &UD1MatchFlowComponent::EvaluateEndCondition);
 	}
@@ -236,7 +236,7 @@ void UD1MatchFlowComponent::RequestEndEvaluation()
 
 void UD1MatchFlowComponent::EvaluateEndCondition()
 {
-	bEndEvalPending = false;
+	bEndEvaluationPending = false;
 
 	if (!HasServerAuthority() || IsMatchEnded())
 	{
@@ -344,7 +344,7 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 	}
 
 	// 미배정 생존자(시간 만료/무승부)는 공동 1위로 보정 — 백엔드는 placement 1~N만 허용.
-	// 탈주·kick 처리자는 ProcessLeaver가 이미 최하위를 부여해 여기 걸리지 않는다.
+	// 탈주·kick 처리자는 RemoveLeaver가 이미 최하위를 부여해 여기 걸리지 않는다.
 	for (APlayerState* PS : GS->PlayerArray)
 	{
 		AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS);

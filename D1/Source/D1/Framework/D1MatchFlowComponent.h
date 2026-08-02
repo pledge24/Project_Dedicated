@@ -76,7 +76,7 @@ private:
 	TArray<TObjectPtr<AD1BomberPlayerState>> PendingDeadBatch;
 
 	/** 다음 틱 종료 평가 예약됨(프레임 내 다중 사망 → 평가 1회). */
-	bool bEndEvalPending = false;
+	bool bEndEvaluationPending = false;
 
 //~ 매치 종료·셧다운
 private:

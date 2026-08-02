@@ -73,10 +73,10 @@ bool FD1MatchConfig::LoadFromFile(const FString& FilePath)
 	Root->TryGetStringField(TEXT("matchId"), MatchId);
 	Root->TryGetStringField(TEXT("matchToken"), MatchToken);
 
-	double ExpectedPlayersNum = 0.0;
-	if (Root->TryGetNumberField(TEXT("expectedPlayers"), ExpectedPlayersNum))
+	double ExpectedPlayersValue = 0.0;
+	if (Root->TryGetNumberField(TEXT("expectedPlayers"), ExpectedPlayersValue))
 	{
-		ExpectedPlayers = static_cast<int32>(ExpectedPlayersNum);
+		ExpectedPlayers = static_cast<int32>(ExpectedPlayersValue);
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* RosterArray = nullptr;

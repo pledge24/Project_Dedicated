@@ -28,7 +28,7 @@ private:
 
 	FTimerHandle WatchTimerHandle;
 
-	float Elapsed = 0.f;
+	float ElapsedSec = 0.f;
 	float GraceSec = 0.f;
 
 	bool bWatchStarted = false;

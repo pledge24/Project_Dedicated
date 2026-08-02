@@ -11,7 +11,7 @@ import type { AddressInfo } from 'node:net';
 
 import buildApp from '../src/app.js';
 import { closePool } from '../src/common/db.js';
-import * as jwtUtil from '../src/common/jwt.js';
+import { sign as signJwt } from '../src/common/jwt.js';
 import { getCurrentTokenVersion } from '../src/common/session.js';
 import * as roster from '../src/match/roster.service.js';
 
@@ -66,7 +66,7 @@ async function main(): Promise<void>
         const tokenVersion = await getCurrentTokenVersion(userId);
         assert.notEqual(tokenVersion, null, 'token_version 조회 실패');
 
-        return { userId, nickname, jwt: jwtUtil.sign({ userId, nickname, tokenVersion: tokenVersion! }) };
+        return { userId, nickname, jwt: signJwt({ userId, nickname, tokenVersion: tokenVersion! }) };
     }
 
     /** 주소를 가진 roster 1건 등록(1인 매치 — 재입장 판정에 인원 수는 무관). */

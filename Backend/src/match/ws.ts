@@ -9,7 +9,7 @@ import type { RawData } from 'ws';
 import { extractBearerToken } from '../common/bearer.js';
 import { config } from '../common/config.js';
 import { AppError, Codes } from '../common/errors.js';
-import * as jwtUtil from '../common/jwt.js';
+import * as jwt from '../common/jwt.js';
 import { logger } from '../common/logger.js';
 import { getCurrentTokenVersion, onSuperseded } from '../common/session.js';
 import type { AuthedUser } from '../common/types.js';
@@ -29,7 +29,7 @@ interface AuthedWs extends WebSocket
     isAlive: boolean;
     msgWindowStart: number;  // rate limit 고정 윈도우 시작 시각(epoch ms)
     msgCount: number;        // 현재 윈도우의 수신 메시지 수
-    limitNotified: boolean;  // 이번 윈도우에 초과 경고를 이미 보냈는가
+    isLimitNotified: boolean;  // 이번 윈도우에 초과 경고를 이미 보냈는가
 }
 
 /** http.Server에 매칭 WS를 붙이고 사이클/heartbeat를 기동. stop()으로 정리. */
@@ -151,7 +151,7 @@ async function authenticate(req: IncomingMessage): Promise<AuthedUser | null>
 
     try
     {
-        const claims = jwtUtil.verify(token);
+        const claims = jwt.verify(token);
 
         const currentVersion = await getCurrentTokenVersion(claims.userId);
         if (currentVersion === null || currentVersion !== claims.tokenVersion)
@@ -196,16 +196,16 @@ function allowMessage(ws: AuthedWs): boolean
     {
         ws.msgWindowStart = now;
         ws.msgCount = 0;
-        ws.limitNotified = false;
+        ws.isLimitNotified = false;
     }
     ws.msgCount += 1;
     if (ws.msgCount <= config.rateLimit.wsMax)
     {
         return true;
     }
-    if (!ws.limitNotified)
+    if (!ws.isLimitNotified)
     {
-        ws.limitNotified = true;
+        ws.isLimitNotified = true;
         sendError(ws, 'error', Codes.RATE_LIMITED, '메시지가 너무 잦습니다. 잠시 후 다시 시도해주세요.');
         logger.warn({ userId: ws.userId, count: ws.msgCount }, 'WS 메시지 rate limit 초과');
     }
@@ -276,7 +276,7 @@ function onConnection(wss: WebSocketServer, ws: WebSocket, user: AuthedUser): vo
     newSocket.isAlive = true;
     newSocket.msgWindowStart = Date.now();
     newSocket.msgCount = 0;
-    newSocket.limitNotified = false;
+    newSocket.isLimitNotified = false;
 
     kickThisUserSockets(wss, user.userId, newSocket);
 
