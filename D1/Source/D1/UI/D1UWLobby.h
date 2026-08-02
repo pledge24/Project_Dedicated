@@ -57,10 +57,10 @@ private:
 //~ WS 매칭
 protected:
 	UFUNCTION()
-	void OnStartMatchingClicked();
+	void OnStartMatchmakingClicked();
 
 	UFUNCTION()
-	void OnCancelMatchingClicked();
+	void OnCancelMatchmakingClicked();
 
 	/** MatchmakingSubsystem 멀티캐스트 구독 (큐 입장·성사·에러). */
 	UFUNCTION()
@@ -73,29 +73,29 @@ protected:
 	void HandleMatchmakingError(const FBackendResponse& Error);
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
-	TObjectPtr<UButton> StartMatchingButton;
+	TObjectPtr<UButton> StartMatchmakingButton;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UVerticalBox> MatchStatusPanel;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
-	TObjectPtr<UButton> CancelMatchingButton;
+	TObjectPtr<UButton> CancelMatchmakingButton;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> MatchStatusLabel;
 	
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
-	TObjectPtr<UTextBlock> MatchSearchingElapsedLabel;
+	TObjectPtr<UTextBlock> MatchmakingElapsedLabel;
 
 private:
 	/** 1초 간격 타이머 콜백 — 경과 초 증가·라벨 갱신. */
-	void UpdateMatchSearchingElapsed();
+	void UpdateMatchmakingElapsed();
 
-	void StopMatchSearchingElapsed();
+	void StopMatchmakingElapsed();
 
-	FTimerHandle MatchSearchingElapsedTimerHandle;
+	FTimerHandle MatchmakingElapsedTimerHandle;
 
-	int32 MatchSearchingElapsedSec = 0;
+	int32 MatchmakingElapsedSec = 0;
 
 //~ 랭킹
 protected:

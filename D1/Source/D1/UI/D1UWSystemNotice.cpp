@@ -29,7 +29,7 @@ void UD1UWSystemNotice::SetNotice(const FText& InTitle, const FText& InMessage)
 void UD1UWSystemNotice::OnConfirmClicked()
 {
 	// 실제 세션 정리·화면 복귀는 구독자(SessionSubsystem)가 담당.
-	OnConfirmed.Broadcast();
+	OnSystemNoticeConfirmed.Broadcast();
 }
 
 void UD1UWSystemNotice::ApplyPending()
