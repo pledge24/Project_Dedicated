@@ -20,7 +20,7 @@ const matchWs = attachMatchWebSocket(server);
 // 진행 중이던 매치 명단 복원 — 지난 실행에서 살아남은 DS가 결과를 보고할 때 serverToken 검증에 필요하다.
 // reapOrphans와 달리 실패 시 기동을 막는다: roster 없이 뜨면 그 DS들의 결과가 전부 404로 버려지고,
 // 증상은 "점수가 안 올랐다"로만 나타나 원인 추적이 사실상 불가능해진다.
-const restoredRosters = await roster.loadActive();
+const restoredRosters = await roster.fetchActive();
 if (restoredRosters > 0)
 {
     logger.info({ count: restoredRosters }, '진행 중이던 매치 roster 복원 — 결과 보고 수신 가능');

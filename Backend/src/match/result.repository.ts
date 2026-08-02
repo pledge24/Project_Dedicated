@@ -9,7 +9,7 @@ import type { MatchEndReason } from '../common/types.js';
 import { computeFfaEloDeltas } from './elo.js';
 
 /** saveResult 함수용 - 종료 매치 각 플레이어 정보 */
-export interface SaveResultParticipant
+export interface SaveResultPlayer
 {
     userId: number;
     slotIndex: number;
@@ -31,7 +31,7 @@ export interface SaveResultInput
     durationSec: number;
     endReason: MatchEndReason;
     winnerUserId: number | null;
-    participants: SaveResultParticipant[];
+    participants: SaveResultPlayer[];
 }
 
 /** ELO 계산 결과 반환 구조체 */
@@ -184,7 +184,7 @@ export async function saveResult(input: SaveResultInput): Promise<PlayerScoreRes
 /** 참가자별 파생값 + 프로필 갱신 여부. */
 interface ComputedRow
 {
-    p: SaveResultParticipant;
+    p: SaveResultPlayer;
     c: { scoreBefore: number; scoreDelta: number; scoreAfter: number; expGained: number; isWin: number; levelAfter: number };
     updateProfile: boolean;
 }

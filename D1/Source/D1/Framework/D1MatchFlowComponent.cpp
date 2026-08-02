@@ -38,7 +38,7 @@ UD1MatchFlowComponent::UD1MatchFlowComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayers, float InWaitTimeoutSec, float InShutdownGraceSec,
+void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayerCount, float InWaitTimeoutSec, float InShutdownGraceSec,
 	const FString& InMatchId, const FString& InMatchToken, const TArray<FD1JoinEntry>& InExpectedRoster)
 {
 	if (!HasServerAuthority())
@@ -46,7 +46,7 @@ void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayers, float InWai
 		return;
 	}
 
-	ExpectedPlayerCount      = InExpectedPlayers;
+	ExpectedPlayerCount      = InExpectedPlayerCount;
 	WaitForPlayersTimeoutSec = InWaitTimeoutSec;
 	ShutdownGraceSec         = InShutdownGraceSec;
 	CurrentMatchId           = InMatchId;
@@ -75,7 +75,7 @@ void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayers, float InWai
 	}
 }
 
-void UD1MatchFlowComponent::HandlePlayerJoined()
+void UD1MatchFlowComponent::NotifyPlayerJoined()
 {
 	// 이미 시작했거나 게이트 비활성(PIE·솔로)이면 시작 게이트 카운트 생략.
 	if (!HasServerAuthority() || HasMatchStarted() || ExpectedPlayerCount <= 1)

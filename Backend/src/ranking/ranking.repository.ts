@@ -3,8 +3,8 @@ import type { RowDataPacket } from 'mysql2';
 
 import { getPool, queryOne } from '../common/db.js';
 
-/** DB player_profiles JOIN users 행 (랭킹 페이지 쿼리). */
-export interface RankingRow extends RowDataPacket
+/** DB player_profiles JOIN users 행 (랭킹 페이지 쿼리). 파일 내부 전용 — snake_case row는 밖으로 내보내지 않는다(§2). */
+interface RankingRow extends RowDataPacket
 {
     user_id: number;
     nickname: string;
@@ -13,6 +13,18 @@ export interface RankingRow extends RowDataPacket
     wins: number;
     losses: number;
     matches_played: number;
+}
+
+/** 랭킹 한 행의 카멜 공개형 — rank는 service가 부여한다. */
+export interface RankingProfile
+{
+    userId: number;
+    nickname: string;
+    score: number;
+    level: number;
+    wins: number;
+    losses: number;
+    matchesPlayed: number;
 }
 
 /** COUNT(*) 행. */
@@ -28,7 +40,7 @@ interface CountRow extends RowDataPacket
  * (mysql2 prepared-stmt의 LIMIT ? 바인딩은 버전 편차가 있어 query()로 우회 —
  *  result.repository.ts의 동적 IN(...) 선례와 동일 전략. 주입 위험 0.)
  */
-export async function findRankingPage(limit: number, offset: number): Promise<RankingRow[]>
+export async function listRankingPage(limit: number, offset: number): Promise<RankingProfile[]>
 {
     const [rows] = await getPool().query<RankingRow[]>(
         'SELECT pp.user_id, u.nickname, pp.score, pp.level, pp.wins, pp.losses, pp.matches_played ' +
@@ -37,7 +49,15 @@ export async function findRankingPage(limit: number, offset: number): Promise<Ra
         `ORDER BY pp.score DESC, pp.score_updated_at ASC, pp.user_id ASC LIMIT ${limit} OFFSET ${offset}`
     );
 
-    return rows;
+    return rows.map((row) => ({
+        userId: row.user_id,
+        nickname: row.nickname,
+        score: row.score,
+        level: row.level,
+        wins: row.wins,
+        losses: row.losses,
+        matchesPlayed: row.matches_played,
+    }));
 }
 
 /** 전체 프로필 수 (meta.total). 페이지 쿼리와 병렬로 돈다. */

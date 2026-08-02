@@ -19,14 +19,14 @@ UD1PlayerRemovalComponent::UD1PlayerRemovalComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UD1PlayerRemovalComponent::InitializeRemoval(int32 InExpectedPlayers, const FString& InMatchId, const FString& InMatchToken)
+void UD1PlayerRemovalComponent::InitializeRemoval(int32 InExpectedPlayerCount, const FString& InMatchId, const FString& InMatchToken)
 {
 	if (!HasServerAuthority())
 	{
 		return;
 	}
 
-	ExpectedPlayerCount = InExpectedPlayers;
+	ExpectedPlayerCount = InExpectedPlayerCount;
 	CurrentMatchId      = InMatchId;
 	CurrentMatchToken   = InMatchToken;
 

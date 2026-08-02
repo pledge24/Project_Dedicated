@@ -28,11 +28,11 @@ public:
 //~ 시작 게이트
 public:
 	/** 서버 전용: GameMode::BeginPlay가 cmdline 파싱·맵빌드 후 호출. 설정을 받고 시작 게이트를 arm. */
-	void InitializeMatch(int32 InExpectedPlayers, float InWaitTimeoutSec, float InShutdownGraceSec,
+	void InitializeMatch(int32 InExpectedPlayerCount, float InWaitTimeoutSec, float InShutdownGraceSec,
 		const FString& InMatchId, const FString& InMatchToken, const TArray<FD1JoinEntry>& InExpectedRoster);
 
 	/** 서버 전용: GameMode::PostLogin이 호출. 예상 인원 도달 시 매치 시작. */
-	void HandlePlayerJoined();
+	void NotifyPlayerJoined();
 
 private:
 	void StartMatch();

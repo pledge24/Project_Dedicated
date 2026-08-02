@@ -11,7 +11,7 @@ import { config } from '../common/config.js';
 import { AppError, Codes } from '../common/errors.js';
 import * as jwt from '../common/jwt.js';
 import { logger } from '../common/logger.js';
-import { getCurrentTokenVersion, onSuperseded } from '../common/session.js';
+import { fetchCurrentTokenVersion, onSuperseded } from '../common/session.js';
 import type { AuthedUser } from '../common/types.js';
 import { allocator } from './dsAllocator.js';
 import { handleBotMatch, handleMatch } from './matchFormation.handler.js';
@@ -153,7 +153,7 @@ async function authenticate(req: IncomingMessage): Promise<AuthedUser | null>
     {
         const claims = jwt.verify(token);
 
-        const currentVersion = await getCurrentTokenVersion(claims.userId);
+        const currentVersion = await fetchCurrentTokenVersion(claims.userId);
         if (currentVersion === null || currentVersion !== claims.tokenVersion)
         {
             return null;
@@ -311,8 +311,8 @@ function runMatchCycle(): void
     // 매치 하나의 실패가 진행 중인 다른 매치까지 끌고 죽지 않도록 사이클·매치 단위로 가둔다.
     try
     {
-        // runMatching이 매칭 즉시 큐에서 제거하므로, 비동기 할당 중 재매칭 위험은 없다.
-        const { groups, botFills } = service.runMatching(Date.now());
+        // runMatchmaking이 매칭 즉시 큐에서 제거하므로, 비동기 할당 중 재매칭 위험은 없다.
+        const { groups, botFills } = service.runMatchmaking(Date.now());
         for (const group of groups)
         {
             handleMatch(group).catch((err) =>

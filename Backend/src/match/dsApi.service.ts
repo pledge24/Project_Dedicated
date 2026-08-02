@@ -172,7 +172,7 @@ function assertResultsMatchRoster(players: rosters.RosterPlayer[], results: Matc
  * DS도 같은 보정을 하므로(AppendNoShowResults) 정상 경로에서는 발동하지 않는 안전망이다 —
  * 구버전 DS나 DS 측 roster 파싱 실패까지 덮는다.
  */
-function buildPlayers(roster: rosters.MatchRoster, results: MatchResultRequest['results']): repo.SaveResultParticipant[]
+function buildPlayers(roster: rosters.MatchRoster, results: MatchResultRequest['results']): repo.SaveResultPlayer[]
 {
     const reported = new Map(results.map((r) => [r.userId, r]));
     const usedSlots = new Set(results.map((r) => r.slotIndex));

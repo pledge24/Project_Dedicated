@@ -114,15 +114,15 @@ export function kickUserFromLiveMatch(userId: number): void
     }
 }
 
-/** runMatching 결과 — 실 매치 그룹 + 봇전 대상(장기 대기자 1명씩). */
-export interface MatchingResult
+/** runMatchmaking 결과 — 실 매치 그룹 + 봇전 대상(장기 대기자 1명씩). */
+export interface MatchmakingResult
 {
     groups: MatchGroup<WebSocket>[];
     botFills: QueueEntry<WebSocket>[];
 }
 
 /** 1초 사이클이 호출. 실 매치를 먼저 성사시키고, 남은 장기 대기자를 봇전 대상으로 넘긴다. */
-export function runMatching(now: number): MatchingResult
+export function runMatchmaking(now: number): MatchmakingResult
 {
     const groups = queue.runCycle(now);
     const botFills = config.match.botFill.enabled

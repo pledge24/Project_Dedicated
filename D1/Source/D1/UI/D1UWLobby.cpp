@@ -64,7 +64,7 @@ void UD1UWLobby::NativeConstruct()
 
 		// 구독 뒤에 확인 — 진행 중 매치가 있으면 응답이 OnMatchFound를 태우고 그대로 DS로 들어간다.
 		// (끊긴 채 로비로 돌아온 클라의 유일한 복구 경로. 없으면 조용히 아무 일도 안 일어난다.)
-		Matchmaking->CheckRejoinableMatch();
+		Matchmaking->FetchRejoinableMatch();
 	}
 
 	if (UD1AuthSubsystem* Auth = GetGameInstance()->GetSubsystem<UD1AuthSubsystem>())
@@ -230,7 +230,7 @@ void UD1UWLobby::HandleMatchFound(const FMatchFoundDTO& Match)
 
 	StopMatchSearchingElapsed();
 
-	// 재입장 경로(CheckRejoinableMatch)는 버튼 클릭 없이 도착 — 패널·버튼 상태를 직접 맞춘다.
+	// 재입장 경로(FetchRejoinableMatch)는 버튼 클릭 없이 도착 — 패널·버튼 상태를 직접 맞춘다.
 	if (MatchStatusPanel)
 	{
 		MatchStatusPanel->SetVisibility(ESlateVisibility::SelfHitTestInvisible);

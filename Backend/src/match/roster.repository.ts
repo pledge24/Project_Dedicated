@@ -37,7 +37,7 @@ export async function deleteById(matchId: string): Promise<void>
 }
 
 /** 기동 시 복원 대상 — 아직 만료되지 않은 명단 전량. */
-export async function selectActive(sinceEpochMs: number): Promise<MatchRoster[]>
+export async function listActive(sinceEpochMs: number): Promise<MatchRoster[]>
 {
     const [rows] = await getPool().execute<RosterRow[]>(
         'SELECT match_id, server_token, server_host, server_port, map_name, started_at, players_json ' +
@@ -57,7 +57,7 @@ export interface ExpiredRoster
 }
 
 /** 만료분 조회 — 지우기 전에 "결과가 끝내 안 온 매치"를 가려내기 위해 먼저 읽는다. */
-export async function selectExpired(beforeEpochMs: number): Promise<ExpiredRoster[]>
+export async function listExpired(beforeEpochMs: number): Promise<ExpiredRoster[]>
 {
     const [rows] = await getPool().execute<RosterRow[]>(
         'SELECT match_id, map_name, started_at FROM match_rosters WHERE started_at <= ?',

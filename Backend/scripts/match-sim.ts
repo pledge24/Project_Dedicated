@@ -2,7 +2,7 @@
 // 실행: npm run match:sim  (전부 PASS여야 머지 — CLAUDE.md '알고리즘은 테스트 도구로 검증 후 머지')
 import assert from 'node:assert/strict';
 
-import { makeBotOpponents } from '../src/match/bots.js';
+import { createBotOpponents } from '../src/match/bots.js';
 import { selectRequeue } from '../src/match/formation.js';
 import { MatchQueue } from '../src/match/queue.js';
 import type { MatchQueueParams } from '../src/match/queue.js';
@@ -207,22 +207,22 @@ const scenarios: Array<[string, () => void]> = [
         assert.equal(q.size, 0);
     }],
 
-    ['makeBotOpponents — sentinel 음수 userId·닉네임·clamp된 rating(주입 rand로 결정론)', () =>
+    ['createBotOpponents — sentinel 음수 userId·닉네임·clamp된 rating(주입 rand로 결정론)', () =>
     {
         const seq = [0.0, 0.5, 1.0, 0.0]; // start(name idx 0), offset i0=0, i1=+100, i2=-100
         let k = 0;
         const rand = (): number => seq[k++];
-        const bots = makeBotOpponents(1200, 3, 100, 100, 5000, rand);
+        const bots = createBotOpponents(1200, 3, 100, 100, 5000, rand);
         assert.deepEqual(bots.map((b) => b.userId), [-1, -2, -3]);
         assert.deepEqual(bots.map((b) => b.nickname), ['Bot Arden', 'Bot Luna', 'Bot Milo']);
         assert.deepEqual(bots.map((b) => b.rating), [1200, 1300, 1100]);
     }],
 
-    ['makeBotOpponents — floor/ceiling clamp', () =>
+    ['createBotOpponents — floor/ceiling clamp', () =>
     {
-        const low = makeBotOpponents(120, 1, 100, 100, 5000, () => 0); // offset=-100 → 20 → floor 100
+        const low = createBotOpponents(120, 1, 100, 100, 5000, () => 0); // offset=-100 → 20 → floor 100
         assert.equal(low[0].rating, 100);
-        const high = makeBotOpponents(4950, 1, 100, 100, 5000, () => 1); // offset=+100 → 5050 → ceiling 5000
+        const high = createBotOpponents(4950, 1, 100, 100, 5000, () => 1); // offset=+100 → 5050 → ceiling 5000
         assert.equal(high[0].rating, 5000);
     }],
 ];

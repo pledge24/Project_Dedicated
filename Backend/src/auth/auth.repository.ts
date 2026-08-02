@@ -3,13 +3,22 @@ import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 
 import { queryOne, withTransaction } from '../common/db.js';
 
-/** DB users 행. */
-export interface UserRow extends RowDataPacket
+/** DB users 행. 파일 내부 전용 — snake_case row는 밖으로 내보내지 않는다(§2). */
+interface UserRow extends RowDataPacket
 {
     id: number;
     login_id: string;
     password_hash: string;
     nickname: string;
+}
+
+/** users 행의 카멜 공개형. */
+export interface UserAccount
+{
+    id: number;
+    loginId: string;
+    nickname: string;
+    passwordHash: string;
 }
 
 /** token_version 단건 조회용 행. */
@@ -18,8 +27,8 @@ interface TokenVersionRow extends RowDataPacket
     token_version: number;
 }
 
-/** DB player_profiles 행. */
-export interface PlayerProfileRow extends RowDataPacket
+/** DB player_profiles 행. 파일 내부 전용. */
+interface PlayerProfileRow extends RowDataPacket
 {
     user_id: number;
     score: number;
@@ -31,20 +40,37 @@ export interface PlayerProfileRow extends RowDataPacket
     last_match_at: Date | null;
 }
 
-export async function findByLoginId(loginId: string): Promise<UserRow | null>
+/** player_profiles 행의 카멜 공개형. */
+export interface PlayerProfile
 {
-    return queryOne<UserRow>(
+    userId: number;
+    score: number;
+    level: number;
+    exp: number;
+    wins: number;
+    losses: number;
+    matchesPlayed: number;
+    lastMatchAt: Date | null;
+}
+
+export async function findByLoginId(loginId: string): Promise<UserAccount | null>
+{
+    const row = await queryOne<UserRow>(
         'SELECT id, login_id, password_hash, nickname FROM users WHERE login_id = ? LIMIT 1',
         [loginId]
     );
+
+    return row ? toUserAccount(row) : null;
 }
 
-export async function findByNickname(nickname: string): Promise<UserRow | null>
+export async function findByNickname(nickname: string): Promise<UserAccount | null>
 {
-    return queryOne<UserRow>(
+    const row = await queryOne<UserRow>(
         'SELECT id, login_id, password_hash, nickname FROM users WHERE nickname = ? LIMIT 1',
         [nickname]
     );
+
+    return row ? toUserAccount(row) : null;
 }
 
 /**
@@ -73,13 +99,26 @@ export async function insertUser(
     });
 }
 
-export async function findProfileByUserId(userId: number): Promise<PlayerProfileRow | null>
+export async function findProfileByUserId(userId: number): Promise<PlayerProfile | null>
 {
-    return queryOne<PlayerProfileRow>(
+    const row = await queryOne<PlayerProfileRow>(
         'SELECT user_id, score, level, exp, wins, losses, matches_played, last_match_at ' +
         'FROM player_profiles WHERE user_id = ? LIMIT 1',
         [userId]
     );
+
+    return row ? toPlayerProfile(row) : null;
+}
+
+/** userId의 현재 token_version. 유저가 없으면 null. (common/session이 위임 호출) */
+export async function findTokenVersionByUserId(userId: number): Promise<number | null>
+{
+    const row = await queryOne<TokenVersionRow>(
+        'SELECT token_version FROM users WHERE id = ? LIMIT 1',
+        [userId]
+    );
+
+    return row ? row.token_version : null;
 }
 
 /**
@@ -101,4 +140,23 @@ export async function bumpTokenVersion(userId: number): Promise<number>
 
         return rows[0].token_version;
     });
+}
+
+function toUserAccount(row: UserRow): UserAccount
+{
+    return { id: row.id, loginId: row.login_id, nickname: row.nickname, passwordHash: row.password_hash };
+}
+
+function toPlayerProfile(row: PlayerProfileRow): PlayerProfile
+{
+    return {
+        userId: row.user_id,
+        score: row.score,
+        level: row.level,
+        exp: row.exp,
+        wins: row.wins,
+        losses: row.losses,
+        matchesPlayed: row.matches_played,
+        lastMatchAt: row.last_match_at,
+    };
 }

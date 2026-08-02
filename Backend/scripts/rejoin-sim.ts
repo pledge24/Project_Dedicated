@@ -12,7 +12,7 @@ import type { AddressInfo } from 'node:net';
 import buildApp from '../src/app.js';
 import { closePool } from '../src/common/db.js';
 import { sign as signJwt } from '../src/common/jwt.js';
-import { getCurrentTokenVersion } from '../src/common/session.js';
+import { fetchCurrentTokenVersion } from '../src/common/session.js';
 import * as roster from '../src/match/roster.service.js';
 
 const PASSWORD = 'rejointest123';
@@ -63,7 +63,7 @@ async function main(): Promise<void>
         assert.equal(reg.body.ok, true, `register 실패: ${JSON.stringify(reg.body)}`);
 
         const userId = reg.body.data!.userId as number;
-        const tokenVersion = await getCurrentTokenVersion(userId);
+        const tokenVersion = await fetchCurrentTokenVersion(userId);
         assert.notEqual(tokenVersion, null, 'token_version 조회 실패');
 
         return { userId, nickname, jwt: signJwt({ userId, nickname, tokenVersion: tokenVersion! }) };
@@ -75,7 +75,7 @@ async function main(): Promise<void>
         const matchId = `rejoin-${randomBytes(6).toString('hex')}`;
         const serverToken = randomBytes(24).toString('base64url');
         const joinToken = randomBytes(16).toString('base64url');
-        await roster.register({
+        await roster.add({
             matchId,
             serverToken,
             server: opts.withServer ? DS : undefined,

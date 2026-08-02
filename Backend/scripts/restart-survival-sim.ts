@@ -4,7 +4,7 @@
 // 두 가지를 따로 본다:
 //   A. DS 수명 분리 — 확정(commit)된 DS는 shutdownUncommitted가 죽이지 않고, 확정 전 DS는 회수된다.
 //      실제 D1Server.exe를 띄워 PID 생사로 판정. MATCH_DS_ENABLED=false거나 exe가 없으면 skip.
-//   B. roster 재시작 생존 — 명단을 DB에 남긴 뒤 '별도 프로세스'가 loadActive로 복원해
+//   B. roster 재시작 생존 — 명단을 DB에 남긴 뒤 '별도 프로세스'가 fetchActive로 복원해
 //      그 매치의 결과 POST를 200으로 받는지. 재시작을 흉내내는 게 아니라 실제로 새 프로세스에서 확인한다.
 //
 // B의 자식 프로세스는 이 파일을 --phase=restarted 로 다시 실행한 것이다(같은 코드, 빈 메모리).
@@ -135,7 +135,7 @@ async function checkRosterSurvivesRestart(): Promise<boolean>
         const serverToken = randomBytes(24).toString('base64url');
 
         // 매치 성사 — 이 시점의 명단이 DB에 남는다.
-        await roster.register({
+        await roster.add({
             matchId,
             serverToken,
             mapName: MAP,
@@ -189,7 +189,7 @@ async function checkRosterSurvivesRestart(): Promise<boolean>
 
 /**
  * 자식 — "재시작된 백엔드" 역할. 메모리 roster는 비어 있는 상태로 시작한다.
- * index.ts와 같은 순서로 loadActive를 거친 뒤 결과 POST를 받는다.
+ * index.ts와 같은 순서로 fetchActive를 거친 뒤 결과 POST를 받는다.
  */
 async function runRestartedPhase(): Promise<void>
 {
@@ -199,7 +199,7 @@ async function runRestartedPhase(): Promise<void>
     // 복원 전에는 이 매치를 몰라야 정상 — 복원의 효과를 증명하는 전제다.
     assert.equal(roster.get(matchId), undefined, '새 프로세스인데 roster가 이미 메모리에 있음');
 
-    const restored = await roster.loadActive();
+    const restored = await roster.fetchActive();
     console.log(`[restarted] roster 복원 ${restored}건`);
     assert.ok(roster.get(matchId) !== undefined, `복원됐지만 대상 매치(${matchId})가 없음`);
 

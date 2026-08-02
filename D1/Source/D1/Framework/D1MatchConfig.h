@@ -16,7 +16,7 @@ struct FD1MatchConfig
 	FString MatchToken;
 
 	/** 시작 정원(0/1=즉시). */
-	int32 ExpectedPlayers = 0;
+	int32 ExpectedPlayerCount = 0;
 
 	/** join 토큰 → 신원. InitNewPlayer가 ?join= 토큰으로 신원 매핑. */
 	TMap<FString, FD1JoinEntry> Roster;

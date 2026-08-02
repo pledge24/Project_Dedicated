@@ -37,7 +37,7 @@ export async function login(loginId: string, password: string): Promise<AuthUser
 {
     const row = await repo.findByLoginId(loginId);
     // ID/PW 어느 쪽이 틀린지 노출하지 않음 (enumeration 방지)
-    if (!row || !(await verifyPassword(password, row.password_hash)))
+    if (!row || !(await verifyPassword(password, row.passwordHash)))
     {
         throw new AppError(Codes.INVALID_CREDENTIALS, 'ID 또는 비밀번호가 일치하지 않습니다.');
     }
@@ -57,7 +57,7 @@ export async function login(loginId: string, password: string): Promise<AuthUser
 }
 
 /** 현재 사용자 프로필 조회. 토큰 검증(requireAuth) 통과 후 호출된다. */
-export async function getMe(userId: number, nickname: string): Promise<RegisterResultDTO>
+export async function fetchMe(userId: number, nickname: string): Promise<RegisterResultDTO>
 {
     const profile = await repo.findProfileByUserId(userId);
     // 토큰은 유효하지만 계정이 사라진 경우 (삭제 등)
@@ -69,8 +69,8 @@ export async function getMe(userId: number, nickname: string): Promise<RegisterR
     return buildProfileResult(userId, nickname, profile);
 }
 
-/** userId·nickname·프로필을 공개 응답 형태로 조립. register·login·getMe 공용. */
-function buildProfileResult(userId: number, nickname: string, profile: repo.PlayerProfileRow): RegisterResultDTO
+/** userId·nickname·프로필을 공개 응답 형태로 조립. register·login·fetchMe 공용. */
+function buildProfileResult(userId: number, nickname: string, profile: repo.PlayerProfile): RegisterResultDTO
 {
     return {
         userId,
