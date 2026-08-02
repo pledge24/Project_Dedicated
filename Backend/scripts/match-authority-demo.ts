@@ -8,7 +8,7 @@
 // matchId를 지어내면 roster 조회에서 404가 먼저 나므로 시연이 성립하지 않는다.
 // 그래서 실제로 큐에 들어가 매치를 하나 잡고, 그 매치의 진짜 matchId로 공격한다.
 //
-// 실행: npm run demo:authority   (백엔드 가동 필요. MATCH_DS_ENABLED는 true/false 무관)
+// 실행: npm run match:authority-demo   (백엔드 가동 필요. MATCH_DS_ENABLED는 true/false 무관)
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { WebSocket } from 'ws';
