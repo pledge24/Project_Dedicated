@@ -57,7 +57,7 @@ async function main(): Promise<void>
     // 2. roster 시드(같은 프로세스라 서버가 보는 그 Map) + 결과 본문
     const matchId = `sim-${suffix}-${randomBytes(4).toString('hex')}`;
     const serverToken = randomBytes(24).toString('base64url');
-    await roster.register({
+    await roster.add({
         matchId,
         serverToken,
         mapName: MAP,
@@ -161,7 +161,7 @@ async function main(): Promise<void>
             const us = await seedUsers('lv', s, 4); // 모두 1000점
             const mid = `lv-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            await roster.register({
+            await roster.add({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `lj${i}` })),
             });
@@ -205,7 +205,7 @@ async function main(): Promise<void>
             const us = await seedUsers('esc', s, 4); // 모두 1000점
             const mid = `esc-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            await roster.register({
+            await roster.add({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `ej${i}` })),
             });
@@ -237,7 +237,7 @@ async function main(): Promise<void>
             const us = await seedUsers('ns', s, 4); // 모두 1000점
             const mid = `ns-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            await roster.register({
+            await roster.add({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `nj${i}` })),
             });
@@ -278,7 +278,7 @@ async function main(): Promise<void>
             const us = await seedUsers('rc', s, 4); // 모두 1000점
             const mid = `rc-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            await roster.register({
+            await roster.add({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: us.map((u, i) => ({ userId: u.userId, nickname: u.nickname, joinToken: `rj${i}` })),
             });
@@ -324,7 +324,7 @@ async function main(): Promise<void>
 
             const mid = `zsim-${s2}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            await roster.register({
+            await roster.add({
                 matchId: mid,
                 serverToken: stk,
                 mapName: MAP,
@@ -356,7 +356,7 @@ async function main(): Promise<void>
             const hu = (await seedUsers('bf', s, 1))[0]; // 1000점
             const mid = `bf-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            await roster.register({
+            await roster.add({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: [
                     { userId: hu.userId, nickname: hu.nickname, joinToken: 'bfjoin' },
@@ -392,7 +392,7 @@ async function main(): Promise<void>
             const hu = (await seedUsers('bw', s, 1))[0];
             const mid = `bw-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            await roster.register({
+            await roster.add({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: [
                     { userId: hu.userId, nickname: hu.nickname, joinToken: 'bwjoin' },
@@ -420,7 +420,7 @@ async function main(): Promise<void>
             const s = randomBytes(3).toString('hex');
             const u = (await seedUsers('ab', s, 1))[0];
             const mid = `ab-${s}-${randomBytes(4).toString('hex')}`;
-            await roster.register({
+            await roster.add({
                 matchId: mid, serverToken: randomBytes(24).toString('base64url'), mapName: MAP,
                 startedAt: Date.now(),
                 players: [{ userId: u.userId, nickname: u.nickname, joinToken: 'abjoin' }],
@@ -442,7 +442,7 @@ async function main(): Promise<void>
             const u = (await seedUsers('nd', s, 1))[0];
             const mid = `nd-${s}-${randomBytes(4).toString('hex')}`;
             const stk = randomBytes(24).toString('base64url');
-            await roster.register({
+            await roster.add({
                 matchId: mid, serverToken: stk, mapName: MAP, startedAt: Date.now(),
                 players: [{ userId: u.userId, nickname: u.nickname, joinToken: 'ndjoin' }],
             });

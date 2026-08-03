@@ -17,7 +17,7 @@ const BOT_NAMES = ['Arden', 'Luna', 'Milo', 'Nova', 'Kai', 'Iris', 'Rex', 'Zoe',
  * 대기 유저 1명을 위한 봇 count명 생성. rating = humanScore ± rand(spread), floor/ceiling clamp.
  * rand는 순수성 위해 주입 가능(테스트 결정론); 미주입 시 Math.random.
  */
-export function makeBotOpponents(
+export function createBotOpponents(
     humanScore: number,
     count: number,
     spread: number,

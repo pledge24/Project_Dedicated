@@ -21,7 +21,7 @@ class UD1MatchResultSubsystem : public UGameInstanceSubsystem
 
 public:
 	/** 서버 전용(DS): 맵 빌드·초기화 완료 시 호출. 백엔드가 이 콜백을 받고 클라에 match:found 전송. 전송 실패 시 소폭 재시도. */
-	void ReportDSReady(const FString& MatchId, const FString& MatchToken);
+	void ReportDSReady(const FString& MatchId, const FString& ServerToken);
 
 	/**
 	 * 서버 전용(DS): 매치 종료 시 호출. 매치별 서버 토큰을 Bearer로 첨부.
@@ -29,15 +29,15 @@ public:
 	 * 전송이 확정되면(성공·409 멱등·확정 실패·재시도 소진) OnSettled를 정확히 한 번 실행한다.
 	 * 호출측은 이 시점 이후에 DS를 종료해야 인플라이트 요청이 프로세스와 함께 사라지지 않는다.
 	 */
-	void ReportMatchResult(const FString& MatchId, const FString& MatchToken, const FString& MapName,
+	void ReportMatchResult(const FString& MatchId, const FString& ServerToken, const FString& MapName,
 		int32 DurationSec, const FString& EndReason, const TArray<FMatchResultPlayer>& Players,
 		const FSimpleDelegate& OnSettled);
 
 	/** 서버 전용(DS): 탈주 발생 즉시 호출. 백엔드가 최하위 확정값으로 점수를 바로 정산(로비 반영). */
-	void ReportLeaver(const FString& MatchId, const FString& MatchToken, int64 UserId);
+	void ReportLeaver(const FString& MatchId, const FString& ServerToken, int64 UserId);
 
 	/** 서버 전용(DS): kick 대기열 1회 조회(GET /api/match/:id/kicks). 성공 시에만 OnKicked(userId 배열). */
-	void FetchKicks(const FString& MatchId, const FString& MatchToken, TFunction<void(const TArray<int64>&)> OnKicked);
+	void FetchKicks(const FString& MatchId, const FString& ServerToken, TFunction<void(const TArray<int64>&)> OnKicked);
 
 private:
 	/** 준비/결과 POST 공통 재시도 정책 — 지연 배열·409 처리·확정 콜백·로그 수위만 다르다. */
@@ -64,7 +64,7 @@ private:
 
 	/** 준비/결과 공용 전송부. Body는 회차 간 재사용해 재전송 페이로드 동일성을 보장.
 	 *  일시 실패(전송 실패·0·5xx·429)는 정책 백오프로 자기 재호출. */
-	void SendReport(const FString& Path, const FString& MatchToken, const TSharedRef<FJsonObject>& Body,
+	void SendReport(const FString& Path, const FString& ServerToken, const TSharedRef<FJsonObject>& Body,
 		int32 Attempt, const FD1ReportPolicy& Policy, FTimerHandle& RetryTimerHandle);
 
 	FTimerHandle ServerReadyRetryTimerHandle;

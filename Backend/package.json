@@ -24,12 +24,12 @@
     "match:sim": "tsx scripts/match-sim.ts",
     "match:elo": "tsx scripts/match-elo.ts",
     "match:result-sim": "tsx scripts/match-result-sim.ts",
-    "match:rejoin-sim": "tsx scripts/rejoin-sim.ts",
-    "match:restart-sim": "tsx scripts/restart-survival-sim.ts",
+    "match:rejoin-sim": "tsx scripts/match-rejoin-sim.ts",
+    "match:restart-survival-sim": "tsx scripts/match-restart-survival-sim.ts",
     "match:bots": "tsx scripts/match-bots.ts",
-    "demo:authority": "tsx scripts/authority-demo.ts",
+    "match:authority-demo": "tsx scripts/match-authority-demo.ts",
     "ranking:sim": "tsx scripts/ranking-sim.ts",
-    "auth:sim": "tsx scripts/auth-session-sim.ts"
+    "auth:session-sim": "tsx scripts/auth-session-sim.ts"
   },
   "keywords": [],
   "author": "",

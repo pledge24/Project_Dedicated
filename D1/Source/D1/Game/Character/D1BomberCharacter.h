@@ -73,7 +73,7 @@ private:
 protected:
 	/** PS OnSpeedLevelChanged 핸들러. SpeedLevel을 MaxWalkSpeed에 반영. */
 	UFUNCTION()
-	void OnSpeedLevelChanged();
+	void HandleSpeedLevelChanged();
 
 private:
 	/** 기본 이동속도(SpeedLevel 0). 생성자에서 MaxWalkSpeed에 적용. */
@@ -140,7 +140,7 @@ public:
 protected:
 	/** PS OnAliveStateChanged 핸들러. 클라까지 사망 정리 전파. */
 	UFUNCTION()
-	void OnPlayerAliveStateChanged();
+	void HandlePlayerAliveStateChanged();
 
 private:
 	bool bDeathHandled = false;
@@ -153,7 +153,7 @@ public:
 protected:
 	/** PS OnLeftChanged 핸들러. */
 	UFUNCTION()
-	void OnPlayerLeftChanged();
+	void HandlePlayerLeftChanged();
 
 private:
 	bool bLeftHandled = false;
@@ -162,7 +162,7 @@ private:
 protected:
 	/** PS OnPlayerNameChanged 핸들러. 이름표 재푸시 위해 OnPlayerStateReady 재호출. */
 	UFUNCTION()
-	void OnPlayerNameRefreshed();
+	void HandlePlayerNameRefreshed();
 
 	/** PS 최초 확보 + 이름 갱신마다 호출. BP에서 이름표 등 UI 푸시용. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Bomber|Events", meta = (DisplayName = "On Player State Ready"))

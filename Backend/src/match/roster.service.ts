@@ -1,11 +1,11 @@
 // 매치 성사 시점의 진실(roster) — matchId로 결과 POST를 검증하기 위한 저장소.
-// DB(match_rosters)가 진실 원천이고 메모리 Map은 그 write-through 캐시다. 기동 시 loadActive로 복원한다.
+// DB(match_rosters)가 진실 원천이고 메모리 Map은 그 write-through 캐시다. 기동 시 fetchActive로 복원한다.
 // 영속화하는 이유: 백엔드가 죽어도 확정된 DS는 살아남아 경기를 끝내므로(ds.shutdownUncommitted),
 // 재시작한 백엔드가 그 DS의 serverToken을 검증할 수 있어야 결과가 유실되지 않는다.
 // get()을 동기로 유지하는 것은 "프로세스 1개" 가정을 남겨둔 것 — 기동 시 전량 로드하므로 캐시 미스가 없다.
 // 다중 프로세스로 나갈 때 여기만 async로 바꾸면 되고, 호출부(dsApi)는 그때 함께 옮긴다.
 // 멱등성은 DB의 client_match_id UNIQUE로 일원화하므로 결과 확정 시 roster를 지우지 않는다.
-// (지우면 재제출이 404가 되어 409와 의미가 갈림.) 대신 만료분만 register 시 청소한다.
+// (지우면 재제출이 404가 되어 409와 의미가 갈림.) 대신 만료분만 add 시 청소한다.
 import { config } from '../common/config.js';
 import { logger } from '../common/logger.js';
 import * as resultRepo from './result.repository.js';
@@ -22,9 +22,9 @@ const rosters = new Map<string, MatchRoster>();
  * 실패 시 throw해 기동을 막는다: roster 없이 뜨면 살아남은 DS의 결과 보고가 전부 404가 되고,
  * 그 사실이 15분 뒤 "결과가 없다"로만 드러나 원인 추적이 불가능해진다.
  */
-export async function loadActive(): Promise<number>
+export async function fetchActive(): Promise<number>
 {
-    const restored = await repo.selectActive(Date.now() - config.match.ds.maxLifetimeMs);
+    const restored = await repo.listActive(Date.now() - config.match.ds.maxLifetimeMs);
     for (const r of restored)
     {
         rosters.set(r.matchId, r);
@@ -34,7 +34,7 @@ export async function loadActive(): Promise<number>
 }
 
 /** 매치 성사 시 등록. 등록 때마다 sweep 실행(결과 미수신 누수 방지) */
-export async function register(roster: MatchRoster): Promise<void>
+export async function add(roster: MatchRoster): Promise<void>
 {
     // DB 우선 — 실패 시 호출측이 매치를 버릴 수 있도록 메모리에 흔적을 남기지 않는다.
     await repo.insert(roster);
@@ -81,8 +81,8 @@ export function findMatchByUser(userId: number): string | undefined
 
 /**
  * 만료된 roster(DS 수명 시각 초과)를 자료구조에서 제거.
- * DB 쪽 처리는 실패해도 캐시 정합성에 영향이 없고(다음 기동의 loadActive가 같은 기준으로 거른다)
- * register를 막아서도 안 되므로 대기하지 않고 로그만 남긴다.
+ * DB 쪽 처리는 실패해도 캐시 정합성에 영향이 없고(다음 기동의 fetchActive가 같은 기준으로 거른다)
+ * add를 막아서도 안 되므로 대기하지 않고 로그만 남긴다.
  */
 function sweep(now: number): void
 {
@@ -114,7 +114,7 @@ function sweep(now: number): void
 export async function settleExpired(now: number = Date.now()): Promise<number>
 {
     const cutoff = now - config.match.ds.maxLifetimeMs;
-    const expired = await repo.selectExpired(cutoff);
+    const expired = await repo.listExpired(cutoff);
     if (expired.length === 0)
     {
         return 0;

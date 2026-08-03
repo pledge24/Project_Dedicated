@@ -3,8 +3,8 @@ import type { NextFunction, Request, Response } from 'express';
 
 import { extractBearerToken } from './bearer.js';
 import { AppError, Codes } from './errors.js';
-import * as jwtUtil from './jwt.js';
-import { getCurrentTokenVersion } from './session.js';
+import * as jwt from './jwt.js';
+import { fetchCurrentTokenVersion } from './session.js';
 
 /**
  * Authorization: Bearer <token> 를 검증하고 req.user를 채운다.
@@ -23,7 +23,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     let payload;
     try
     {
-        payload = jwtUtil.verify(token);
+        payload = jwt.verify(token);
     }
     catch (err)
     {
@@ -37,7 +37,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
 
     // 더 최신 로그인이 있었으면(버전 불일치) 이 토큰은 무효 — 다른 기기 로그인으로 세션 대체됨.
-    const currentVersion = await getCurrentTokenVersion(payload.userId);
+    const currentVersion = await fetchCurrentTokenVersion(payload.userId);
     if (currentVersion === null || currentVersion !== payload.tokenVersion)
     {
         return next(new AppError(Codes.SESSION_SUPERSEDED, '다른 기기에서 로그인되어 세션이 종료되었습니다.'));

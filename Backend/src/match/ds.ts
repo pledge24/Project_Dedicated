@@ -20,14 +20,14 @@ interface DsProcess
     port: number;
     killTimer: NodeJS.Timeout;
     /** 매치 성사가 확정돼 플레이어가 붙은 서버인가. true면 백엔드 종료가 이 프로세스를 죽이지 않는다. */
-    committed: boolean;
+    isCommitted: boolean;
 }
 
 /** DS에 넘길 매치 설정. 커맨드라인에 두면 안 되는 값(토큰)이 전부 여기 모인다. */
 interface MatchConfigFile
 {
     matchId: string;
-    matchToken: string;
+    serverToken: string;
     expectedPlayers: number;
     roster: { joinToken: string; userId: number; nickname: string }[];
     bots: { userId: number; nickname: string }[];
@@ -73,7 +73,7 @@ export function commit(matchId: string): void
     {
         if (proc.matchId === matchId)
         {
-            proc.committed = true;
+            proc.isCommitted = true;
 
             return;
         }
@@ -96,7 +96,7 @@ export function shutdownUncommitted(): void
 
     for (const proc of [...running.values()])
     {
-        if (proc.committed)
+        if (proc.isCommitted)
         {
             // kill하지 않고 핸들만 놓아준다(killTimer는 이 프로세스와 함께 사라진다).
             clearTimeout(proc.killTimer);
@@ -180,7 +180,7 @@ function spawnOnPort(port: number, matchId: string, serverToken: string, expecte
      */
     const configPath = writeMatchConfig(matchId, {
         matchId,
-        matchToken: serverToken,
+        serverToken,
         expectedPlayers,
         roster: roster.map((r) => ({ joinToken: r.joinToken, userId: r.userId, nickname: r.nickname })),
         bots: bots.map((b) => ({ userId: b.userId, nickname: b.nickname })),
@@ -200,7 +200,7 @@ function spawnOnPort(port: number, matchId: string, serverToken: string, expecte
         killTimer.unref();
     }
 
-    running.set(port, { child, matchId, port, killTimer, committed: false });
+    running.set(port, { child, matchId, port, killTimer, isCommitted: false });
 
     child.on('exit', (code) =>
     {

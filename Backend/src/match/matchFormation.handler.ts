@@ -12,7 +12,7 @@ import { WebSocket } from 'ws';
 import { config } from '../common/config.js';
 import { logger } from '../common/logger.js';
 import type { BotOpponent } from './bots.js';
-import { makeBotOpponents } from './bots.js';
+import { createBotOpponents } from './bots.js';
 import { allocator } from './dsAllocator.js';
 import * as dsApiState from './dsApi.state.js';
 import * as service from './matchmaking.service.js';
@@ -36,7 +36,7 @@ export async function handleMatch(group: MatchGroup<WebSocket>): Promise<void>
  */
 export async function handleBotMatch(entry: QueueEntry<WebSocket>): Promise<void>
 {
-    const bots = makeBotOpponents(entry.score, config.match.playersPerMatch - 1,
+    const bots = createBotOpponents(entry.score, config.match.playersPerMatch - 1,
         config.match.botFill.ratingSpread, config.match.scoreFloor, config.match.scoreCeiling);
     await assembleMatch([entry], bots);
 }
@@ -92,7 +92,7 @@ async function assembleMatch(entries: QueueEntry<WebSocket>[], bots: BotOpponent
     //    DB 저장 실패 시 매치를 버린다: roster 없이 진행하면 ready 콜백도 결과 보고도 404가 된다.
     try
     {
-        await roster.register({
+        await roster.add({
             matchId,
             serverToken,
             server,

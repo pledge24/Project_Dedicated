@@ -5,11 +5,11 @@ import express from 'express';
 
 import { requireAuth } from '../common/authMiddleware.js';
 import { config } from '../common/config.js';
-import { makeRateLimiter } from '../common/rateLimit.js';
+import { createRateLimiter } from '../common/rateLimit.js';
 import * as handler from './matchmaking.handler.js';
 
 // 로그인 직후 1회 호출이라 랭킹과 같은 한도로 충분하다.
-const currentLimiter = makeRateLimiter(config.rateLimit.rankingMax);
+const currentLimiter = createRateLimiter(config.rateLimit.rankingMax);
 
 const router = express.Router();
 

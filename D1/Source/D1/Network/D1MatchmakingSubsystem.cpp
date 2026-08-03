@@ -255,7 +255,7 @@ void UD1MatchmakingSubsystem::HandleSocketClosed(int32 StatusCode, const FString
 	OnMatchmakingError.Broadcast(Err);
 }
 
-void UD1MatchmakingSubsystem::CheckRejoinableMatch()
+void UD1MatchmakingSubsystem::FetchRejoinableMatch()
 {
 	// 매칭 중이면 확인하지 않는다 — 큐/확정 흐름이 진행 중인데 travel을 끼워 넣으면 상태가 어긋난다.
 	if (MatchmakingState != EMatchmakingState::Idle)

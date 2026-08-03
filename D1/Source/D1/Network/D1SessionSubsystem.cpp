@@ -90,7 +90,7 @@ void UD1SessionSubsystem::TravelToFrontend()
 	OpenFrontendMap();
 }
 
-void UD1SessionSubsystem::OnNoticeConfirmed()
+void UD1SessionSubsystem::HandleNoticeConfirmed()
 {
 	if (NoticeWidget)
 	{
@@ -129,7 +129,7 @@ bool UD1SessionSubsystem::ShowNotice(const FText& Title, const FText& Message)
 	if (UD1UWSystemNotice* Notice = Cast<UD1UWSystemNotice>(NoticeWidget))
 	{
 		Notice->SetNotice(Title, Message);
-		Notice->OnConfirmed.AddDynamic(this, &UD1SessionSubsystem::OnNoticeConfirmed);
+		Notice->OnSystemNoticeConfirmed.AddDynamic(this, &UD1SessionSubsystem::HandleNoticeConfirmed);
 	}
 
 	// 모달 조작을 위해 UI 입력 + 커서 (인게임 GameOnly 상태에서도 확인 클릭 가능).

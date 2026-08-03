@@ -39,13 +39,13 @@ void UD1UWLobby::NativeConstruct()
 	// 우선 캐시값으로 라벨 표시 → 아래 RefreshMyProfile 완료 시 최신값으로 교체.
 	ApplyProfileToLabels();
 
-	if (StartMatchingButton)
+	if (StartMatchmakingButton)
 	{
-		StartMatchingButton->OnClicked.AddDynamic(this, &UD1UWLobby::OnStartMatchingClicked);
+		StartMatchmakingButton->OnClicked.AddDynamic(this, &UD1UWLobby::OnStartMatchmakingClicked);
 	}
-	if (CancelMatchingButton)
+	if (CancelMatchmakingButton)
 	{
-		CancelMatchingButton->OnClicked.AddDynamic(this, &UD1UWLobby::OnCancelMatchingClicked);
+		CancelMatchmakingButton->OnClicked.AddDynamic(this, &UD1UWLobby::OnCancelMatchmakingClicked);
 	}
 	if (RankingButton)
 	{
@@ -64,7 +64,7 @@ void UD1UWLobby::NativeConstruct()
 
 		// 구독 뒤에 확인 — 진행 중 매치가 있으면 응답이 OnMatchFound를 태우고 그대로 DS로 들어간다.
 		// (끊긴 채 로비로 돌아온 클라의 유일한 복구 경로. 없으면 조용히 아무 일도 안 일어난다.)
-		Matchmaking->CheckRejoinableMatch();
+		Matchmaking->FetchRejoinableMatch();
 	}
 
 	if (UD1AuthSubsystem* Auth = GetGameInstance()->GetSubsystem<UD1AuthSubsystem>())
@@ -86,7 +86,7 @@ void UD1UWLobby::NativeConstruct()
 
 void UD1UWLobby::NativeDestruct()
 {
-	StopMatchSearchingElapsed();
+	StopMatchmakingElapsed();
 
 	if (UWorld* World = GetWorld())
 	{
@@ -158,7 +158,7 @@ void UD1UWLobby::ApplyProfileToLabels()
 	}
 }
 
-void UD1UWLobby::OnStartMatchingClicked()
+void UD1UWLobby::OnStartMatchmakingClicked()
 {
 	UD1MatchmakingSubsystem* Matchmaking = GetGameInstance()->GetSubsystem<UD1MatchmakingSubsystem>();
 	if (!Matchmaking)
@@ -176,22 +176,22 @@ void UD1UWLobby::OnStartMatchingClicked()
 	{
 		MatchStatusLabel->SetText(NSLOCTEXT("Lobby", "MatchConnecting", "매칭 준비 중..."));
 	}
-	if (StartMatchingButton)
+	if (StartMatchmakingButton)
 	{
-		StartMatchingButton->SetIsEnabled(false);
+		StartMatchmakingButton->SetIsEnabled(false);
 	}
 
 	// 준비 중엔 0:00 정지 표시. 실제 카운트는 큐 입장(HandleQueueJoined)부터.
-	MatchSearchingElapsedSec = 0;
-	if (MatchSearchingElapsedLabel)
+	MatchmakingElapsedSec = 0;
+	if (MatchmakingElapsedLabel)
 	{
-		MatchSearchingElapsedLabel->SetText(FText::FromString(TEXT("0:00")));
+		MatchmakingElapsedLabel->SetText(FText::FromString(TEXT("0:00")));
 	}
 }
 
-void UD1UWLobby::OnCancelMatchingClicked()
+void UD1UWLobby::OnCancelMatchmakingClicked()
 {
-	StopMatchSearchingElapsed();
+	StopMatchmakingElapsed();
 
 	if (UD1MatchmakingSubsystem* Matchmaking = GetGameInstance()->GetSubsystem<UD1MatchmakingSubsystem>())
 	{
@@ -202,9 +202,9 @@ void UD1UWLobby::OnCancelMatchingClicked()
 	{
 		MatchStatusPanel->SetVisibility(ESlateVisibility::Collapsed);
 	}
-	if (StartMatchingButton)
+	if (StartMatchmakingButton)
 	{
-		StartMatchingButton->SetIsEnabled(true);
+		StartMatchmakingButton->SetIsEnabled(true);
 	}
 }
 
@@ -218,8 +218,8 @@ void UD1UWLobby::HandleQueueJoined()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(
-			MatchSearchingElapsedTimerHandle, this,
-			&UD1UWLobby::UpdateMatchSearchingElapsed, 1.f, /*bLoop=*/true);
+			MatchmakingElapsedTimerHandle, this,
+			&UD1UWLobby::UpdateMatchmakingElapsed, 1.f, /*bLoop=*/true);
 	}
 }
 
@@ -228,16 +228,16 @@ void UD1UWLobby::HandleMatchFound(const FMatchFoundDTO& Match)
 	UE_LOG(LogD1, Log, TEXT("[Lobby] 매칭 완료 — server=%s:%d"),
 		*Match.ServerHost, Match.ServerPort);
 
-	StopMatchSearchingElapsed();
+	StopMatchmakingElapsed();
 
-	// 재입장 경로(CheckRejoinableMatch)는 버튼 클릭 없이 도착 — 패널·버튼 상태를 직접 맞춘다.
+	// 재입장 경로(FetchRejoinableMatch)는 버튼 클릭 없이 도착 — 패널·버튼 상태를 직접 맞춘다.
 	if (MatchStatusPanel)
 	{
 		MatchStatusPanel->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
-	if (StartMatchingButton)
+	if (StartMatchmakingButton)
 	{
-		StartMatchingButton->SetIsEnabled(false);
+		StartMatchmakingButton->SetIsEnabled(false);
 	}
 
 	if (MatchStatusLabel)
@@ -249,62 +249,62 @@ void UD1UWLobby::HandleMatchFound(const FMatchFoundDTO& Match)
 	}
 	// 매칭 완료 → 타이머·취소 버튼만 숨기고 상태 라벨('입장 중')은 남긴다.
 	// 실제 DS 입장(ClientTravel)은 Matchmaking Subsystem이 처리.
-	if (MatchSearchingElapsedLabel)
+	if (MatchmakingElapsedLabel)
 	{
-		MatchSearchingElapsedLabel->SetVisibility(ESlateVisibility::Collapsed);
+		MatchmakingElapsedLabel->SetVisibility(ESlateVisibility::Collapsed);
 	}
-	if (CancelMatchingButton)
+	if (CancelMatchmakingButton)
 	{
-		CancelMatchingButton->SetVisibility(ESlateVisibility::Collapsed);
+		CancelMatchmakingButton->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 
 void UD1UWLobby::HandleMatchmakingError(const FBackendResponse& Error)
 {
-	const FString Msg = FBackendErrorMessages::Resolve(Error);
+	const FString ErrorMessage = FBackendErrorMessages::Resolve(Error);
 
-	UE_LOG(LogD1, Warning, TEXT("[Lobby] 매칭 에러: %s"), *Msg);
+	UE_LOG(LogD1, Warning, TEXT("[Lobby] 매칭 에러: %s"), *ErrorMessage);
 
-	StopMatchSearchingElapsed();
+	StopMatchmakingElapsed();
 
 	if (MatchStatusLabel)
 	{
-		MatchStatusLabel->SetText(FText::FromString(Msg));
+		MatchStatusLabel->SetText(FText::FromString(ErrorMessage));
 	}
-	if (StartMatchingButton)
+	if (StartMatchmakingButton)
 	{
 		// 에러 문구는 패널에 남겨두고 다시 시도 가능하게 Start 재활성
-		StartMatchingButton->SetIsEnabled(true);
+		StartMatchmakingButton->SetIsEnabled(true);
 	}
 
 	// HandleMatchFound가 접은 위젯 원복 — travel 실패 후 재검색 UI가 온전하도록.
-	if (MatchSearchingElapsedLabel)
+	if (MatchmakingElapsedLabel)
 	{
-		MatchSearchingElapsedLabel->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		MatchmakingElapsedLabel->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	}
-	if (CancelMatchingButton)
+	if (CancelMatchmakingButton)
 	{
-		CancelMatchingButton->SetVisibility(ESlateVisibility::Visible);
+		CancelMatchmakingButton->SetVisibility(ESlateVisibility::Visible);
 	}
 }
 
-void UD1UWLobby::UpdateMatchSearchingElapsed()
+void UD1UWLobby::UpdateMatchmakingElapsed()
 {
-	++MatchSearchingElapsedSec;
-	if (MatchSearchingElapsedLabel)
+	++MatchmakingElapsedSec;
+	if (MatchmakingElapsedLabel)
 	{
-		const int32 Minutes = MatchSearchingElapsedSec / 60;
-		const int32 Seconds = MatchSearchingElapsedSec % 60;
-		MatchSearchingElapsedLabel->SetText(FText::FromString(
+		const int32 Minutes = MatchmakingElapsedSec / 60;
+		const int32 Seconds = MatchmakingElapsedSec % 60;
+		MatchmakingElapsedLabel->SetText(FText::FromString(
 			FString::Printf(TEXT("%d:%02d"), Minutes, Seconds)));
 	}
 }
 
-void UD1UWLobby::StopMatchSearchingElapsed()
+void UD1UWLobby::StopMatchmakingElapsed()
 {
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().ClearTimer(MatchSearchingElapsedTimerHandle);
+		World->GetTimerManager().ClearTimer(MatchmakingElapsedTimerHandle);
 	}
 }
 

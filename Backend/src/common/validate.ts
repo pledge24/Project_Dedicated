@@ -17,7 +17,7 @@ export function normalizeLoginId(v: unknown): unknown
     return typeof v === 'string' ? v.toLowerCase() : v;
 }
 
-export function validateLoginId(loginId: unknown): asserts loginId is string
+export function assertLoginId(loginId: unknown): asserts loginId is string
 {
     if (!RX_LOGIN_ID.test(asString(loginId)))
     {
@@ -25,7 +25,7 @@ export function validateLoginId(loginId: unknown): asserts loginId is string
     }
 }
 
-export function validatePassword(password: unknown): asserts password is string
+export function assertPassword(password: unknown): asserts password is string
 {
     if (!RX_PASSWORD.test(asString(password)))
     {
@@ -33,7 +33,7 @@ export function validatePassword(password: unknown): asserts password is string
     }
 }
 
-export function validateNickname(nickname: unknown): asserts nickname is string
+export function assertNickname(nickname: unknown): asserts nickname is string
 {
     const s = asString(nickname);
     if (s !== s.trim())

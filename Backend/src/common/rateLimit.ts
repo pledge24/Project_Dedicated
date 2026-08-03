@@ -13,7 +13,7 @@ function rateLimitHandler(req: Request, res: Response): void
 }
 
 /** limit 요청/windowMs 제한 미들웨어 생성. windowMs는 전역 설정을 공유한다. */
-export function makeRateLimiter(limit: number)
+export function createRateLimiter(limit: number)
 {
     return rateLimit({
         windowMs: config.rateLimit.windowMs,

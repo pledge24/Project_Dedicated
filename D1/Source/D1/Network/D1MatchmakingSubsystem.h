@@ -63,7 +63,7 @@ public:
 	 *  백엔드가 "결과 미저장 + 탈주 미정산"인 매치만 알려주므로 끝난 경기로 되돌아가지 않는다.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Backend|Match")
-	void CheckRejoinableMatch();
+	void FetchRejoinableMatch();
 
 private:
 	void HandleRejoinResponse(const FString& Body);

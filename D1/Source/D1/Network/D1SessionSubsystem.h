@@ -45,7 +45,7 @@ public:
 
 protected:
 	UFUNCTION()
-	void OnNoticeConfirmed();
+	void HandleNoticeConfirmed();
 
 private:
 	/** 알림 모달 표시. 못 띄웠으면 false — 호출측이 즉시 복귀시켜 갇힘을 막는다. */

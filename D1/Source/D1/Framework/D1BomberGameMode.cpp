@@ -93,7 +93,7 @@ void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 	{
 		if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
 		{
-			Flow->HandlePlayerJoined();
+			Flow->NotifyPlayerJoined();
 		}
 	}
 }
@@ -152,15 +152,15 @@ void AD1BomberGameMode::BeginPlay()
 	{
 		if (UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval())
 		{
-			Removal->InitializeRemoval(MatchConfig.ExpectedPlayers, MatchConfig.MatchId, MatchConfig.MatchToken);
+			Removal->InitializeRemoval(MatchConfig.ExpectedPlayerCount, MatchConfig.MatchId, MatchConfig.ServerToken);
 		}
 
 		if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
 		{
 			TArray<FD1JoinEntry> ExpectedRoster;
 			MatchConfig.Roster.GenerateValueArray(ExpectedRoster);
-			Flow->InitializeMatch(MatchConfig.ExpectedPlayers, WaitForPlayersTimeoutSec, ShutdownGraceSec,
-				MatchConfig.MatchId, MatchConfig.MatchToken, ExpectedRoster);
+			Flow->InitializeMatch(MatchConfig.ExpectedPlayerCount, WaitForPlayersTimeoutSec, ShutdownGraceSec,
+				MatchConfig.MatchId, MatchConfig.ServerToken, ExpectedRoster);
 		}
 	}
 }

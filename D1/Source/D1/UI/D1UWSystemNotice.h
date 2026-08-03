@@ -31,7 +31,7 @@ public:
 	void SetNotice(const FText& InTitle, const FText& InMessage);
 
 	UPROPERTY(BlueprintAssignable, Category = "D1|Notice")
-	FOnSystemNoticeConfirmed OnConfirmed;
+	FOnSystemNoticeConfirmed OnSystemNoticeConfirmed;
 
 protected:
 	UFUNCTION()

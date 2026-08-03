@@ -2,7 +2,7 @@
 import type { Request, Response } from 'express';
 
 import { ok } from '../common/envelope.js';
-import { normalizeLoginId, validateLoginId, validateNickname, validatePassword } from '../common/validate.js';
+import { assertLoginId, assertNickname, assertPassword, normalizeLoginId } from '../common/validate.js';
 import * as service from './auth.service.js';
 
 /**
@@ -14,9 +14,9 @@ export async function register(req: Request, res: Response): Promise<void>
     const body = req.body ?? {};
     const loginId = normalizeLoginId(body.loginId);
     const { password, nickname } = body;
-    validateLoginId(loginId);
-    validatePassword(password);
-    validateNickname(nickname);
+    assertLoginId(loginId);
+    assertPassword(password);
+    assertNickname(nickname);
 
     const data = await service.register(loginId, password, nickname);
     res.json(ok(data));
@@ -31,8 +31,8 @@ export async function login(req: Request, res: Response): Promise<void>
     const body = req.body ?? {};
     const loginId = normalizeLoginId(body.loginId);
     const { password } = body;
-    validateLoginId(loginId);
-    validatePassword(password);
+    assertLoginId(loginId);
+    assertPassword(password);
 
     const data = await service.login(loginId, password);
     res.json(ok(data));
@@ -46,7 +46,7 @@ export async function me(req: Request, res: Response): Promise<void>
 {
     // requireAuth 통과 후이므로 req.user 는 항상 채워져 있다.
     const { userId, nickname } = req.user!;
-    const data = await service.getMe(userId, nickname);
+    const data = await service.fetchMe(userId, nickname);
     res.json(ok(data));
 }
 

@@ -71,12 +71,12 @@ bool FD1MatchConfig::LoadFromFile(const FString& FilePath)
 	}
 
 	Root->TryGetStringField(TEXT("matchId"), MatchId);
-	Root->TryGetStringField(TEXT("matchToken"), MatchToken);
+	Root->TryGetStringField(TEXT("serverToken"), ServerToken);
 
-	double ExpectedPlayersNum = 0.0;
-	if (Root->TryGetNumberField(TEXT("expectedPlayers"), ExpectedPlayersNum))
+	double ExpectedPlayersValue = 0.0;
+	if (Root->TryGetNumberField(TEXT("expectedPlayers"), ExpectedPlayersValue))
 	{
-		ExpectedPlayers = static_cast<int32>(ExpectedPlayersNum);
+		ExpectedPlayerCount = static_cast<int32>(ExpectedPlayersValue);
 	}
 
 	const TArray<TSharedPtr<FJsonValue>>* RosterArray = nullptr;
@@ -128,8 +128,8 @@ bool FD1MatchConfig::LoadFromFile(const FString& FilePath)
 	}
 
 	UE_LOG(LogD1, Log, TEXT("[Match] DS matchId=%s token=%s expected=%d roster=%d bots=%d"),
-		*MatchId, MatchToken.IsEmpty() ? TEXT("(none)") : TEXT("(set)"),
-		ExpectedPlayers, Roster.Num(), Bots.Num());
+		*MatchId, ServerToken.IsEmpty() ? TEXT("(none)") : TEXT("(set)"),
+		ExpectedPlayerCount, Roster.Num(), Bots.Num());
 
 	return !MatchId.IsEmpty();
 }
@@ -137,12 +137,12 @@ bool FD1MatchConfig::LoadFromFile(const FString& FilePath)
 void FD1MatchConfig::LoadFromCommandLine()
 {
 	FParse::Value(FCommandLine::Get(), TEXT("MatchId="), MatchId);
-	FParse::Value(FCommandLine::Get(), TEXT("MatchToken="), MatchToken);
-	FParse::Value(FCommandLine::Get(), TEXT("ExpectedPlayers="), ExpectedPlayers);
+	FParse::Value(FCommandLine::Get(), TEXT("ServerToken="), ServerToken);
+	FParse::Value(FCommandLine::Get(), TEXT("ExpectedPlayers="), ExpectedPlayerCount);
 	if (!MatchId.IsEmpty())
 	{
 		UE_LOG(LogD1, Log, TEXT("[Match] DS matchId=%s token=%s expected=%d (커맨드라인 경로)"),
-			*MatchId, MatchToken.IsEmpty() ? TEXT("(none)") : TEXT("(set)"), ExpectedPlayers);
+			*MatchId, ServerToken.IsEmpty() ? TEXT("(none)") : TEXT("(set)"), ExpectedPlayerCount);
 	}
 
 	// {token}:{userId}:{base64(nickname)};… — InitNewPlayer가 ?join= 토큰으로 신원·이름을 확정한다.

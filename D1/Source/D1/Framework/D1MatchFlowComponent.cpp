@@ -38,26 +38,26 @@ UD1MatchFlowComponent::UD1MatchFlowComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayers, float InWaitTimeoutSec, float InShutdownGraceSec,
-	const FString& InMatchId, const FString& InMatchToken, const TArray<FD1JoinEntry>& InExpectedRoster)
+void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayerCount, float InWaitTimeoutSec, float InShutdownGraceSec,
+	const FString& InMatchId, const FString& InServerToken, const TArray<FD1JoinEntry>& InExpectedRoster)
 {
 	if (!HasServerAuthority())
 	{
 		return;
 	}
 
-	ExpectedPlayerCount      = InExpectedPlayers;
+	ExpectedPlayerCount      = InExpectedPlayerCount;
 	WaitForPlayersTimeoutSec = InWaitTimeoutSec;
 	ShutdownGraceSec         = InShutdownGraceSec;
 	CurrentMatchId           = InMatchId;
-	CurrentMatchToken        = InMatchToken;
+	CurrentServerToken        = InServerToken;
 	ExpectedRoster           = InExpectedRoster;
 
 	// 맵 빌드·시작 게이트 준비 완료 → 백엔드에 "플레이어 받을 준비됨" 통지(토큰 있는 실 DS만).
 	// 백엔드는 이 콜백을 받고 클라에 match:found(입장 패킷) 전송. PIE/standalone은 토큰 없어 스킵.
 	if (UD1MatchResultSubsystem* ResultClient = GetResultClient())
 	{
-		ResultClient->ReportDSReady(CurrentMatchId, CurrentMatchToken);
+		ResultClient->ReportDSReady(CurrentMatchId, CurrentServerToken);
 	}
 
 	// 시작 게이트: 예상 인원 0/1(PIE·솔로)이면 즉시 시작, 아니면 전원 입장(PostLogin) 또는 타임아웃까지 Waiting.
@@ -75,7 +75,7 @@ void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayers, float InWai
 	}
 }
 
-void UD1MatchFlowComponent::HandlePlayerJoined()
+void UD1MatchFlowComponent::NotifyPlayerJoined()
 {
 	// 이미 시작했거나 게이트 비활성(PIE·솔로)이면 시작 게이트 카운트 생략.
 	if (!HasServerAuthority() || HasMatchStarted() || ExpectedPlayerCount <= 1)
@@ -222,13 +222,13 @@ void UD1MatchFlowComponent::EnsureAliveListInitialized()
 
 void UD1MatchFlowComponent::RequestEndEvaluation()
 {
-	if (bEndEvalPending)
+	if (bEndEvaluationPending)
 	{
 		return; // 프레임 내 다중 사망 → 타이머 1개만
 	}
 	if (UWorld* World = GetWorld())
 	{
-		bEndEvalPending = true;
+		bEndEvaluationPending = true;
 		World->GetTimerManager().SetTimerForNextTick(
 			this, &UD1MatchFlowComponent::EvaluateEndCondition);
 	}
@@ -236,7 +236,7 @@ void UD1MatchFlowComponent::RequestEndEvaluation()
 
 void UD1MatchFlowComponent::EvaluateEndCondition()
 {
-	bEndEvalPending = false;
+	bEndEvaluationPending = false;
 
 	if (!HasServerAuthority() || IsMatchEnded())
 	{
@@ -344,7 +344,7 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 	}
 
 	// 미배정 생존자(시간 만료/무승부)는 공동 1위로 보정 — 백엔드는 placement 1~N만 허용.
-	// 탈주·kick 처리자는 ProcessLeaver가 이미 최하위를 부여해 여기 걸리지 않는다.
+	// 탈주·kick 처리자는 RemoveLeaver가 이미 최하위를 부여해 여기 걸리지 않는다.
 	for (APlayerState* PS : GS->PlayerArray)
 	{
 		AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS);
@@ -378,7 +378,7 @@ void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, E
 	// 셧다운 감시는 결과 POST가 확정(성공·409·확정 실패·재시도 소진)된 뒤에 시작한다.
 	const int32 DurationSec = FMath::Max(0,
 		FMath::RoundToInt(GS->GetServerWorldTimeSeconds() - GS->GetMatchStartServerTime()));
-	ResultClient->ReportMatchResult(CurrentMatchId, CurrentMatchToken, GS->GetMapName(),
+	ResultClient->ReportMatchResult(CurrentMatchId, CurrentServerToken, GS->GetMapName(),
 		DurationSec, EndReasonToString(Reason), ResultPlayers,
 		FSimpleDelegate::CreateWeakLambda(this, [this]()
 		{
@@ -432,7 +432,7 @@ AD1BomberGameState* UD1MatchFlowComponent::GetBomberGameState() const
 
 UD1MatchResultSubsystem* UD1MatchFlowComponent::GetResultClient() const
 {
-	if (CurrentMatchToken.IsEmpty())
+	if (CurrentServerToken.IsEmpty())
 	{
 		return nullptr;
 	}
