@@ -18,7 +18,6 @@ class UD1UWMatchResultRow : public UD1UserWidget
 	GENERATED_BODY()
 
 public:
-	/** 한 플레이어 결과를 행에 바인딩. */
 	UFUNCTION(BlueprintCallable, Category = "MatchResult")
 	void SetEntry(const FD1MatchResultEntry& Entry);
 

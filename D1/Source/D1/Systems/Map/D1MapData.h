@@ -46,16 +46,16 @@ public:
 	TSubclassOf<AD1SoftBlock> GetSoftBlockClass() const { return SoftBlockClass; }
 
 private:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<AD1WallBlock> WallBlockClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<AD1SoftBlock> SoftBlockClass;
+
 	/** 이 맵의 논리 이름(레벨/쉘 umap 이름과 무관). 매치 결과의 map_name으로 보고. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map", meta = (AllowPrivateAccess = "true"))
 	FString MapName;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map", meta = (AllowPrivateAccess = "true"))
 	TArray<FString> Rows;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map", meta = (AllowPrivateAccess = "true"))
-	TSubclassOf<AD1WallBlock> WallBlockClass;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map", meta = (AllowPrivateAccess = "true"))
-	TSubclassOf<AD1SoftBlock> SoftBlockClass;
 };

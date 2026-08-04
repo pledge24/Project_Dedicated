@@ -91,7 +91,7 @@ public:
 
 protected:
 	UFUNCTION()
-	void OnRep_Invulnerable();
+	void OnRep_bIsInvulnerable();
 
 private:
 	/** 서버 전용: 비치명 피격 후 무적 시작. DurationSec 뒤 EndInvulnerability. */
@@ -103,7 +103,7 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	float HitInvulnSec = 2.f;
 
-	UPROPERTY(ReplicatedUsing = OnRep_Invulnerable, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(ReplicatedUsing = OnRep_bIsInvulnerable, BlueprintReadOnly, Category = "Bomber", meta = (AllowPrivateAccess = "true"))
 	bool bIsInvulnerable = false;
 
 	FTimerHandle InvulnTimerHandle;

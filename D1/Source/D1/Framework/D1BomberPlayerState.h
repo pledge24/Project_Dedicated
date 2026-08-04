@@ -58,7 +58,7 @@ private:
 
 //~ 탈주 (게임중 다른 기기 로그인 kick — 사망과 별개)
 public:
-	/** 탈주 여부. 카드 BP가 "탈주" 배지 토글에 사용(BlueprintPure). */
+	/** 카드 BP가 "탈주" 배지 토글에 사용. */
 	UFUNCTION(BlueprintPure, Category = "Bomber")
 	bool HasLeft() const { return bLeft; }
 
@@ -78,7 +78,7 @@ private:
 
 //~ 봇 (봇전 서버측 스폰 봇 — 카드 BOT 배지)
 public:
-	/** 봇 여부. 카드 BP가 "BOT" 배지 토글에 사용(BlueprintPure). */
+	/** 카드 BP가 "BOT" 배지 토글에 사용. */
 	UFUNCTION(BlueprintPure, Category = "Bomber")
 	bool IsBot() const { return bIsBot; }
 

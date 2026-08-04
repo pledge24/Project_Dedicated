@@ -68,7 +68,7 @@ void D1MatchSettlement::AppendResultPair(TArray<FD1MatchResultEntry>& InOutEntri
 	Player.SlotIndex = SlotIndex;
 	Player.Placement = Placement;
 	Player.LivesLeft = LivesLeft;
-	Player.Left      = bLeft;
+	Player.bLeft     = bLeft;
 	InOutPlayers.Add(Player);
 }
 

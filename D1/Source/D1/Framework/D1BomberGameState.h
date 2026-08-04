@@ -158,7 +158,7 @@ private:
 
 //~ 서버 로직 컴포넌트
 public:
-	/** 매치 흐름 컴포넌트(시작 게이트·등수·종료 판정). 생성자에서 항상 생성 → non-null. */
+	/** 생성자에서 항상 생성 → non-null. */
 	UD1MatchFlowComponent* GetMatchFlow() const { return MatchFlowComp; }
 
 	/** 킥·탈주 처리 컴포넌트. 생성자에서 항상 생성 → non-null. */

@@ -43,7 +43,7 @@ void UD1MatchResultSubsystem::ReportMatchResult(const FString& MatchId, const FS
 		Entry->SetNumberField(TEXT("slotIndex"), P.SlotIndex);
 		Entry->SetNumberField(TEXT("placement"), P.Placement);
 		Entry->SetNumberField(TEXT("livesLeft"), P.LivesLeft);
-		Entry->SetBoolField(TEXT("left"),        P.Left);
+		Entry->SetBoolField(TEXT("left"),        P.bLeft);
 		Results.Add(MakeShared<FJsonValueObject>(Entry));
 	}
 	Body->SetArrayField(TEXT("results"), Results);

@@ -212,7 +212,7 @@ void AD1BomberCharacter::ReceiveExplosionHit()
 	}
 }
 
-void AD1BomberCharacter::OnRep_Invulnerable()
+void AD1BomberCharacter::OnRep_bIsInvulnerable()
 {
 	// Start/EndInvulnerability의 수동 OnRep 호출로 서버(리슨 호스트)에서도 불린다 — DS 스킵은 컴포넌트가 담당.
 	if (bIsInvulnerable)
@@ -234,7 +234,7 @@ void AD1BomberCharacter::StartInvulnerability(float DurationSec)
 	bIsInvulnerable = true;
 	GetWorldTimerManager().SetTimer(InvulnTimerHandle, this,
 		&AD1BomberCharacter::EndInvulnerability, DurationSec, false);
-	OnRep_Invulnerable();
+	OnRep_bIsInvulnerable();
 }
 
 void AD1BomberCharacter::EndInvulnerability()
@@ -244,7 +244,7 @@ void AD1BomberCharacter::EndInvulnerability()
 		return;
 	}
 	bIsInvulnerable = false;
-	OnRep_Invulnerable();
+	OnRep_bIsInvulnerable();
 }
 
 void AD1BomberCharacter::ApplyHitStun()

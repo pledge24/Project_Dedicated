@@ -53,9 +53,6 @@ private:
 	/** DS로 travel 자체가 실패했을 때(주소 불가·거절). */
 	void HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString);
 
-	FDelegateHandle NetworkFailureHandle;
-	FDelegateHandle TravelFailureHandle;
-
 	UPROPERTY(Transient)
 	FAuthUserDTO CurrentUser;
 
@@ -64,4 +61,7 @@ private:
 
 	/** UPROPERTY로 두지 않음 — BP/리플렉션 노출 방지. */
 	FString CurrentJwt;
+
+	FDelegateHandle NetworkFailureHandle;
+	FDelegateHandle TravelFailureHandle;
 };

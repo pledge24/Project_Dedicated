@@ -67,12 +67,12 @@ public:
 	void SetHeldItem(EPowerupType InType, TSubclassOf<AD1PowerupPickup> InPickupClass, float InDropZ);
 
 private:
-	/** 빌드 시 사전 배정된 보유 아이템(서버 전용, 비복제 — 파괴 전엔 숨김). */
-	EPowerupType HeldItem{};
-
 	/** 드롭할 픽업 클래스·높이(서버 전용, 빌드 시 GameMode가 주입). */
 	UPROPERTY()
 	TSubclassOf<AD1PowerupPickup> PickupClass;
+
+	/** 빌드 시 사전 배정된 보유 아이템(서버 전용, 비복제 — 파괴 전엔 숨김). */
+	EPowerupType HeldItem{};
 
 	float DropZ = 40.f;
 
