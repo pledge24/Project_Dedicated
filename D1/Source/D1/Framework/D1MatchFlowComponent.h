@@ -36,7 +36,9 @@ public:
 
 private:
 	void StartMatch();
-	void OnWaitForPlayersTimeout();
+	void StartMatchOnGateTimeout();
+	/** 시작 순간 명단에 없는 roster 인원을 미입장자로 확정 — 이후 입장을 거절한다. */
+	void MarkNoShowUsers();
 
 	FTimerHandle WaitForPlayersTimerHandle;
 
@@ -60,6 +62,10 @@ public:
 	void NotifyPlayerLeft(AD1BomberPlayerState* LeftPS);
 
 private:
+	/**
+	 * StartMatch가 아니라 첫 사망·탈주 때 만드는 이유: 실 DS는 시작 시점에 명단이 확정되지만
+	 * (PreLogin·InitNewPlayer 가드), 토큰 없는 PIE는 그 가드가 꺼져 시작 뒤에도 클라가 붙는다.
+	 */
 	void EnsureAliveListInitialized();
 	/** 다음 틱 종료 평가 예약(중복 예약 방지). */
 	void RequestEndEvaluation();
@@ -80,9 +86,9 @@ private:
 
 //~ 매치 종료·셧다운
 private:
-	void OnMatchTimeExpired();
+	void EndMatchByTimeout();
 	/** 종료 확정: 등수 보정·페이즈 전이는 여기서, 결과 두 배열 조립은 D1MatchSettlement에 위임. */
-	void EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason);
+	void EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason);
 	/** 결과 보고가 확정됐거나 하드캡에 걸렸을 때 DS 셧다운 감시 시작. 선착순 1회만 유효(감시가 멱등). */
 	void BeginShutdownAfterReport();
 

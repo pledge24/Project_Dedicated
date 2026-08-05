@@ -22,6 +22,16 @@ export function markServerReady(serverToken: string, matchId: string): void
     readiness.signal(matchId);
 }
 
+/**
+ * DS 통지(POST /started): 서버 토큰 검증 후 플레이 시작 시각을 기록(멱등).
+ * 이 시각이 찍힌 뒤로는 재입장 주소를 발급하지 않는다 — 재입장 허용 창은 매치 시작 전까지다.
+ */
+export async function markMatchPlaying(serverToken: string, matchId: string): Promise<void>
+{
+    assertServerToken(serverToken, matchId);
+    await rosters.markPlayStarted(matchId, Date.now());
+}
+
 /** 서버 토큰을 검증하고 결과를 기록한다. 실패 케이스별 AppError를 throw. */
 export async function submitResult(serverToken: string, req: MatchResultRequest): Promise<MatchResultResponse>
 {

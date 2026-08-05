@@ -78,6 +78,12 @@ private:
 
 //~ 인증 — 접속 신원 검증
 private:
+	/**
+	 * 매치 시작 후 들어오는 접속인가 — PreLogin·InitNewPlayer 공용 판정.
+	 * 토큰 없는 PIE/standalone은 시작 게이트 없이 즉시 Playing이 되므로 항상 false(입장 허용).
+	 */
+	bool IsJoinAfterMatchStart() const;
+
 	/** BeginPlay에서 FD1MatchConfig::Load()로 적재 — 매치 식별자/토큰/명단/봇 좌석. */
 	FD1MatchConfig MatchConfig;
 

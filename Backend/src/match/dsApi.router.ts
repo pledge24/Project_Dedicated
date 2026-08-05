@@ -13,6 +13,7 @@ const router = express.Router();
 
 router.post('/result', resultLimiter, handler.submitResult);
 router.post('/:matchId/ready', pollLimiter, handler.reportReady);
+router.post('/:matchId/started', pollLimiter, handler.reportStarted);
 router.get('/:matchId/kicks', pollLimiter, handler.listKicks);
 router.post('/:matchId/leaver', pollLimiter, handler.submitLeaver);
 

@@ -25,6 +25,19 @@ void UD1MatchResultSubsystem::ReportDSReady(const FString& MatchId, const FStrin
 	SendReport(Path, ServerToken, MakeShared<FJsonObject>(), /*Attempt=*/0, Policy, ServerReadyRetryTimerHandle);
 }
 
+void UD1MatchResultSubsystem::ReportMatchStarted(const FString& MatchId, const FString& ServerToken)
+{
+	FD1ReportPolicy Policy;
+	Policy.Label = TEXT("시작");
+	Policy.MatchId = MatchId;
+	// 1,2,4,8,16초(누적 31s) — 준비 통지와 달리 백엔드 쪽 마감이 없고, 유실 시 재입장 창이 열린 채 남는다.
+	Policy.RetryDelaysSec = { 1.f, 2.f, 4.f, 8.f, 16.f };
+
+	// 빈 바디({}) — matchId는 경로, 인증은 매치별 서버 토큰. 도착만으로 "플레이 시작됨" 판정.
+	const FString Path = FString::Printf(TEXT("/api/match/%s/started"), *MatchId);
+	SendReport(Path, ServerToken, MakeShared<FJsonObject>(), /*Attempt=*/0, Policy, MatchStartedRetryTimerHandle);
+}
+
 void UD1MatchResultSubsystem::ReportMatchResult(const FString& MatchId, const FString& ServerToken, const FString& MapName,
 	int32 DurationSec, const FString& EndReason, const TArray<FMatchResultPlayer>& Players,
 	const FSimpleDelegate& OnSettled)

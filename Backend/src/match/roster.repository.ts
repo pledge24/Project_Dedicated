@@ -13,6 +13,7 @@ interface RosterRow extends RowDataPacket
     server_port: number | null;
     map_name: string;
     started_at: Date;
+    play_started_at: Date | null;
     players_json: RosterPlayer[] | string;
 }
 
@@ -30,6 +31,18 @@ export async function insert(roster: MatchRoster): Promise<void>
     );
 }
 
+/**
+ * DS가 시작 게이트를 통과한 시각을 기록. insert의 컬럼 목록에는 넣지 않는다 —
+ * 성사 시점엔 항상 미시작이고, 재등록(ON DUPLICATE)이 이 값을 되돌리면 재입장 창이 다시 열린다.
+ */
+export async function updatePlayStarted(matchId: string, atEpochMs: number): Promise<void>
+{
+    await getPool().execute(
+        'UPDATE match_rosters SET play_started_at = ? WHERE match_id = ?',
+        [new Date(atEpochMs), matchId]
+    );
+}
+
 /** 미확정 매치를 버릴 때 즉시 제거. */
 export async function deleteById(matchId: string): Promise<void>
 {
@@ -40,7 +53,7 @@ export async function deleteById(matchId: string): Promise<void>
 export async function listActive(sinceEpochMs: number): Promise<MatchRoster[]>
 {
     const [rows] = await getPool().execute<RosterRow[]>(
-        'SELECT match_id, server_token, server_host, server_port, map_name, started_at, players_json ' +
+        'SELECT match_id, server_token, server_host, server_port, map_name, started_at, play_started_at, players_json ' +
         'FROM match_rosters WHERE started_at > ? ORDER BY started_at ASC',
         [new Date(sinceEpochMs)]
     );
@@ -89,6 +102,7 @@ function toRoster(row: RosterRow): MatchRoster
         serverToken: row.server_token,
         mapName: row.map_name,
         startedAt: row.started_at.getTime(),
+        playStartedAt: row.play_started_at?.getTime(),
         players,
         server: row.server_host !== null && row.server_port !== null
             ? { host: row.server_host, port: row.server_port }

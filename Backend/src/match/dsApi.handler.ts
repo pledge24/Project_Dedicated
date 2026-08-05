@@ -36,6 +36,18 @@ export function reportReady(req: Request, res: Response): void
 }
 
 /**
+ * POST /api/match/:matchId/started  (DS만)
+ * DS가 시작 게이트를 통과했음을 통지. 백엔드는 이 시각 이후 재입장 주소 발급을 멈춘다.
+ */
+export async function reportStarted(req: Request, res: Response): Promise<void>
+{
+    const serverToken = extractServerToken(req);
+    const matchId = typeof req.params.matchId === 'string' ? req.params.matchId : '';
+    await service.markMatchPlaying(serverToken, matchId);
+    res.json(ok({}));
+}
+
+/**
  * GET /api/match/:matchId/kicks  (DS만)
  * 이 매치에서 강제 회수(다른 기기 로그인)해야 할 userId 목록. DS가 5초 폴링해 kick한다.
  */

@@ -114,6 +114,48 @@ async function main(): Promise<void>
             assert.deepEqual(r.body.data!.server, DS);
         }],
 
+        ['매치가 시작된 뒤 → active:false (재입장 창은 시작 전까지)', async () =>
+        {
+            const u = await seedUser('strt');
+            const m = await seedRoster(u, { withServer: true });
+
+            const before = await get('/api/match/current', u.jwt);
+            assert.equal(before.body.data!.active, true, '사전 조건: 시작 전에는 재입장 대상');
+
+            const started = await post(`/api/match/${m.matchId}/started`, {}, m.serverToken);
+            assert.equal(started.status, 200, JSON.stringify(started.body));
+
+            const after = await get('/api/match/current', u.jwt);
+            assert.equal(after.body.data!.active, false, '시작한 매치로 보내면 DS가 입장을 거절한다');
+        }],
+
+        ['시작 통지 재전송은 멱등 — 시작 시각이 밀리지 않는다', async () =>
+        {
+            const u = await seedUser('idem');
+            const m = await seedRoster(u, { withServer: true });
+
+            await post(`/api/match/${m.matchId}/started`, {}, m.serverToken);
+            const first = roster.get(m.matchId)!.playStartedAt;
+            assert.ok(first !== undefined, '첫 통지가 시작 시각을 남기지 않았다');
+
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            const retry = await post(`/api/match/${m.matchId}/started`, {}, m.serverToken);
+            assert.equal(retry.status, 200, JSON.stringify(retry.body));
+            assert.equal(roster.get(m.matchId)!.playStartedAt, first, 'DS 유실 대비 재전송이 시작 시각을 덮어썼다');
+        }],
+
+        ['시작 통지에 틀린 서버 토큰 → 거절, 재입장 창 유지', async () =>
+        {
+            const u = await seedUser('tok');
+            const m = await seedRoster(u, { withServer: true });
+
+            const bad = await post(`/api/match/${m.matchId}/started`, {}, randomBytes(24).toString('base64url'));
+            assert.equal(bad.body.ok, false, '아무나 시작 처리하면 남의 재입장을 임의로 막을 수 있다');
+
+            const r = await get('/api/match/current', u.jwt);
+            assert.equal(r.body.data!.active, true, '거절됐으면 재입장 창이 그대로 열려 있어야 한다');
+        }],
+
         ['결과가 저장된 매치 → active:false (roster는 남아있어도)', async () =>
         {
             const u = await seedUser('done');

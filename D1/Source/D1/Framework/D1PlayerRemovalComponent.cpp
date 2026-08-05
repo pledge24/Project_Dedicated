@@ -34,6 +34,16 @@ void UD1PlayerRemovalComponent::InitializeRemoval(int32 InExpectedPlayerCount, c
 	StartKickPolling();
 }
 
+void UD1PlayerRemovalComponent::NotifyNoShow(int64 UserId)
+{
+	if (!HasServerAuthority() || UserId <= 0)
+	{
+		return;
+	}
+
+	KickedUserIds.Add(UserId);
+}
+
 void UD1PlayerRemovalComponent::NotifyPlayerDisconnected(AController* Exiting)
 {
 	if (!HasServerAuthority() || !Exiting)

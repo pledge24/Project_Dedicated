@@ -59,6 +59,15 @@ void AD1BomberGameMode::PreLogin(const FString& Options, const FString& Address,
 		return;
 	}
 
+	// 매치 시작 후 입장 거절 — 신규·복귀 불문(재입장 허용 창은 시작 전까지).
+	// 늦은 좌석은 StartMatch가 이미 미입장자로 확정했다. PC를 스폰하기 전에 끊는 빠른 경로다.
+	if (IsJoinAfterMatchStart())
+	{
+		ErrorMessage = TEXT("매치가 이미 시작되어 입장할 수 없습니다.");
+		UE_LOG(LogD1, Warning, TEXT("[Match] PreLogin 거절 — 매치 시작 후 입장 시도 (%s)"), *Address);
+		return;
+	}
+
 	// 재입장 거절 — ?join= 토큰이 roster에 있고 그 유저가 이미 kick(다른 기기 로그인)됐으면 연결 거부.
 	const FString JoinToken = UGameplayStatics::ParseOption(Options, TEXT("join"));
 	if (JoinToken.IsEmpty())
@@ -167,6 +176,16 @@ void AD1BomberGameMode::BeginPlay()
 
 FString AD1BomberGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)
 {
+	// PreLogin과 같은 판정을 한 번 더 — PreLogin은 클라의 join 응답이 오기 전에 돌아서, 그 왕복 사이에
+	// StartMatch가 끼면 이미 승인된 접속이 시작 후에 들어온다(게이트 타임아웃 직전 접속이 이 창에 걸린다).
+	// Super보다 앞에 둬야 UserId가 안 찍혀, PC 파괴가 부르는 Logout이 이 접속을 탈주로 오정산하지 않는다.
+	if (IsJoinAfterMatchStart())
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Match] InitNewPlayer 거절 — PreLogin 승인 후 매치가 시작됨"));
+
+		return TEXT("매치가 이미 시작되어 입장할 수 없습니다.");
+	}
+
 	const FString Result = Super::InitNewPlayer(NewPlayerController, UniqueId, Options, Portal);
 
 	AD1BomberPlayerState* PS = NewPlayerController ? NewPlayerController->GetPlayerState<AD1BomberPlayerState>() : nullptr;
@@ -238,6 +257,20 @@ AActor* AD1BomberGameMode::ChoosePlayerStart_Implementation(AController* Player)
 
 	UsedStarts.Add(Chosen);
 	return Chosen;
+}
+
+bool AD1BomberGameMode::IsJoinAfterMatchStart() const
+{
+	// 토큰 없는 PIE/standalone은 ExpectedPlayerCount<=1로 BeginPlay 중 즉시 Playing이 된다 —
+	// 여기서 막으면 추가 PIE 클라가 통째로 못 들어온다.
+	if (MatchConfig.ServerToken.IsEmpty())
+	{
+		return false;
+	}
+
+	const AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
+
+	return GS && GS->GetMatchPhase() != EBomberMatchPhase::Waiting;
 }
 
 void AD1BomberGameMode::SpawnBots()

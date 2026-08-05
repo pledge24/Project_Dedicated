@@ -1,5 +1,5 @@
 // 백엔드 재시작 생존 하네스 — "백엔드가 죽어도 진행 중인 경기는 끝나고 결과가 남는다"를 검증한다.
-// 실행: npm run match:restart-sim   (MySQL 가동 + Backend/.env 필요)
+// 실행: npm run match:restart-survival-sim   (MySQL 가동 + Backend/.env 필요)
 //
 // 두 가지를 따로 본다:
 //   A. DS 수명 분리 — 확정(commit)된 DS는 shutdownUncommitted가 죽이지 않고, 확정 전 DS는 회수된다.
@@ -147,6 +147,12 @@ async function checkRosterSurvivesRestart(): Promise<boolean>
         assert.equal(persisted, 1, 'roster가 DB에 저장되지 않음 — 재시작하면 결과가 404가 된다');
         console.log('  · roster DB 저장 확인');
 
+        // 플레이 시작 시각도 같은 이유로 영속화 대상이다 — 재시작한 백엔드가 이걸 잊으면
+        // 진행 중인 매치에 재입장 주소를 다시 내준다. 복원 여부는 자식이 확인한다.
+        await roster.markPlayStarted(matchId, Date.now());
+        assert.notEqual(await selectPlayStartedAt(matchId), null, 'play_started_at이 DB에 안 남음');
+        console.log('  · 플레이 시작 시각 DB 저장 확인');
+
         // 여기서 이 프로세스의 메모리 캐시는 의미를 잃는다. 자식은 DB만 보고 시작한다.
         const scoreBefore = await selectScore(users.map((u) => u.userId));
 
@@ -202,6 +208,8 @@ async function runRestartedPhase(): Promise<void>
     const restored = await roster.fetchActive();
     console.log(`[restarted] roster 복원 ${restored}건`);
     assert.ok(roster.get(matchId) !== undefined, `복원됐지만 대상 매치(${matchId})가 없음`);
+    assert.notEqual(roster.get(matchId)!.playStartedAt, undefined,
+        '복원된 roster에 플레이 시작 시각이 없음 — 재시작하면 재입장 창이 다시 열린다');
 
     const app = buildApp();
     const server = app.listen(0);
@@ -239,6 +247,14 @@ async function seedUsers(label: string, s: string, n: number): Promise<Array<{ u
     }
 
     return out;
+}
+
+async function selectPlayStartedAt(matchId: string): Promise<Date | null>
+{
+    const [rows] = await getPool().query<RowDataPacket[]>(
+        'SELECT play_started_at FROM match_rosters WHERE match_id = ?', [matchId]);
+
+    return (rows[0]?.play_started_at as Date | null) ?? null;
 }
 
 async function countRosterRows(matchId: string): Promise<number>

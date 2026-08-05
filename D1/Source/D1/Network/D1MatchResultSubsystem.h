@@ -24,6 +24,12 @@ public:
 	void ReportDSReady(const FString& MatchId, const FString& ServerToken);
 
 	/**
+	 * 서버 전용(DS): 시작 게이트 통과 시 호출. 백엔드가 이후 재입장 주소 발급을 중단한다.
+	 * 유실되면 진행 중인 매치에 재입장 주소가 계속 나가므로(정책 위반) 준비 통지보다 길게 재시도한다.
+	 */
+	void ReportMatchStarted(const FString& MatchId, const FString& ServerToken);
+
+	/**
 	 * 서버 전용(DS): 매치 종료 시 호출. 매치별 서버 토큰을 Bearer로 첨부.
 	 * 일시 실패(전송 실패·5xx·429)는 백오프 재시도 — 백엔드 재시작 창을 넘겨야 결과가 살아남는다.
 	 * 전송이 확정되면(성공·409 멱등·확정 실패·재시도 소진) OnSettled를 정확히 한 번 실행한다.
@@ -68,5 +74,6 @@ private:
 		int32 Attempt, const FD1ReportPolicy& Policy, FTimerHandle& RetryTimerHandle);
 
 	FTimerHandle ServerReadyRetryTimerHandle;
+	FTimerHandle MatchStartedRetryTimerHandle;
 	FTimerHandle MatchResultRetryTimerHandle;
 };

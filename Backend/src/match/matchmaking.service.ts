@@ -141,10 +141,11 @@ export function queueSize(): number
  * 재입장 대상 매치 조회 — 클라가 match:found를 놓친(끊김·크래시·재실행) 경우의 유일한 복구 경로.
  *
  * "진행 중"은 roster 존재만으로 판정할 수 없다. roster는 결과 재제출 멱등을 위해 종료 후에도
- * sweep(DS 최대 수명)까지 남기 때문이다. 그래서 세 가지를 모두 통과해야 주소를 준다:
+ * sweep(DS 최대 수명)까지 남기 때문이다. 그래서 네 가지를 모두 통과해야 주소를 준다:
  *   1) roster에 이 유저가 있는 최신 매치가 있다      — findMatchByUser
- *   2) 그 매치의 결과가 아직 저장되지 않았다          — 저장됐으면 경기가 끝난 것
- *   3) 이 유저가 아직 탈주로 정산되지 않았다          — DS가 KickedUserIds로 재입장을 거절할 대상
+ *   2) 그 매치가 아직 시작되지 않았다                 — 재입장 허용 창은 매치 시작 전까지(정책)
+ *   3) 그 매치의 결과가 아직 저장되지 않았다          — 저장됐으면 경기가 끝난 것
+ *   4) 이 유저가 아직 탈주로 정산되지 않았다          — DS가 KickedUserIds로 재입장을 거절할 대상
  * server 주소가 없는 roster는 재입장 주소를 만들 수 없으므로 대상에서 제외한다.
  */
 export async function findRejoinableMatch(userId: number): Promise<MatchFoundData | null>
@@ -157,6 +158,13 @@ export async function findRejoinableMatch(userId: number): Promise<MatchFoundDat
 
     const found = roster.get(matchId);
     if (!found?.server)
+    {
+        return null;
+    }
+
+    // 시작한 매치는 DS가 PreLogin/InitNewPlayer에서 접속을 거절한다 — 주소를 계속 주면
+    // 클라가 연결에 실패한 뒤에야 그 사실을 알게 된다. DB 조회 전에 메모리에서 끊는다.
+    if (found.playStartedAt !== undefined)
     {
         return null;
     }

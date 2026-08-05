@@ -50,7 +50,7 @@ void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayerCount, float I
 	WaitForPlayersTimeoutSec = InWaitTimeoutSec;
 	ShutdownGraceSec         = InShutdownGraceSec;
 	CurrentMatchId           = InMatchId;
-	CurrentServerToken        = InServerToken;
+	CurrentServerToken       = InServerToken;
 	ExpectedRoster           = InExpectedRoster;
 
 	// 맵 빌드·시작 게이트 준비 완료 → 백엔드에 "플레이어 받을 준비됨" 통지(토큰 있는 실 DS만).
@@ -68,7 +68,7 @@ void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayerCount, float I
 	else if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(
-			WaitForPlayersTimerHandle, this, &UD1MatchFlowComponent::OnWaitForPlayersTimeout,
+			WaitForPlayersTimerHandle, this, &UD1MatchFlowComponent::StartMatchOnGateTimeout,
 			WaitForPlayersTimeoutSec, /*bLoop=*/false);
 		UE_LOG(LogD1, Log, TEXT("[Match] 시작 게이트 대기 — 예상 %d명 (타임아웃 %.0fs)"),
 			ExpectedPlayerCount, WaitForPlayersTimeoutSec);
@@ -127,12 +127,12 @@ void UD1MatchFlowComponent::StartMatch()
 		if (World)
 		{
 			World->GetTimerManager().SetTimer(
-				MatchTimerHandle, this, &UD1MatchFlowComponent::OnMatchTimeExpired,
+				MatchTimerHandle, this, &UD1MatchFlowComponent::EndMatchByTimeout,
 				GS->GetMatchDurationSec(), /*bLoop=*/false);
 		}
 	}
 
-	// 시작 게이트 해제 — 입장 시 서버가 잠근 이동(PossessedBy의 MOVE_None) 일괄 재개.
+	// 시작 게이트 해제 — 입장 시 서버가 잠근 이동(Restart의 MOVE_None) 일괄 재개.
 	if (World)
 	{
 		for (AD1BomberCharacter* Character : TActorRange<AD1BomberCharacter>(World))
@@ -145,10 +145,19 @@ void UD1MatchFlowComponent::StartMatch()
 		}
 	}
 
+	// 여기부터 MatchPhase가 Playing이라 이후 접속은 PreLogin이 거절한다 — 안 온 사람을 지금 확정한다.
+	MarkNoShowUsers();
+
+	// 백엔드의 재입장 주소 발급 중단(토큰 있는 실 DS만). 재입장 허용 창은 여기서 닫힌다.
+	if (UD1MatchResultSubsystem* ResultClient = GetResultClient())
+	{
+		ResultClient->ReportMatchStarted(CurrentMatchId, CurrentServerToken);
+	}
+
 	UE_LOG(LogD1, Log, TEXT("[Match] 매치 시작 (Playing)"));
 }
 
-void UD1MatchFlowComponent::OnWaitForPlayersTimeout()
+void UD1MatchFlowComponent::StartMatchOnGateTimeout()
 {
 	if (HasMatchStarted())
 	{
@@ -156,6 +165,41 @@ void UD1MatchFlowComponent::OnWaitForPlayersTimeout()
 	}
 	UE_LOG(LogD1, Warning, TEXT("[Match] 시작 게이트 타임아웃 — 현재 인원으로 시작"));
 	StartMatch();
+}
+
+void UD1MatchFlowComponent::MarkNoShowUsers()
+{
+	AD1BomberGameState* GS = GetBomberGameState();
+	UD1PlayerRemovalComponent* Removal = GS ? GS->GetPlayerRemoval() : nullptr;
+	if (!GS || !Removal || ExpectedRoster.Num() == 0)
+	{
+		return; // PIE/standalone은 명단이 없어 판정 기준 자체가 없다.
+	}
+
+	TSet<int64> JoinedUserIds;
+	for (const APlayerState* PS : GS->PlayerArray)
+	{
+		if (const AD1BomberPlayerState* BPS = Cast<AD1BomberPlayerState>(PS))
+		{
+			JoinedUserIds.Add(BPS->GetBackendUserId());
+		}
+	}
+
+	int32 NoShowCount = 0;
+	for (const FD1JoinEntry& Expected : ExpectedRoster)
+	{
+		if (!JoinedUserIds.Contains(Expected.UserId))
+		{
+			Removal->NotifyNoShow(Expected.UserId);
+			++NoShowCount;
+			UE_LOG(LogD1, Warning, TEXT("[Match] 미입장 확정 userId=%lld — 이후 입장 거절"), Expected.UserId);
+		}
+	}
+
+	if (NoShowCount > 0)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Match] 미입장 %d명 두고 시작"), NoShowCount);
+	}
 }
 
 void UD1MatchFlowComponent::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
@@ -257,7 +301,7 @@ void UD1MatchFlowComponent::EvaluateEndCondition()
 	{
 		const bool bHasSurvivor = AlivePlayerStates.Num() == 1;
 		AD1BomberPlayerState* Winner = bHasSurvivor ? AlivePlayerStates[0].Get() : nullptr;
-		EndMatchWithWinner(Winner, bHasSurvivor ? EBomberEndReason::Winner : EBomberEndReason::Draw);
+		EndMatch(Winner, bHasSurvivor ? EBomberEndReason::Winner : EBomberEndReason::Draw);
 	}
 }
 
@@ -282,7 +326,7 @@ void UD1MatchFlowComponent::FlushPendingDeaths()
 	PendingDeadBatch.Reset();
 }
 
-void UD1MatchFlowComponent::OnMatchTimeExpired()
+void UD1MatchFlowComponent::EndMatchByTimeout()
 {
 	if (IsMatchEnded())
 	{
@@ -290,10 +334,10 @@ void UD1MatchFlowComponent::OnMatchTimeExpired()
 	}
 	UE_LOG(LogD1, Log, TEXT("Match time expired -> ending match"));
 	// 생존자는 EndMatchWithWinner에서 공동 1위로 보정된다.
-	EndMatchWithWinner(nullptr, EBomberEndReason::TimeExpired);
+	EndMatch(nullptr, EBomberEndReason::TimeExpired);
 }
 
-void UD1MatchFlowComponent::EndMatchWithWinner(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason)
+void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndReason Reason)
 {
 	if (IsMatchEnded())
 	{

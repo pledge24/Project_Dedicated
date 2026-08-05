@@ -32,6 +32,12 @@ public:
 	/** 서버 전용: GameMode::BeginPlay가 설정 push. 토큰 있는 실 DS면 kick 폴링 시작. */
 	void InitializeRemoval(int32 InExpectedPlayerCount, const FString& InMatchId, const FString& InServerToken);
 
+	/**
+	 * 서버 전용: 시작 게이트 통과 시 MatchFlow가 호출 — 끝내 입장하지 않은 유저를 재입장 거절 대상으로 확정.
+	 * PlayerState가 생긴 적이 없어 RemoveLeaver를 태울 수 없다. 결과는 EndMatch의 AppendNoShowResults가 채운다.
+	 */
+	void NotifyNoShow(int64 UserId);
+
 	/** 서버 전용: GameMode::Logout이 호출. 매치 진행 중 이탈(끊김/나가기)을 탈주로 처리. */
 	void NotifyPlayerDisconnected(AController* Exiting);
 

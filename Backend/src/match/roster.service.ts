@@ -42,6 +42,23 @@ export async function add(roster: MatchRoster): Promise<void>
     rosters.set(roster.matchId, roster);
 }
 
+/**
+ * DS가 시작 게이트를 통과했음을 기록 — 이 시각이 찍히면 findRejoinableMatch가 주소를 주지 않는다.
+ * 첫 통지만 반영한다: DS는 유실 대비로 재전송하고, 그때마다 덮어쓰면 시각이 뒤로 밀린다.
+ * DB 우선(add와 같은 순서) — 영속화가 실패했는데 메모리만 시작으로 바뀌면 재시작 후 재입장 창이 되열린다.
+ */
+export async function markPlayStarted(matchId: string, atEpochMs: number): Promise<void>
+{
+    const roster = rosters.get(matchId);
+    if (!roster || roster.playStartedAt !== undefined)
+    {
+        return;
+    }
+
+    await repo.updatePlayStarted(matchId, atEpochMs);
+    roster.playStartedAt = atEpochMs;
+}
+
 export function get(matchId: string): MatchRoster | undefined
 {
     return rosters.get(matchId);

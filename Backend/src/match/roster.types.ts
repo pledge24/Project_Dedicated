@@ -17,7 +17,9 @@ export interface MatchRoster
     matchId: string;
     serverToken: string;
     mapName: string;
-    startedAt: number;      // epoch ms
+    startedAt: number;      // epoch ms — 매치 "성사" 시각(시작 시각 아님)
+    /** DS가 시작 게이트를 통과한 시각(epoch ms). 미시작이면 undefined — 재입장 허용 여부를 가른다. */
+    playStartedAt?: number;
     players: RosterPlayer[];
     /** 이 매치를 실행 중인 DS 주소. 재입장 안내에 쓴다. DB에 주소가 없는 행(server_host/port NULL)은 undefined. */
     server?: { host: string; port: number };
