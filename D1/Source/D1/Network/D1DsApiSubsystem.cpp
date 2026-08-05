@@ -1,6 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "Network/D1MatchResultSubsystem.h"
+#include "Network/D1DsApiSubsystem.h"
 
 #include "Core/D1LogChannels.h"
 #include "Dom/JsonObject.h"
@@ -12,7 +12,7 @@
 #include "Network/D1BackendHttp.h"
 #include "TimerManager.h"
 
-void UD1MatchResultSubsystem::ReportDSReady(const FString& MatchId, const FString& ServerToken)
+void UD1DsApiSubsystem::ReportDsReady(const FString& MatchId, const FString& ServerToken)
 {
 	FD1ReportPolicy Policy;
 	Policy.Label = TEXT("준비");
@@ -25,7 +25,7 @@ void UD1MatchResultSubsystem::ReportDSReady(const FString& MatchId, const FStrin
 	SendReport(Path, ServerToken, MakeShared<FJsonObject>(), /*Attempt=*/0, Policy, ServerReadyRetryTimerHandle);
 }
 
-void UD1MatchResultSubsystem::ReportMatchStarted(const FString& MatchId, const FString& ServerToken)
+void UD1DsApiSubsystem::ReportMatchStarted(const FString& MatchId, const FString& ServerToken)
 {
 	FD1ReportPolicy Policy;
 	Policy.Label = TEXT("시작");
@@ -38,7 +38,7 @@ void UD1MatchResultSubsystem::ReportMatchStarted(const FString& MatchId, const F
 	SendReport(Path, ServerToken, MakeShared<FJsonObject>(), /*Attempt=*/0, Policy, MatchStartedRetryTimerHandle);
 }
 
-void UD1MatchResultSubsystem::ReportMatchResult(const FString& MatchId, const FString& ServerToken, const FString& MapName,
+void UD1DsApiSubsystem::ReportMatchResult(const FString& MatchId, const FString& ServerToken, const FString& MapName,
 	int32 DurationSec, const FString& EndReason, const TArray<FMatchResultPlayer>& Players,
 	const FSimpleDelegate& OnSettled)
 {
@@ -76,7 +76,7 @@ void UD1MatchResultSubsystem::ReportMatchResult(const FString& MatchId, const FS
 	SendReport(TEXT("/api/match/result"), ServerToken, Body, /*Attempt=*/0, Policy, MatchResultRetryTimerHandle);
 }
 
-void UD1MatchResultSubsystem::ReportLeaver(const FString& MatchId, const FString& ServerToken, int64 UserId)
+void UD1DsApiSubsystem::ReportLeaver(const FString& MatchId, const FString& ServerToken, int64 UserId)
 {
 	const TSharedRef<FJsonObject> Body = MakeShared<FJsonObject>();
 	Body->SetNumberField(TEXT("userId"), static_cast<double>(UserId));
@@ -100,7 +100,7 @@ void UD1MatchResultSubsystem::ReportLeaver(const FString& MatchId, const FString
 	UE_LOG(LogD1, Log, TEXT("[Match] 탈주 즉시 정산 POST userId=%lld matchId=%s"), UserId, *MatchId);
 }
 
-void UD1MatchResultSubsystem::FetchKicks(const FString& MatchId, const FString& ServerToken,
+void UD1DsApiSubsystem::FetchKicks(const FString& MatchId, const FString& ServerToken,
 	TFunction<void(const TArray<int64>&)> OnKicked)
 {
 	const FString Path = FString::Printf(TEXT("/api/match/%s/kicks"), *MatchId);
@@ -146,13 +146,13 @@ void UD1MatchResultSubsystem::FetchKicks(const FString& MatchId, const FString& 
 		});
 }
 
-void UD1MatchResultSubsystem::SendReport(const FString& Path, const FString& ServerToken,
+void UD1DsApiSubsystem::SendReport(const FString& Path, const FString& ServerToken,
 	const TSharedRef<FJsonObject>& Body, int32 Attempt, const FD1ReportPolicy& Policy, FTimerHandle& RetryTimerHandle)
 {
 	const TSharedRef<IHttpRequest> Request = D1BackendHttp::BuildPostJson(
 		GetGameInstance(), Path, Body, D1BackendHttp::EBackendAuth::ServerToken, ServerToken);
 
-	TWeakObjectPtr<UD1MatchResultSubsystem> WeakThis(this);
+	TWeakObjectPtr<UD1DsApiSubsystem> WeakThis(this);
 	FTimerHandle* TimerHandlePtr = &RetryTimerHandle;
 	Request->OnProcessRequestComplete().BindLambda(
 		[WeakThis, Path, ServerToken, Body, Attempt, Policy, TimerHandlePtr](FHttpRequestPtr, FHttpResponsePtr Res, bool bSucceeded)
@@ -188,7 +188,7 @@ void UD1MatchResultSubsystem::SendReport(const FString& Path, const FString& Ser
 			}
 
 			// 일시 실패(전송 실패/0/5xx/429): 상한까지 백오프 재시도. 준비 signal·결과 저장 모두 멱등이라 중복 무해.
-			UD1MatchResultSubsystem* Self = WeakThis.Get();
+			UD1DsApiSubsystem* Self = WeakThis.Get();
 			UGameInstance* GI = Self ? Self->GetGameInstance() : nullptr;
 			UWorld* World = GI ? GI->GetWorld() : nullptr;
 			if (!Self || !World || Attempt >= Policy.RetryDelaysSec.Num())

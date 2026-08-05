@@ -12,7 +12,7 @@
 class AController;
 class AD1BomberGameState;
 class AD1BomberPlayerState;
-class UD1MatchResultSubsystem;
+class UD1DsApiSubsystem;
 
 /**
  *  게임중 플레이어 제거 담당 컴포넌트 (GameState 부착·서버 전용) — kick(다른 기기 로그인)과 탈주.
@@ -55,7 +55,7 @@ public:
 	const TArray<FMatchResultPlayer>& GetLeftPlayers() const { return LeftPlayers; }
 
 private:
-	/** 백엔드 kick 대기열을 주기 폴링(DS·토큰 있을 때만). HTTP는 MatchResultSubsystem::FetchKicks 위임. */
+	/** 백엔드 kick 대기열을 주기 폴링(DS·토큰 있을 때만). HTTP는 D1DsApiSubsystem::FetchKicks 위임. */
 	void StartKickPolling();
 	void PollKicks();
 	/** 대상 유저를 kick — 온라인이면 탈주 처리·통지, 종료 후면 통지만. */
@@ -86,8 +86,8 @@ private:
 	/** 소유 GameState. 없으면 nullptr. */
 	AD1BomberGameState* GetBomberGameState() const;
 
-	/** kick 조회·즉시 정산 Subsystem. 토큰 없으면(PIE/standalone) nullptr — 호출측은 스킵. */
-	UD1MatchResultSubsystem* GetResultClient() const;
+	/** kick 조회·즉시 정산용 DS API 클라이언트. 토큰 없으면(PIE/standalone) nullptr — 호출측은 스킵. */
+	UD1DsApiSubsystem* GetDsApi() const;
 
 	/** 서버 권위 여부. 모든 진입점 방어 가드. */
 	bool HasServerAuthority() const;

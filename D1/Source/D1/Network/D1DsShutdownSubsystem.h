@@ -4,14 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
-#include "D1DedicatedServerSubsystem.generated.h"
+#include "D1DsShutdownSubsystem.generated.h"
 
 /**
- *  Dedicated Server 수명 관리. 매치 종료 후 전원 퇴장 또는 하드캡 도달 시 프로세스를 자가 종료한다.
+ *  DS 프로세스 자가 종료. 매치 종료 후 전원 퇴장 또는 하드캡 도달 시 종료를 요청한다.
  *  실 DS에서만 동작(BeginShutdownWatch가 IsRunningDedicatedServer로 가드 — PIE/Listen은 no-op).
  */
 UCLASS()
-class UD1DedicatedServerSubsystem : public UWorldSubsystem
+class UD1DsShutdownSubsystem : public UWorldSubsystem
 {
 	GENERATED_BODY()
 

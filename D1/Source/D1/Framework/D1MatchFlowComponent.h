@@ -10,7 +10,7 @@
 
 class AD1BomberGameState;
 class AD1BomberPlayerState;
-class UD1MatchResultSubsystem;
+class UD1DsApiSubsystem;
 
 /**
  *  매치 흐름 담당 컴포넌트 (GameState 부착·서버 전용).
@@ -116,8 +116,8 @@ private:
 	/** 소유 GameState. 없으면 nullptr. */
 	AD1BomberGameState* GetBomberGameState() const;
 
-	/** 결과 보고 Subsystem. 토큰 없으면(PIE/standalone) nullptr — 호출측은 보고 스킵. */
-	UD1MatchResultSubsystem* GetResultClient() const;
+	/** DS API 클라이언트. 토큰 없으면(PIE/standalone) nullptr — 호출측은 보고 스킵. */
+	UD1DsApiSubsystem* GetDsApi() const;
 
 	/** 서버 권위 여부. 모든 진입점 방어 가드. */
 	bool HasServerAuthority() const;

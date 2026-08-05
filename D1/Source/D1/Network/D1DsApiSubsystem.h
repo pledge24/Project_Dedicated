@@ -5,23 +5,24 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Network/BackendTypes.h"
-#include "D1MatchResultSubsystem.generated.h"
+#include "D1DsApiSubsystem.generated.h"
 
 class FJsonObject;
 
 /**
- *  매치 생명주기 보고 전담 Subsystem (DS 서버권위) — 준비/결과/탈주.
- *  DS의 GameMode·MatchFlow만 C++로 호출. 매치별 서버 토큰을 Bearer로 첨부해 POST /api/match/*.
+ *  DS→백엔드 DS API 클라이언트 (서버 권위) — 생명주기 보고(준비/시작/결과/탈주) + kick 폴링.
+ *  백엔드 dsApi.* 레이어와 1:1. DS의 GameMode·MatchFlow만 C++로 호출.
+ *  전 호출에 매치별 서버 토큰을 Bearer로 첨부(/api/match/*).
  *  클라 인증/매칭과 물리 분리 — 서버 권위 전송 경로를 격리한다.
  */
 UCLASS()
-class UD1MatchResultSubsystem : public UGameInstanceSubsystem
+class UD1DsApiSubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
 
 public:
 	/** 서버 전용(DS): 맵 빌드·초기화 완료 시 호출. 백엔드가 이 콜백을 받고 클라에 match:found 전송. 전송 실패 시 소폭 재시도. */
-	void ReportDSReady(const FString& MatchId, const FString& ServerToken);
+	void ReportDsReady(const FString& MatchId, const FString& ServerToken);
 
 	/**
 	 * 서버 전용(DS): 시작 게이트 통과 시 호출. 백엔드가 이후 재입장 주소 발급을 중단한다.

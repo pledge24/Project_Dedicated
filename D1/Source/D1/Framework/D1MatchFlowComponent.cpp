@@ -15,8 +15,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Network/BackendTypes.h"
-#include "Network/D1DedicatedServerSubsystem.h"
-#include "Network/D1MatchResultSubsystem.h"
+#include "Network/D1DsApiSubsystem.h"
+#include "Network/D1DsShutdownSubsystem.h"
 #include "TimerManager.h"
 
 namespace
@@ -55,9 +55,9 @@ void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayerCount, float I
 
 	// 맵 빌드·시작 게이트 준비 완료 → 백엔드에 "플레이어 받을 준비됨" 통지(토큰 있는 실 DS만).
 	// 백엔드는 이 콜백을 받고 클라에 match:found(입장 패킷) 전송. PIE/standalone은 토큰 없어 스킵.
-	if (UD1MatchResultSubsystem* ResultClient = GetResultClient())
+	if (UD1DsApiSubsystem* DsApi = GetDsApi())
 	{
-		ResultClient->ReportDSReady(CurrentMatchId, CurrentServerToken);
+		DsApi->ReportDsReady(CurrentMatchId, CurrentServerToken);
 	}
 
 	// 시작 게이트: 예상 인원 0/1(PIE·솔로)이면 즉시 시작, 아니면 전원 입장(PostLogin) 또는 타임아웃까지 Waiting.
@@ -149,9 +149,9 @@ void UD1MatchFlowComponent::StartMatch()
 	MarkNoShowUsers();
 
 	// 백엔드의 재입장 주소 발급 중단(토큰 있는 실 DS만). 재입장 허용 창은 여기서 닫힌다.
-	if (UD1MatchResultSubsystem* ResultClient = GetResultClient())
+	if (UD1DsApiSubsystem* DsApi = GetDsApi())
 	{
-		ResultClient->ReportMatchStarted(CurrentMatchId, CurrentServerToken);
+		DsApi->ReportMatchStarted(CurrentMatchId, CurrentServerToken);
 	}
 
 	UE_LOG(LogD1, Log, TEXT("[Match] 매치 시작 (Playing)"));
@@ -409,8 +409,8 @@ void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndR
 	GS->SetFinalResults(Entries);
 
 	// 백엔드가 띄운 DS일 때만 결과 보고(토큰 없으면 PIE/standalone → 스킵).
-	UD1MatchResultSubsystem* ResultClient = GetResultClient();
-	if (!ResultClient || !World)
+	UD1DsApiSubsystem* DsApi = GetDsApi();
+	if (!DsApi || !World)
 	{
 		// 보고할 곳이 없으면 기다릴 이유도 없다(PIE/standalone).
 		BeginShutdownAfterReport();
@@ -422,7 +422,7 @@ void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndR
 	// 셧다운 감시는 결과 POST가 확정(성공·409·확정 실패·재시도 소진)된 뒤에 시작한다.
 	const int32 DurationSec = FMath::Max(0,
 		FMath::RoundToInt(GS->GetServerWorldTimeSeconds() - GS->GetMatchStartServerTime()));
-	ResultClient->ReportMatchResult(CurrentMatchId, CurrentServerToken, GS->GetMapName(),
+	DsApi->ReportMatchResult(CurrentMatchId, CurrentServerToken, GS->GetMapName(),
 		DurationSec, EndReasonToString(Reason), ResultPlayers,
 		FSimpleDelegate::CreateWeakLambda(this, [this]()
 		{
@@ -451,9 +451,9 @@ void UD1MatchFlowComponent::BeginShutdownAfterReport()
 
 	// 클라들이 결과 화면 카운트다운 후 ClientTravel로 빠지면 DS가 스스로 종료.
 	// 확정 콜백과 하드캡이 모두 도달할 수 있지만 BeginShutdownWatch가 멱등이라 첫 호출만 유효하다.
-	if (UD1DedicatedServerSubsystem* DS = World->GetSubsystem<UD1DedicatedServerSubsystem>())
+	if (UD1DsShutdownSubsystem* DsShutdown = World->GetSubsystem<UD1DsShutdownSubsystem>())
 	{
-		DS->BeginShutdownWatch(ShutdownGraceSec);
+		DsShutdown->BeginShutdownWatch(ShutdownGraceSec);
 	}
 }
 
@@ -474,7 +474,7 @@ AD1BomberGameState* UD1MatchFlowComponent::GetBomberGameState() const
 	return Cast<AD1BomberGameState>(GetOwner());
 }
 
-UD1MatchResultSubsystem* UD1MatchFlowComponent::GetResultClient() const
+UD1DsApiSubsystem* UD1MatchFlowComponent::GetDsApi() const
 {
 	if (CurrentServerToken.IsEmpty())
 	{
@@ -483,7 +483,7 @@ UD1MatchResultSubsystem* UD1MatchFlowComponent::GetResultClient() const
 
 	UWorld* World = GetWorld();
 	UGameInstance* GI = World ? World->GetGameInstance() : nullptr;
-	return GI ? GI->GetSubsystem<UD1MatchResultSubsystem>() : nullptr;
+	return GI ? GI->GetSubsystem<UD1DsApiSubsystem>() : nullptr;
 }
 
 bool UD1MatchFlowComponent::HasServerAuthority() const

@@ -10,7 +10,7 @@
 #include "Framework/D1MatchFlowComponent.h"
 #include "Framework/D1MatchSettlement.h"
 #include "Framework/D1PlayerController.h"
-#include "Network/D1MatchResultSubsystem.h"
+#include "Network/D1DsApiSubsystem.h"
 #include "Network/D1OnlineSettings.h"
 #include "TimerManager.h"
 
@@ -96,14 +96,14 @@ void UD1PlayerRemovalComponent::StopKickPolling()
 
 void UD1PlayerRemovalComponent::PollKicks()
 {
-	UD1MatchResultSubsystem* Result = GetResultClient();
-	if (CurrentMatchId.IsEmpty() || !Result)
+	UD1DsApiSubsystem* DsApi = GetDsApi();
+	if (CurrentMatchId.IsEmpty() || !DsApi)
 	{
 		return;
 	}
 
 	TWeakObjectPtr<UD1PlayerRemovalComponent> WeakThis(this);
-	Result->FetchKicks(CurrentMatchId, CurrentServerToken,
+	DsApi->FetchKicks(CurrentMatchId, CurrentServerToken,
 		[WeakThis](const TArray<int64>& UserIds)
 		{
 			UD1PlayerRemovalComponent* Self = WeakThis.Get();
@@ -188,9 +188,9 @@ void UD1PlayerRemovalComponent::RemoveLeaver(AD1BomberPlayerState* Target, bool 
 		LastPlacement, Target->GetLives(), Target->GetPlayerName(), /*bLeft=*/true);
 
 	// 탈주 즉시 정산 — 백엔드가 최하위 확정값을 바로 반영(로비 즉시 반영). 토큰 있는 실 DS만.
-	if (UD1MatchResultSubsystem* ResultClient = GetResultClient())
+	if (UD1DsApiSubsystem* DsApi = GetDsApi())
 	{
-		ResultClient->ReportLeaver(CurrentMatchId, CurrentServerToken, UserId);
+		DsApi->ReportLeaver(CurrentMatchId, CurrentServerToken, UserId);
 	}
 
 	// 클라 통지(팝업 + 로그인 복귀) + 남은 시간 입력 차단. 끊김(disconnect)은 이미 떠나 생략.
@@ -231,7 +231,7 @@ AD1BomberGameState* UD1PlayerRemovalComponent::GetBomberGameState() const
 	return Cast<AD1BomberGameState>(GetOwner());
 }
 
-UD1MatchResultSubsystem* UD1PlayerRemovalComponent::GetResultClient() const
+UD1DsApiSubsystem* UD1PlayerRemovalComponent::GetDsApi() const
 {
 	if (CurrentServerToken.IsEmpty())
 	{
@@ -240,7 +240,7 @@ UD1MatchResultSubsystem* UD1PlayerRemovalComponent::GetResultClient() const
 
 	UWorld* World = GetWorld();
 	UGameInstance* GI = World ? World->GetGameInstance() : nullptr;
-	return GI ? GI->GetSubsystem<UD1MatchResultSubsystem>() : nullptr;
+	return GI ? GI->GetSubsystem<UD1DsApiSubsystem>() : nullptr;
 }
 
 bool UD1PlayerRemovalComponent::HasServerAuthority() const
