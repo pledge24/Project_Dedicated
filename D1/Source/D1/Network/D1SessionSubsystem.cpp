@@ -39,7 +39,7 @@ void UD1SessionSubsystem::NotifySessionSuperseded()
 		NSLOCTEXT("Session", "SupersededMsg", "다른 기기에서 로그인하여\n접속이 종료되었습니다.")))
 	{
 		// 팝업을 못 띄웠으면(설정 누락/로컬 PC 없음) 즉시 복귀 — 갇힘 방지.
-		LeaveToDestination();
+		TravelToDestination();
 	}
 }
 
@@ -66,7 +66,7 @@ void UD1SessionSubsystem::NotifyMatchDisconnected()
 		NSLOCTEXT("Session", "DisconnectedTitle", "연결 종료"),
 		NSLOCTEXT("Session", "DisconnectedMsg", "게임 서버와의 연결이 끊어졌습니다.\n로비로 돌아갑니다.")))
 	{
-		LeaveToDestination();
+		TravelToDestination();
 	}
 }
 
@@ -81,7 +81,7 @@ void UD1SessionSubsystem::TravelToLobby()
 {
 	// 이동이 일으키는 넷드라이버 종료(DS에서 복귀 등)가 장애로 잡히지 않게 먼저 표시.
 	BeginIntentionalTravel();
-	ReturnToLobby();
+	OpenLobbyMap();
 }
 
 void UD1SessionSubsystem::TravelToFrontend()
@@ -98,7 +98,7 @@ void UD1SessionSubsystem::HandleNoticeConfirmed()
 		NoticeWidget = nullptr;
 	}
 
-	LeaveToDestination();
+	TravelToDestination();
 }
 
 bool UD1SessionSubsystem::ShowNotice(const FText& Title, const FText& Message)
@@ -139,7 +139,7 @@ bool UD1SessionSubsystem::ShowNotice(const FText& Title, const FText& Message)
 	return true;
 }
 
-void UD1SessionSubsystem::LeaveToDestination()
+void UD1SessionSubsystem::TravelToDestination()
 {
 	// 이 시점부터의 넷드라이버 종료는 우리가 일으킨 것 — 다시 장애로 잡히면 팝업이 겹친다.
 	BeginIntentionalTravel();
@@ -151,7 +151,7 @@ void UD1SessionSubsystem::LeaveToDestination()
 		return;
 	}
 
-	ReturnToLobby();
+	OpenLobbyMap();
 }
 
 void UD1SessionSubsystem::ReturnToLogin()
@@ -164,7 +164,7 @@ void UD1SessionSubsystem::ReturnToLogin()
 	OpenFrontendMap();
 }
 
-void UD1SessionSubsystem::ReturnToLobby()
+void UD1SessionSubsystem::OpenLobbyMap()
 {
 	const UD1OnlineSettings* Settings = GetDefault<UD1OnlineSettings>();
 	if (Settings && !Settings->LobbyMap.IsNull())

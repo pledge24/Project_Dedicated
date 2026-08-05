@@ -30,7 +30,7 @@ void UD1UWMatchResult::NativeConstruct()
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(
-			CountdownTimerHandle, this, &UD1UWMatchResult::OnCountdownTick, 1.f, /*bLoop=*/true);
+			CountdownTimerHandle, this, &UD1UWMatchResult::TickReturnCountdown, 1.f, /*bLoop=*/true);
 	}
 }
 
@@ -67,7 +67,7 @@ void UD1UWMatchResult::OnLeaveClicked()
 	ReturnToLobby();
 }
 
-void UD1UWMatchResult::OnCountdownTick()
+void UD1UWMatchResult::TickReturnCountdown()
 {
 	--RemainingSec;
 	if (CountdownLabel)

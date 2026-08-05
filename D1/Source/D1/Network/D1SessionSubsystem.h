@@ -51,9 +51,9 @@ private:
 	/** 알림 모달 표시. 못 띄웠으면 false — 호출측이 즉시 복귀시켜 갇힘을 막는다. */
 	bool ShowNotice(const FText& Title, const FText& Message);
 	/** [확인] 또는 모달 실패 시의 목적지 분기. */
-	void LeaveToDestination();
+	void TravelToDestination();
 	void ReturnToLogin();
-	void ReturnToLobby();
+	void OpenLobbyMap();
 	void OpenFrontendMap();
 
 	UPROPERTY(Transient)
