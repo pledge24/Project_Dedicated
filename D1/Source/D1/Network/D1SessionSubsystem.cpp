@@ -106,15 +106,26 @@ bool UD1SessionSubsystem::ShowNotice(const FText& Title, const FText& Message)
 	// 위젯 클래스는 온라인 설정에서 로드(C++ 하드코딩 경로 금지).
 	UGameInstance* GI = GetGameInstance();
 	APlayerController* PC = GI ? GI->GetFirstLocalPlayerController() : nullptr;
-	const UD1OnlineSettings* Settings = GetDefault<UD1OnlineSettings>();
-	if (!PC || !Settings || Settings->SystemNoticeWidgetClass.IsNull())
+	if (!PC)
 	{
+		// DS·travel 과도기 — 정상 부재. 호출자의 즉시 복귀 폴백이 담당.
+		return false;
+	}
+
+	const UD1OnlineSettings* Settings = GetDefault<UD1OnlineSettings>();
+	if (!Settings || Settings->SystemNoticeWidgetClass.IsNull())
+	{
+		UE_LOG(LogD1, Error, TEXT("[Session] SystemNoticeWidgetClass 미설정 — 공지 없이 복귀 (Project Settings > D1 > Session)"));
+
 		return false;
 	}
 
 	UClass* NoticeClass = Settings->SystemNoticeWidgetClass.LoadSynchronous();
 	if (!NoticeClass)
 	{
+		UE_LOG(LogD1, Error, TEXT("[Session] SystemNoticeWidgetClass 로드 실패 — 공지 없이 복귀: %s"),
+			*Settings->SystemNoticeWidgetClass.ToString());
+
 		return false;
 	}
 

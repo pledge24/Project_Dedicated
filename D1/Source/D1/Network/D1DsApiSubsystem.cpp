@@ -108,13 +108,22 @@ void UD1DsApiSubsystem::FetchKicks(const FString& MatchId, const FString& Server
 		GetGameInstance(), Path, D1BackendHttp::EBackendAuth::ServerToken, ServerToken);
 
 	D1BackendHttp::SendAsync(this, Request,
-		[OnKicked = MoveTemp(OnKicked)](const FHttpResponsePtr& Res, bool bSucceeded)
+		[this, OnKicked = MoveTemp(OnKicked)](const FHttpResponsePtr& Res, bool bSucceeded)
 		{
-			// 폴링 1회 실패는 무시 — 다음 주기가 곧 온다.
+			// 폴링 1회 실패는 무시 — 다음 주기가 곧 온다. 단 연속 실패는 영구 원인(토큰 불일치·
+			// roster 소멸)일 수 있어 임계에서 1회만 표면화(주기 도배 방지).
 			if (!bSucceeded || !Res.IsValid() || Res->GetResponseCode() != 200)
 			{
+				++KickPollFailStreak;
+				if (KickPollFailStreak == 5)
+				{
+					UE_LOG(LogD1, Warning, TEXT("[Match] kick 폴링 연속 %d회 실패 code=%d — 토큰/roster 상태 확인 필요"),
+						KickPollFailStreak, Res.IsValid() ? Res->GetResponseCode() : 0);
+				}
+
 				return;
 			}
+			KickPollFailStreak = 0;
 
 			TSharedPtr<FJsonObject> Root;
 			if (!D1BackendHttp::DeserializeJson(Res->GetContentAsString(), Root))
@@ -191,7 +200,16 @@ void UD1DsApiSubsystem::SendReport(const FString& Path, const FString& ServerTok
 			UD1DsApiSubsystem* Self = WeakThis.Get();
 			UGameInstance* GI = Self ? Self->GetGameInstance() : nullptr;
 			UWorld* World = GI ? GI->GetWorld() : nullptr;
-			if (!Self || !World || Attempt >= Policy.RetryDelaysSec.Num())
+			if (!Self || !World)
+			{
+				// teardown 중 도착한 응답 — 재시도 소진과 원인이 다르므로 로그를 나눈다.
+				UE_LOG(LogD1, Warning, TEXT("[Match] %s POST 중단 — 종료 중 code=%d attempt=%d matchId=%s"),
+					*Policy.Label, Code, Attempt, *Policy.MatchId);
+				Policy.OnSettled.ExecuteIfBound();
+
+				return;
+			}
+			if (Attempt >= Policy.RetryDelaysSec.Num())
 			{
 				if (Policy.bLogLossAsError)
 				{

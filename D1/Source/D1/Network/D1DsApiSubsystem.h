@@ -77,4 +77,7 @@ private:
 	FTimerHandle ServerReadyRetryTimerHandle;
 	FTimerHandle MatchStartedRetryTimerHandle;
 	FTimerHandle MatchResultRetryTimerHandle;
+
+	/** kick 폴링 연속 실패 수 — 임계(5회) 도달 시 1회 Warning으로 영구 실패 가시화, 성공 시 리셋. */
+	int32 KickPollFailStreak = 0;
 };

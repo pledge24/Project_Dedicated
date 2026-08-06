@@ -56,7 +56,7 @@ bool UD1MapData::BuildLayout(FD1MapLayout& OutLayout, FString& OutError) const
 				break; // 빈칸
 
 			default:
-				// '1'~'4'는 스폰 지점(슬롯 0~3). 그 외 문자는 빈칸 취급.
+				// '1'~'9'는 스폰 문자로 파싱 — 슬롯 범위(1~4) 초과는 오타로 보고 에러. 그 외 문자는 빈칸 취급.
 				if (C >= TEXT('1') && C <= TEXT('9'))
 				{
 					const int32 Slot = static_cast<int32>(C - TEXT('1'));
