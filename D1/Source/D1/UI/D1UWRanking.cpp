@@ -64,8 +64,7 @@ void UD1UWRanking::PopulateRows(const FD1RankingResult& Result)
 		return;
 	}
 
-	const UD1GameInstance* GI = GetGameInstance<UD1GameInstance>();
-	const int32 LocalUserId = GI ? GI->GetCurrentUser().UserId : 0;
+	const int32 LocalUserId = GetGameInstance<UD1GameInstance>()->GetCurrentUser().UserId;
 
 	RankingScrollBox->ClearChildren();
 	for (int32 i = 0; i < RankRowCount; ++i)
@@ -96,12 +95,7 @@ void UD1UWRanking::ApplyMyRankRow(const FD1RankingResult& Result)
 		return;
 	}
 
-	const UD1GameInstance* GI = GetGameInstance<UD1GameInstance>();
-	if (!GI)
-	{
-		return;
-	}
-	const FAuthUserDTO& User = GI->GetCurrentUser();
+	const FAuthUserDTO& User = GetGameInstance<UD1GameInstance>()->GetCurrentUser();
 
 	// me.rank(순위)는 서버 응답, 닉네임/점수는 세션 캐시서 합성(응답 me엔 rank만 있음).
 	FD1RankingEntryDTO Mine;

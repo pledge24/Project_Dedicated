@@ -220,11 +220,6 @@ void AD1BotController::BuildDangerMap(const AD1BomberCharacter* Bot, const AD1Bo
 
 	for (AD1Bomb* Bomb : TActorRange<AD1Bomb>(GetWorld()))
 	{
-		if (!IsValid(Bomb))
-		{
-			continue;
-		}
-
 		const FIntPoint Origin = UD1BomberGridLibrary::WorldToCell(Bomb->GetActorLocation());
 		BombCells.Add(Origin);
 		if (Bomb->GetOwner() == Bot)
@@ -244,10 +239,6 @@ void AD1BotController::BuildDangerMap(const AD1BomberCharacter* Bot, const AD1Bo
 	// 이미 터진 폭발의 잔류 위험(~0.5s) — 방금 터진 셀로 경로를 새로 잡는 순간 방지.
 	for (AD1ExplosionHazard* Hazard : TActorRange<AD1ExplosionHazard>(GetWorld()))
 	{
-		if (!IsValid(Hazard))
-		{
-			continue;
-		}
 		for (const FIntPoint& C : Hazard->GetHazardCells())
 		{
 			DangerCells.Add(C);
@@ -258,7 +249,7 @@ void AD1BotController::BuildDangerMap(const AD1BomberCharacter* Bot, const AD1Bo
 	// 생존한 적 봇 위치(HUNT 타겟). 동적이라 통과 판정엔 넣지 않음 — 막으면 경로 jitter.
 	for (AD1BomberCharacter* Char : TActorRange<AD1BomberCharacter>(GetWorld()))
 	{
-		if (!IsValid(Char) || Char == Bot)
+		if (Char == Bot)
 		{
 			continue;
 		}
@@ -273,10 +264,6 @@ void AD1BotController::BuildDangerMap(const AD1BomberCharacter* Bot, const AD1Bo
 	// 드롭된 파워업 위치(근거리·안전할 때만 획득 대상).
 	for (AD1PowerupPickup* Pickup : TActorRange<AD1PowerupPickup>(GetWorld()))
 	{
-		if (!IsValid(Pickup))
-		{
-			continue;
-		}
 		ItemCells.Add(UD1BomberGridLibrary::WorldToCell(Pickup->GetActorLocation()));
 	}
 }

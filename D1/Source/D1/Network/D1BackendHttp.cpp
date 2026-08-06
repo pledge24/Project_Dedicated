@@ -134,14 +134,11 @@ namespace D1BackendHttp
 			return false;
 		}
 
-		if (GameInstance)
+		if (UD1SessionSubsystem* Session = GameInstance->GetSubsystem<UD1SessionSubsystem>())
 		{
-			if (UD1SessionSubsystem* Session = GameInstance->GetSubsystem<UD1SessionSubsystem>())
-			{
-				Session->NotifySessionSuperseded();
+			Session->NotifySessionSuperseded();
 
-				return true;
-			}
+			return true;
 		}
 
 		return false;
@@ -192,7 +189,7 @@ namespace D1BackendHttp
 			const EBackendErrorCode Code = ParseErrorCode(CodeStr);
 
 			// 세션 대체는 에러 콜백이 아니라 화면 복귀로 — 어느 인증 경로든 여기서 일괄 감지.
-			if (Code == EBackendErrorCode::SessionSuperseded && GameInstance)
+			if (Code == EBackendErrorCode::SessionSuperseded)
 			{
 				if (UD1SessionSubsystem* Session = GameInstance->GetSubsystem<UD1SessionSubsystem>())
 				{
@@ -212,11 +209,6 @@ namespace D1BackendHttp
 
 	void ParseAuthUser(const TSharedPtr<FJsonObject>& Data, FAuthUserDTO& OutUser)
 	{
-		if (!Data.IsValid())
-		{
-			return;
-		}
-
 		Data->TryGetNumberField(TEXT("userId"), OutUser.UserId);
 		Data->TryGetStringField(TEXT("nickname"), OutUser.Nickname);
 		Data->TryGetNumberField(TEXT("score"), OutUser.Score);
@@ -227,11 +219,6 @@ namespace D1BackendHttp
 
 	void ParseMatchFound(const TSharedPtr<FJsonObject>& Data, FMatchFoundDTO& OutMatch)
 	{
-		if (!Data.IsValid())
-		{
-			return;
-		}
-
 		Data->TryGetStringField(TEXT("matchId"), OutMatch.MatchId);
 		Data->TryGetStringField(TEXT("joinToken"), OutMatch.JoinToken);
 

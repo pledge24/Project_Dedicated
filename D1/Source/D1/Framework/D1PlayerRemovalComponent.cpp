@@ -78,20 +78,14 @@ void UD1PlayerRemovalComponent::StartKickPolling()
 		return;
 	}
 
-	if (UWorld* World = GetWorld())
-	{
-		const float Interval = FMath::Max(1.f, GetDefault<UD1OnlineSettings>()->KickPollIntervalSec);
-		World->GetTimerManager().SetTimer(
-			KickPollTimerHandle, this, &UD1PlayerRemovalComponent::PollKicks, Interval, /*bLoop=*/true);
-	}
+	const float Interval = FMath::Max(1.f, GetDefault<UD1OnlineSettings>()->KickPollIntervalSec);
+	GetWorld()->GetTimerManager().SetTimer(
+		KickPollTimerHandle, this, &UD1PlayerRemovalComponent::PollKicks, Interval, /*bLoop=*/true);
 }
 
 void UD1PlayerRemovalComponent::StopKickPolling()
 {
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(KickPollTimerHandle);
-	}
+	GetWorld()->GetTimerManager().ClearTimer(KickPollTimerHandle);
 }
 
 void UD1PlayerRemovalComponent::PollKicks()
@@ -127,10 +121,6 @@ void UD1PlayerRemovalComponent::KickUser(int64 UserId)
 	}
 
 	AD1BomberGameState* GS = GetBomberGameState();
-	if (!GS)
-	{
-		return;
-	}
 
 	AD1BomberPlayerState* Target = nullptr;
 	for (APlayerState* PS : GS->PlayerArray)
@@ -168,11 +158,11 @@ void UD1PlayerRemovalComponent::KickUser(int64 UserId)
 
 void UD1PlayerRemovalComponent::RemoveLeaver(AD1BomberPlayerState* Target, bool bNotifyClient)
 {
-	AD1BomberGameState* GS = GetBomberGameState();
-	if (!GS || !Target)
+	if (!Target)
 	{
 		return;
 	}
+	AD1BomberGameState* GS = GetBomberGameState();
 
 	const int64 UserId = Target->GetBackendUserId();
 
@@ -216,14 +206,12 @@ void UD1PlayerRemovalComponent::RemoveLeaver(AD1BomberPlayerState* Target, bool 
 
 bool UD1PlayerRemovalComponent::HasMatchStarted() const
 {
-	const AD1BomberGameState* GS = GetBomberGameState();
-	return GS && GS->GetMatchPhase() != EBomberMatchPhase::Waiting;
+	return GetBomberGameState()->GetMatchPhase() != EBomberMatchPhase::Waiting;
 }
 
 bool UD1PlayerRemovalComponent::IsMatchEnded() const
 {
-	const AD1BomberGameState* GS = GetBomberGameState();
-	return GS && GS->GetMatchPhase() == EBomberMatchPhase::Finished;
+	return GetBomberGameState()->GetMatchPhase() == EBomberMatchPhase::Finished;
 }
 
 AD1BomberGameState* UD1PlayerRemovalComponent::GetBomberGameState() const
@@ -238,13 +226,10 @@ UD1DsApiSubsystem* UD1PlayerRemovalComponent::GetDsApi() const
 		return nullptr;
 	}
 
-	UWorld* World = GetWorld();
-	UGameInstance* GI = World ? World->GetGameInstance() : nullptr;
-	return GI ? GI->GetSubsystem<UD1DsApiSubsystem>() : nullptr;
+	return GetWorld()->GetGameInstance()->GetSubsystem<UD1DsApiSubsystem>();
 }
 
 bool UD1PlayerRemovalComponent::HasServerAuthority() const
 {
-	const AActor* Owner = GetOwner();
-	return Owner && Owner->HasAuthority();
+	return GetOwner()->HasAuthority();
 }

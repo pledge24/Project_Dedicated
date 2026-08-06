@@ -159,10 +159,7 @@ void UD1MatchmakingSubsystem::HandleSocketMessage(const FString& Message)
 		// 다른 기기 로그인으로 세션 대체 — 곧 서버가 close(4001). Idle로 만들어 뒤이은 close를 정상 종료로 흡수
 		// (HandleSocketClosed가 NetworkError로 오탐하지 않게). 실제 화면 복귀는 SessionSubsystem이 담당(멱등).
 		MatchmakingState = EMatchmakingState::Idle;
-		if (UD1SessionSubsystem* Session = GetGameInstance()->GetSubsystem<UD1SessionSubsystem>())
-		{
-			Session->NotifySessionSuperseded();
-		}
+		GetGameInstance()->GetSubsystem<UD1SessionSubsystem>()->NotifySessionSuperseded();
 		return;
 	}
 

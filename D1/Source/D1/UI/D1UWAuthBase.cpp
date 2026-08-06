@@ -40,7 +40,7 @@ void UD1UWAuthBase::EndRequest(bool bSuccess, const FString& ErrorMessage)
 
 UD1AuthSubsystem* UD1UWAuthBase::GetAuthSubsystem()
 {
-	UD1AuthSubsystem* AuthSystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UD1AuthSubsystem>() : nullptr;
+	UD1AuthSubsystem* AuthSystem = GetGameInstance()->GetSubsystem<UD1AuthSubsystem>();
 	if (!AuthSystem)
 	{
 		UE_LOG(LogD1, Error, TEXT("[Auth] UD1AuthSubsystem을 찾을 수 없음"));

@@ -103,7 +103,7 @@ void AD1Bomb::MulticastOnExploded_Implementation(const TArray<FIntPoint>& Affect
 
 void AD1Bomb::DoExplode()
 {
-	if (!HasAuthority() || State == ED1BombState::Exploding)
+	if (State == ED1BombState::Exploding)
 	{
 		return;
 	}
@@ -164,16 +164,12 @@ void AD1Bomb::DestroyPowerups(const TArray<FIntPoint>& Cells)
 
 void AD1Bomb::SpawnExplosionHazard(const TArray<FIntPoint>& Cells)
 {
-	if (!HasAuthority() || Cells.Num() == 0)
+	if (Cells.Num() == 0)
 	{
 		return;
 	}
 
 	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
 
 	// 서버 전용 위험 액터가 불꽃 수명 동안 피해를 담당(즉시 1차 + 지속 스윕).
 	FActorSpawnParameters Params;
@@ -188,7 +184,7 @@ void AD1Bomb::SpawnExplosionHazard(const TArray<FIntPoint>& Cells)
 
 void AD1Bomb::TriggerChainDetonation()
 {
-	if (!HasAuthority() || State != ED1BombState::Fusing)
+	if (State != ED1BombState::Fusing)
 	{
 		return;
 	}

@@ -143,13 +143,11 @@ void UD1DsApiSubsystem::FetchKicks(const FString& MatchId, const FString& Server
 				return;
 			}
 
+			// JSON 파서는 null 토큰도 유효 포인터(FJsonValueNull)로 만든다 — 원소 무효 불가.
 			TArray<int64> UserIds;
 			for (const TSharedPtr<FJsonValue>& Value : *UserIdValues)
 			{
-				if (Value.IsValid())
-				{
-					UserIds.Add(static_cast<int64>(Value->AsNumber()));
-				}
+				UserIds.Add(static_cast<int64>(Value->AsNumber()));
 			}
 			OnKicked(UserIds);
 		});

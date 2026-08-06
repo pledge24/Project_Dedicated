@@ -35,10 +35,7 @@ void UD1GameInstance::LoadComplete(const float LoadTime, const FString& MapName)
 	Super::LoadComplete(LoadTime, MapName);
 
 	// 새 맵 도착 = 한 이탈 사이클 종료. 다음 끊김을 정상 감지하려면 세션 가드를 풀어야 한다.
-	if (UD1SessionSubsystem* Session = GetSubsystem<UD1SessionSubsystem>())
-	{
-		Session->NotifyMapLoaded();
-	}
+	GetSubsystem<UD1SessionSubsystem>()->NotifyMapLoaded();
 }
 
 void UD1GameInstance::SetSession(const FString& InJwt, const FAuthUserDTO& InUser)
@@ -48,10 +45,7 @@ void UD1GameInstance::SetSession(const FString& InJwt, const FAuthUserDTO& InUse
 	bLoggedIn = true;
 
 	// 새 로그인 = 새 세션 → 단일 세션 대체 가드 리셋(이전 kick 후 재로그인 시 다음 감지 정상화).
-	if (UD1SessionSubsystem* Session = GetSubsystem<UD1SessionSubsystem>())
-	{
-		Session->ResetSupersededGuard();
-	}
+	GetSubsystem<UD1SessionSubsystem>()->ResetSupersededGuard();
 }
 
 void UD1GameInstance::UpdateUserProfile(const FAuthUserDTO& InUser)
@@ -82,10 +76,7 @@ void UD1GameInstance::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver,
 		ENetworkFailure::ToString(FailureType), *ErrorString);
 
 	// 의도한 이탈인지·중복인지 판단은 Session Subsystem이 한다(세션 대체 경로와 가드를 공유).
-	if (UD1SessionSubsystem* Session = GetSubsystem<UD1SessionSubsystem>())
-	{
-		Session->NotifyMatchDisconnected();
-	}
+	GetSubsystem<UD1SessionSubsystem>()->NotifyMatchDisconnected();
 }
 
 void UD1GameInstance::HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString)
@@ -102,8 +93,5 @@ void UD1GameInstance::HandleTravelFailure(UWorld* World, ETravelFailure::Type Fa
 	UE_LOG(LogD1, Warning, TEXT("[Net] Travel 실패 type=%s msg=%s"),
 		ETravelFailure::ToString(FailureType), *ErrorString);
 
-	if (UD1SessionSubsystem* Session = GetSubsystem<UD1SessionSubsystem>())
-	{
-		Session->NotifyMatchDisconnected();
-	}
+	GetSubsystem<UD1SessionSubsystem>()->NotifyMatchDisconnected();
 }

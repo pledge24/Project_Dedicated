@@ -9,10 +9,8 @@ void UD1UWQuitButton::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (QuitButton)
-	{
-		QuitButton->OnClicked.AddDynamic(this, &UD1UWQuitButton::OnQuitClicked);
-	}
+	// 필수 BindWidget — WBP 컴파일러가 누락을 에러로 차단하므로 null 불가.
+	QuitButton->OnClicked.AddDynamic(this, &UD1UWQuitButton::OnQuitClicked);
 }
 
 void UD1UWQuitButton::OnQuitClicked()

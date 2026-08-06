@@ -237,10 +237,6 @@ void AD1BomberCharacter::OnRep_bIsInvulnerable()
 
 void AD1BomberCharacter::StartInvulnerability(float DurationSec)
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
 	bIsInvulnerable = true;
 	GetWorldTimerManager().SetTimer(InvulnTimerHandle, this,
 		&AD1BomberCharacter::EndInvulnerability, DurationSec, false);
@@ -249,20 +245,12 @@ void AD1BomberCharacter::StartInvulnerability(float DurationSec)
 
 void AD1BomberCharacter::EndInvulnerability()
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
 	bIsInvulnerable = false;
 	OnRep_bIsInvulnerable();
 }
 
 void AD1BomberCharacter::ApplyHitStun()
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
 	bStunned = true;
 	GetWorldTimerManager().SetTimer(StunTimerHandle, this,
 		&AD1BomberCharacter::EndStun, StunDurationSec, false);

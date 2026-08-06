@@ -18,11 +18,6 @@ AD1ExplosionHazard::AD1ExplosionHazard()
 
 void AD1ExplosionHazard::SetupCells(const TArray<FIntPoint>& InCells, float InDurationSec)
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
-
 	HazardCells = InCells;
 	HazardDurationSec = InDurationSec;
 	ElapsedSec = 0.f;

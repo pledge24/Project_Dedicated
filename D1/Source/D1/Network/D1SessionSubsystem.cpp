@@ -26,12 +26,9 @@ void UD1SessionSubsystem::NotifySessionSuperseded()
 	UE_LOG(LogD1, Warning, TEXT("[Session] 다른 기기 로그인으로 세션 대체 — 로그인 화면 복귀"));
 
 	// 큐 대기 중이면 매칭 WS 정리(로비 heartbeat가 감지한 경우 등). 이미 닫혔으면 no-op.
-	if (UGameInstance* GI = GetGameInstance())
+	if (UD1MatchmakingSubsystem* Matchmaking = GetGameInstance()->GetSubsystem<UD1MatchmakingSubsystem>())
 	{
-		if (UD1MatchmakingSubsystem* Matchmaking = GI->GetSubsystem<UD1MatchmakingSubsystem>())
-		{
-			Matchmaking->CancelMatchmaking();
-		}
+		Matchmaking->CancelMatchmaking();
 	}
 
 	if (!ShowNotice(
@@ -113,7 +110,7 @@ bool UD1SessionSubsystem::ShowNotice(const FText& Title, const FText& Message)
 	}
 
 	const UD1OnlineSettings* Settings = GetDefault<UD1OnlineSettings>();
-	if (!Settings || Settings->SystemNoticeWidgetClass.IsNull())
+	if (Settings->SystemNoticeWidgetClass.IsNull())
 	{
 		UE_LOG(LogD1, Error, TEXT("[Session] SystemNoticeWidgetClass 미설정 — 공지 없이 복귀 (Project Settings > D1 > Session)"));
 
@@ -178,7 +175,7 @@ void UD1SessionSubsystem::ReturnToLogin()
 void UD1SessionSubsystem::OpenLobbyMap()
 {
 	const UD1OnlineSettings* Settings = GetDefault<UD1OnlineSettings>();
-	if (Settings && !Settings->LobbyMap.IsNull())
+	if (!Settings->LobbyMap.IsNull())
 	{
 		UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->LobbyMap);
 
@@ -193,7 +190,7 @@ void UD1SessionSubsystem::OpenLobbyMap()
 void UD1SessionSubsystem::OpenFrontendMap()
 {
 	const UD1OnlineSettings* Settings = GetDefault<UD1OnlineSettings>();
-	if (Settings && !Settings->FrontendMap.IsNull())
+	if (!Settings->FrontendMap.IsNull())
 	{
 		// TRAVEL_Absolute — DS 접속(게임중 kick)이나 로비 어디서든 프론트엔드 맵을 새로 연다.
 		UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->FrontendMap);

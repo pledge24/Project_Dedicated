@@ -66,7 +66,7 @@ void AD1PlayerController::SetupInputComponent()
 void AD1PlayerController::HandleMatchFinished()
 {
 	// GS는 이 함수를 부른 브로드캐스트의 발신자(또는 TryBind가 확보한 뒤 직접 호출) — null 불가.
-	AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
+	AD1BomberGameState* GS = GetWorld()->GetGameState<AD1BomberGameState>();
 	if (!ResultClass)
 	{
 		// 무음이면 결과창 없이 UIOnly로 전환된 화면 정지가 원인 불명이 된다.
@@ -94,7 +94,7 @@ void AD1PlayerController::HandleMatchFinished()
 
 void AD1PlayerController::TryBindMatchFinished()
 {
-	AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
+	AD1BomberGameState* GS = GetWorld()->GetGameState<AD1BomberGameState>();
 	if (!GS)
 	{
 		// GameState 복제 전 — 짧게 재시도.
@@ -115,9 +115,5 @@ void AD1PlayerController::TryBindMatchFinished()
 
 void AD1PlayerController::ClientNotifySessionSuperseded_Implementation()
 {
-	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
-	if (UD1SessionSubsystem* Session = GI ? GI->GetSubsystem<UD1SessionSubsystem>() : nullptr)
-	{
-		Session->NotifySessionSuperseded();
-	}
+	GetWorld()->GetGameInstance()->GetSubsystem<UD1SessionSubsystem>()->NotifySessionSuperseded();
 }

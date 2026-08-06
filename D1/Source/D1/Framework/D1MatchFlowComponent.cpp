@@ -65,9 +65,9 @@ void UD1MatchFlowComponent::SetupForMatch(int32 InExpectedPlayerCount, float InW
 	{
 		StartMatch();
 	}
-	else if (UWorld* World = GetWorld())
+	else
 	{
-		World->GetTimerManager().SetTimer(
+		GetWorld()->GetTimerManager().SetTimer(
 			WaitForPlayersTimerHandle, this, &UD1MatchFlowComponent::StartMatchOnGateTimeout,
 			WaitForPlayersTimeoutSec, /*bLoop=*/false);
 		UE_LOG(LogD1, Log, TEXT("[Match] 시작 게이트 대기 — 예상 %d명 (타임아웃 %.0fs)"),
@@ -84,10 +84,6 @@ void UD1MatchFlowComponent::NotifyPlayerJoined()
 	}
 
 	AD1BomberGameState* GS = GetBomberGameState();
-	if (!GS)
-	{
-		return;
-	}
 
 	int32 Connected = 0;
 	for (const APlayerState* PS : GS->PlayerArray)
@@ -121,31 +117,22 @@ void UD1MatchFlowComponent::StartMatch()
 	}
 
 	UWorld* World = GetWorld();
-	if (World)
-	{
-		World->GetTimerManager().ClearTimer(WaitForPlayersTimerHandle);
-	}
+	World->GetTimerManager().ClearTimer(WaitForPlayersTimerHandle);
 
 	GS->SetMatchStartServerTime(GS->GetServerWorldTimeSeconds());
 	GS->SetMatchPhase(EBomberMatchPhase::Playing);
 
-	if (World)
-	{
-		World->GetTimerManager().SetTimer(
-			MatchTimerHandle, this, &UD1MatchFlowComponent::EndMatchByTimeout,
-			GS->GetMatchDurationSec(), /*bLoop=*/false);
-	}
+	World->GetTimerManager().SetTimer(
+		MatchTimerHandle, this, &UD1MatchFlowComponent::EndMatchByTimeout,
+		GS->GetMatchDurationSec(), /*bLoop=*/false);
 
 	// 시작 게이트 해제 — 입장 시 서버가 잠근 이동(Restart의 MOVE_None) 일괄 재개.
-	if (World)
+	for (AD1BomberCharacter* Character : TActorRange<AD1BomberCharacter>(World))
 	{
-		for (AD1BomberCharacter* Character : TActorRange<AD1BomberCharacter>(World))
+		UCharacterMovementComponent* Move = Character->GetCharacterMovement();
+		if (Move && Move->MovementMode == MOVE_None)
 		{
-			UCharacterMovementComponent* Move = Character->GetCharacterMovement();
-			if (Move && Move->MovementMode == MOVE_None)
-			{
-				Move->SetMovementMode(MOVE_Walking);
-			}
+			Move->SetMovementMode(MOVE_Walking);
 		}
 	}
 
@@ -173,12 +160,13 @@ void UD1MatchFlowComponent::StartMatchOnGateTimeout()
 
 void UD1MatchFlowComponent::MarkNoShowUsers()
 {
-	AD1BomberGameState* GS = GetBomberGameState();
-	UD1PlayerRemovalComponent* Removal = GS ? GS->GetPlayerRemoval() : nullptr;
-	if (!GS || !Removal || ExpectedRoster.Num() == 0)
+	if (ExpectedRoster.Num() == 0)
 	{
 		return; // PIE/standalone은 명단이 없어 판정 기준 자체가 없다.
 	}
+
+	AD1BomberGameState* GS = GetBomberGameState();
+	UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval();
 
 	TSet<int64> JoinedUserIds;
 	for (const APlayerState* PS : GS->PlayerArray)
@@ -248,11 +236,6 @@ void UD1MatchFlowComponent::EnsureAliveListInitialized()
 	}
 
 	AD1BomberGameState* GS = GetBomberGameState();
-	if (!GS)
-	{
-		return;
-	}
-
 	for (APlayerState* PS : GS->PlayerArray)
 	{
 		if (AD1BomberPlayerState* BPS = Cast<AD1BomberPlayerState>(PS))
@@ -274,12 +257,9 @@ void UD1MatchFlowComponent::RequestEndEvaluation()
 	{
 		return; // 프레임 내 다중 사망 → 타이머 1개만
 	}
-	if (UWorld* World = GetWorld())
-	{
-		bEndEvaluationPending = true;
-		World->GetTimerManager().SetTimerForNextTick(
-			this, &UD1MatchFlowComponent::EvaluateEndCondition);
-	}
+	bEndEvaluationPending = true;
+	GetWorld()->GetTimerManager().SetTimerForNextTick(
+		this, &UD1MatchFlowComponent::EvaluateEndCondition);
 }
 
 void UD1MatchFlowComponent::EvaluateEndCondition()
@@ -374,14 +354,11 @@ void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndR
 		WinnerPS ? WinnerPS->GetPlacement() : 0);
 
 	UWorld* World = GetWorld();
-	if (World)
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 	{
-		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		if (APlayerController* PC = It->Get())
 		{
-			if (APlayerController* PC = It->Get())
-			{
-				PC->DisableInput(PC);
-			}
+			PC->DisableInput(PC);
 		}
 	}
 
@@ -441,30 +418,21 @@ void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndR
 void UD1MatchFlowComponent::BeginShutdownAfterReport()
 {
 	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
 	World->GetTimerManager().ClearTimer(ResultReportHardCapTimerHandle);
 
 	// 클라들이 결과 화면 카운트다운 후 ClientTravel로 빠지면 DS가 스스로 종료.
 	// 확정 콜백과 하드캡이 모두 도달할 수 있지만 BeginShutdownWatch가 멱등이라 첫 호출만 유효하다.
-	if (UD1DsShutdownSubsystem* DsShutdown = World->GetSubsystem<UD1DsShutdownSubsystem>())
-	{
-		DsShutdown->BeginShutdownWatch(ShutdownGraceSec);
-	}
+	World->GetSubsystem<UD1DsShutdownSubsystem>()->BeginShutdownWatch(ShutdownGraceSec);
 }
 
 bool UD1MatchFlowComponent::HasMatchStarted() const
 {
-	const AD1BomberGameState* GS = GetBomberGameState();
-	return GS && GS->GetMatchPhase() != EBomberMatchPhase::Waiting;
+	return GetBomberGameState()->GetMatchPhase() != EBomberMatchPhase::Waiting;
 }
 
 bool UD1MatchFlowComponent::IsMatchEnded() const
 {
-	const AD1BomberGameState* GS = GetBomberGameState();
-	return GS && GS->GetMatchPhase() == EBomberMatchPhase::Finished;
+	return GetBomberGameState()->GetMatchPhase() == EBomberMatchPhase::Finished;
 }
 
 AD1BomberGameState* UD1MatchFlowComponent::GetBomberGameState() const
@@ -479,13 +447,10 @@ UD1DsApiSubsystem* UD1MatchFlowComponent::GetDsApi() const
 		return nullptr;
 	}
 
-	UWorld* World = GetWorld();
-	UGameInstance* GI = World ? World->GetGameInstance() : nullptr;
-	return GI ? GI->GetSubsystem<UD1DsApiSubsystem>() : nullptr;
+	return GetWorld()->GetGameInstance()->GetSubsystem<UD1DsApiSubsystem>();
 }
 
 bool UD1MatchFlowComponent::HasServerAuthority() const
 {
-	const AActor* Owner = GetOwner();
-	return Owner && Owner->HasAuthority();
+	return GetOwner()->HasAuthority();
 }

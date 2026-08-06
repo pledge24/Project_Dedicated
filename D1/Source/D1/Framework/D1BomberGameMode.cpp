@@ -287,9 +287,7 @@ bool AD1BomberGameMode::IsJoinAfterMatchStart() const
 		return false;
 	}
 
-	const AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
-
-	return GS && GS->GetMatchPhase() != EBomberMatchPhase::Waiting;
+	return GetGameState<AD1BomberGameState>()->GetMatchPhase() != EBomberMatchPhase::Waiting;
 }
 
 void AD1BomberGameMode::SpawnBots()
@@ -300,9 +298,9 @@ void AD1BomberGameMode::SpawnBots()
 	}
 
 	UWorld* World = GetWorld();
-	if (!World || !BotControllerClass)
+	if (!BotControllerClass)
 	{
-		UE_LOG(LogD1, Warning, TEXT("[Bot] 스폰 생략 — World/BotControllerClass 없음"));
+		UE_LOG(LogD1, Warning, TEXT("[Bot] 스폰 생략 — BotControllerClass 없음"));
 		return;
 	}
 
