@@ -181,12 +181,25 @@ void UD1MatchmakingSubsystem::HandleSocketMessage(const FString& Message)
 
 	if (Type == TEXT("match:found"))
 	{
-		FMatchFoundDTO Match;
 		const TSharedPtr<FJsonObject>* DataObj = nullptr;
-		if (D1BackendHttp::GetObjectField(Root, TEXT("data"), DataObj))
+		if (!D1BackendHttp::GetObjectField(Root, TEXT("data"), DataObj))
 		{
-			D1BackendHttp::ParseMatchFound(*DataObj, Match);
+			// 빈 DTO로 Matched에 들어가면 travel 실패 후 재시도 불가 상태로 갇힌다 —
+			// Idle 복귀 후 에러 표면화(Idle 선행이라 아래 close는 정상 종료로 처리됨).
+			UE_LOG(LogD1, Warning, TEXT("[Match] match:found에 data 없음 — 매칭 중단"));
+			MatchmakingState = EMatchmakingState::Idle;
+			CloseMatchSocket();
+
+			FBackendResponse Err;
+			Err.bOk = false;
+			Err.ErrorCode = EBackendErrorCode::Unknown;
+			Err.ErrorMessage = TEXT("매칭 응답이 올바르지 않습니다.");
+			OnMatchmakingError.Broadcast(Err);
+			return;
 		}
+
+		FMatchFoundDTO Match;
+		D1BackendHttp::ParseMatchFound(*DataObj, Match);
 
 		MatchmakingState = EMatchmakingState::Matched;
 		UE_LOG(LogD1, Log, TEXT("[Match] 매칭 성사 matchId=%s server=%s:%d"),

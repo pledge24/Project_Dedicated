@@ -97,6 +97,11 @@ void AD1SoftBlock::SetHeldItem(EPowerupType InType, TSubclassOf<AD1PowerupPickup
 	{
 		return;
 	}
+	// null 클래스로 bHasItem을 세우면 드롭이 스폰 지점에서 조용히 소실된다 — 배정 자체를 거부.
+	if (!InPickupClass)
+	{
+		return;
+	}
 	HeldItem = InType;
 	PickupClass = InPickupClass;
 	DropZ = InDropZ;

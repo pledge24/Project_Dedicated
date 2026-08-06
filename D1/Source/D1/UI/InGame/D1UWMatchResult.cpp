@@ -92,20 +92,22 @@ void UD1UWMatchResult::ReturnToLobby()
 	{
 		return;
 	}
-	bReturning = true;
 
+	// 래치·타이머 정리는 이동이 확정된 뒤에만 — 먼저 잠그면 실패 시 버튼·카운트다운이 다 죽어 갇힌다.
+	UD1SessionSubsystem* Session = GetGameInstance() ? GetGameInstance()->GetSubsystem<UD1SessionSubsystem>() : nullptr;
+	if (!Session)
+	{
+		UE_LOG(LogD1, Error, TEXT("[MatchResult] SessionSubsystem 없음 — 로비 복귀 불가"));
+
+		return;
+	}
+
+	bReturning = true;
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(CountdownTimerHandle);
 	}
 
 	// 이동이 DS 연결을 끊는다 — SessionSubsystem이 의도한 이탈 표시 후 로비 맵(설정 단일 출처)을 연다.
-	if (UD1SessionSubsystem* Session = GetGameInstance() ? GetGameInstance()->GetSubsystem<UD1SessionSubsystem>() : nullptr)
-	{
-		Session->TravelToLobby();
-
-		return;
-	}
-
-	UE_LOG(LogD1, Error, TEXT("[MatchResult] SessionSubsystem 없음 — 로비 복귀 불가"));
+	Session->TravelToLobby();
 }

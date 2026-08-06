@@ -9,6 +9,7 @@
 #include "Systems/Map/D1MapBuilder.h"
 #include "Systems/Map/D1MapData.h"
 #include "Framework/D1MatchTypes.h"
+#include "Network/D1DsShutdownSubsystem.h"
 #include "Core/D1LogChannels.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
@@ -150,6 +151,19 @@ void AD1BomberGameMode::BeginPlay()
 	if (!UD1MapBuilder::Build(GetWorld(), GetGameState<AD1BomberGameState>(), MapCfg, MapErr))
 	{
 		UE_LOG(LogD1, Error, TEXT("[Map] 빌드 실패: %s"), *MapErr);
+
+		// 실 DS는 벽·스폰 없는 맵으로 매치를 돌릴 수 없다 — 결과 보고 없이 종료하면 백엔드 sweep이
+		// 점수 무변동 abort로 기록한다(/result는 빈 결과를 거부하므로 결과를 지어내지 않는다).
+		// 유예 중 입장한 클라는 종료와 함께 끊긴다. PIE/standalone은 빈 맵 관찰을 위해 계속 진행.
+		if (!MatchConfig.MatchId.IsEmpty() && !MatchConfig.ServerToken.IsEmpty())
+		{
+			if (UD1DsShutdownSubsystem* Shutdown = GetWorld()->GetSubsystem<UD1DsShutdownSubsystem>())
+			{
+				Shutdown->BeginShutdownWatch(ShutdownGraceSec);
+			}
+
+			return;
+		}
 	}
 
 	// 봇전: PlayerStart가 준비된(맵 빌드 후) 다음, 시작 게이트 전에 봇을 스폰해 PlayerArray를 채운다.

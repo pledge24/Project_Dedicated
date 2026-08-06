@@ -106,10 +106,14 @@ void UD1AuthSubsystem::HandleProfileResponse(const FHttpResponsePtr& Res, bool b
 	FAuthUserDTO User;
 	D1BackendHttp::ParseAuthUser(Data, User);
 
-	if (UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance()))
+	// cast 실패인데 방송·성공 로그까지 가면 UI가 낡은 캐시를 최신으로 오인한다 — 도달만 차단.
+	// 미스컨피그 검출은 로그인 경로의 ensure(근원 검출기)가 담당.
+	UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance());
+	if (!GI)
 	{
-		GI->UpdateUserProfile(User);
+		return;
 	}
+	GI->UpdateUserProfile(User);
 
 	OnProfileUpdated.Broadcast();
 	UE_LOG(LogD1, Log, TEXT("[Profile] 갱신 완료 score=%d level=%d"), User.Score, User.Level);
