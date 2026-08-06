@@ -19,19 +19,17 @@ UD1PlayerRemovalComponent::UD1PlayerRemovalComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UD1PlayerRemovalComponent::SetupForMatch(int32 InExpectedPlayerCount, const FString& InMatchId, const FString& InServerToken)
+void UD1PlayerRemovalComponent::SetupForMatch(const FD1MatchSetupParams& Params)
 {
 	if (!HasServerAuthority())
 	{
 		return;
 	}
 
-	ExpectedPlayerCount = InExpectedPlayerCount;
-	CurrentMatchId      = InMatchId;
-	CurrentServerToken   = InServerToken;
-
-	// 게임중 강제 회수(다른 기기 로그인) 폴링 시작 — 토큰 있는 실 DS에서만.
-	StartKickPolling();
+	ExpectedPlayerCount = Params.ExpectedPlayerCount;
+	CurrentMatchId      = Params.MatchId;
+	CurrentServerToken  = Params.ServerToken;
+	bIsSetupForMatch    = true;
 }
 
 void UD1PlayerRemovalComponent::NotifyNoShow(int64 UserId)
@@ -72,6 +70,12 @@ void UD1PlayerRemovalComponent::NotifyPlayerDisconnected(AController* Exiting)
 
 void UD1PlayerRemovalComponent::StartKickPolling()
 {
+	// 설정 없이 폴링만 돌면 토큰이 비어 매번 조용히 스킵된다 — kick이 영영 반영되지 않는 무음 실패.
+	if (!ensureMsgf(bIsSetupForMatch, TEXT("[Match] kick 폴링 시작 전 SetupForMatch 누락")))
+	{
+		return;
+	}
+
 	// 백엔드가 띄운 DS(토큰 보유)에서만 — PIE/standalone은 폴링 없음.
 	if (CurrentServerToken.IsEmpty())
 	{

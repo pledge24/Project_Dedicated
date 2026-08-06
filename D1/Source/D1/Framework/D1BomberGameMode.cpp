@@ -52,6 +52,50 @@ AD1BomberGameMode::AD1BomberGameMode()
 	BotControllerClass = AD1BotController::StaticClass();
 }
 
+void AD1BomberGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+{
+	Super::InitGame(MapName, Options, ErrorMessage);
+
+	// 매치 식별자/토큰/명단/봇 좌석 적재. 아무것도 없으면 PIE/standalone(결과 POST 스킵).
+	// PreLogin·InitNewPlayer가 이 값으로 접속 신원을 판정하므로 접속 수락보다 앞서 채워야 한다 —
+	// 비어 있으면 실 DS를 PIE로 오판해 신원 검증이 통째로 열린다.
+	MatchConfig = FD1MatchConfig::Load();
+}
+
+void AD1BomberGameMode::InitGameState()
+{
+	Super::InitGameState();
+
+	// 매치 흐름·킥·탈주는 GameState의 컴포넌트가 소유. 여기선 설정만 주입하고 가동(준비 통지·게이트·
+	// 폴링)은 맵과 봇이 준비된 BeginPlay에서 건다.
+	// GameStateClass 미스컨피그의 최조기 검출기 — 조용히 스킵하면 게이트·킥 폴링·결과 보고가
+	// 전부 미장전된 DS가 Waiting에 영구 잔류한다.
+	AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
+	if (!ensureMsgf(GS, TEXT("[Match] GameStateClass가 AD1BomberGameState 계열이 아님")))
+	{
+		return;
+	}
+
+	// 명단도 함께 넘긴다 — 끝까지 입장하지 않은 유저를 결과에 채우려면 "와야 할 사람"을 알아야 한다.
+	FD1MatchSetupParams Params;
+	Params.ExpectedPlayerCount      = MatchConfig.ExpectedPlayerCount;
+	Params.MatchId                  = MatchConfig.MatchId;
+	Params.ServerToken              = MatchConfig.ServerToken;
+	Params.WaitForPlayersTimeoutSec = WaitForPlayersTimeoutSec;
+	Params.ShutdownGraceSec         = ShutdownGraceSec;
+	MatchConfig.Roster.GenerateValueArray(Params.ExpectedRoster);
+
+	if (UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval())
+	{
+		Removal->SetupForMatch(Params);
+	}
+
+	if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
+	{
+		Flow->SetupForMatch(Params);
+	}
+}
+
 void AD1BomberGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
 {
 	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
@@ -134,9 +178,6 @@ void AD1BomberGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 매치 식별자/토큰/명단/봇 좌석 적재. 아무것도 없으면 PIE/standalone(결과 POST 스킵).
-	MatchConfig = FD1MatchConfig::Load();
-
 	// 맵 빌드는 전용 헬퍼로 위임(GameMode는 config만 보유·전달).
 	FD1MapBuildConfig MapCfg;
 	MapCfg.DefaultMap  = MapData;
@@ -169,27 +210,22 @@ void AD1BomberGameMode::BeginPlay()
 	// 봇전: PlayerStart가 준비된(맵 빌드 후) 다음, 시작 게이트 전에 봇을 스폰해 PlayerArray를 채운다.
 	SpawnBots();
 
-	// 매치 흐름·킥·탈주는 GameState의 컴포넌트가 소유. 설정을 push하고 시작 게이트를 위임.
-	// 명단도 함께 넘긴다 — 끝까지 입장하지 않은 유저를 결과에 채우려면 "와야 할 사람"을 알아야 한다.
-	// GameStateClass 미스컨피그의 최조기 검출기 — 조용히 스킵하면 게이트·킥 폴링·결과 보고가
-	// 전부 미장전된 DS가 Waiting에 영구 잔류한다.
+	// 설정 주입은 InitGameState에서 끝났다 — 여기선 가동만. 맵·PlayerStart·봇이 준비된 뒤라야
+	// 준비 통지가 사실이 되고, 정원 0/1(PIE·솔로)의 즉시 시작이 빈 월드에서 일어나지 않는다.
 	AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
-	if (!ensureMsgf(GS, TEXT("[Match] GameStateClass가 AD1BomberGameState 계열이 아님")))
+	if (!ensureMsgf(GS, TEXT("[Match] 매치 가동 불가 — GameState 없음")))
 	{
 		return;
 	}
 
 	if (UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval())
 	{
-		Removal->SetupForMatch(MatchConfig.ExpectedPlayerCount, MatchConfig.MatchId, MatchConfig.ServerToken);
+		Removal->StartKickPolling();
 	}
 
 	if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
 	{
-		TArray<FD1JoinEntry> ExpectedRoster;
-		MatchConfig.Roster.GenerateValueArray(ExpectedRoster);
-		Flow->SetupForMatch(MatchConfig.ExpectedPlayerCount, WaitForPlayersTimeoutSec, ShutdownGraceSec,
-			MatchConfig.MatchId, MatchConfig.ServerToken, ExpectedRoster);
+		Flow->StartMatchGate();
 	}
 }
 

@@ -27,9 +27,15 @@ public:
 
 //~ 시작 게이트
 public:
-	/** 서버 전용: GameMode::BeginPlay가 cmdline 파싱·맵빌드 후 호출. 설정을 받고 시작 게이트를 arm. */
-	void SetupForMatch(int32 InExpectedPlayerCount, float InWaitTimeoutSec, float InShutdownGraceSec,
-		const FString& InMatchId, const FString& InServerToken, const TArray<FD1JoinEntry>& InExpectedRoster);
+	/** 서버 전용: GameMode::InitGameState가 설정만 주입. 가동은 StartMatchGate가 따로 한다. */
+	void SetupForMatch(const FD1MatchSetupParams& Params);
+
+	/**
+	 * 서버 전용: GameMode::BeginPlay가 맵 빌드·봇 스폰 후 호출. DS 준비 통지 + 시작 게이트 arm.
+	 * SetupForMatch와 분리한 이유 — 맵·PlayerStart·봇이 없는 상태에서 게이트가 즉시 시작(정원 0/1)하면
+	 * 빈 월드로 매치가 돌고, 준비 통지가 클라를 미완성 월드로 불러들인다.
+	 */
+	void StartMatchGate();
 
 	/** 서버 전용: GameMode::PostLogin이 호출. 예상 인원 도달 시 매치 시작. */
 	void NotifyPlayerJoined();
@@ -52,6 +58,16 @@ private:
 	 * 봇전 봇은 -Bots= 로 따로 오고 PlayerArray에 편입되므로 여기 없다.
 	 */
 	TArray<FD1JoinEntry> ExpectedRoster;
+
+	/** SetupForMatch 완료 여부 — 설정만 되고 가동 안 된 중간 상태를 StartMatchGate가 잡아낸다. */
+	bool bIsSetupForMatch = false;
+
+	/**
+	 * StartMatchGate 통과 여부. 설정 주입(InitGameState)이 가동(BeginPlay)보다 앞서므로, 그 사이에
+	 * 들어온 매치 이벤트는 정원·정산에서 제외해야 한다 — 맵 빌드 실패로 셧다운 유예 중인 DS가
+	 * 시작해버리거나 성립한 적 없는 매치의 결과를 보고하는 것을 막는다.
+	 */
+	bool bIsMatchGateStarted = false;
 
 //~ 사망·등수
 public:

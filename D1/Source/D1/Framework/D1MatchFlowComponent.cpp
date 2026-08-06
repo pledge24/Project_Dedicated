@@ -38,22 +38,33 @@ UD1MatchFlowComponent::UD1MatchFlowComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UD1MatchFlowComponent::SetupForMatch(int32 InExpectedPlayerCount, float InWaitTimeoutSec, float InShutdownGraceSec,
-	const FString& InMatchId, const FString& InServerToken, const TArray<FD1JoinEntry>& InExpectedRoster)
+void UD1MatchFlowComponent::SetupForMatch(const FD1MatchSetupParams& Params)
 {
 	if (!HasServerAuthority())
 	{
 		return;
 	}
 
-	ExpectedPlayerCount      = InExpectedPlayerCount;
-	WaitForPlayersTimeoutSec = InWaitTimeoutSec;
-	ShutdownGraceSec         = InShutdownGraceSec;
-	CurrentMatchId           = InMatchId;
-	CurrentServerToken       = InServerToken;
-	ExpectedRoster           = InExpectedRoster;
+	ExpectedPlayerCount      = Params.ExpectedPlayerCount;
+	WaitForPlayersTimeoutSec = Params.WaitForPlayersTimeoutSec;
+	ShutdownGraceSec         = Params.ShutdownGraceSec;
+	CurrentMatchId           = Params.MatchId;
+	CurrentServerToken       = Params.ServerToken;
+	ExpectedRoster           = Params.ExpectedRoster;
+	bIsSetupForMatch         = true;
+}
 
-	// 맵 빌드·시작 게이트 준비 완료 → 백엔드에 "플레이어 받을 준비됨" 통지(토큰 있는 실 DS만).
+void UD1MatchFlowComponent::StartMatchGate()
+{
+	// 설정 없이 게이트만 열리면 정원 0으로 즉시 시작하고 토큰 없이 결과 보고를 스킵한다 — 무음 오작동.
+	if (!ensureMsgf(bIsSetupForMatch, TEXT("[Match] 시작 게이트 가동 전 SetupForMatch 누락")))
+	{
+		return;
+	}
+
+	bIsMatchGateStarted = true;
+
+	// 맵 빌드·봇 스폰 완료 → 백엔드에 "플레이어 받을 준비됨" 통지(토큰 있는 실 DS만).
 	// 백엔드는 이 콜백을 받고 클라에 match:found(입장 패킷) 전송. PIE/standalone은 토큰 없어 스킵.
 	if (UD1DsApiSubsystem* DsApi = GetDsApi())
 	{
@@ -77,8 +88,9 @@ void UD1MatchFlowComponent::SetupForMatch(int32 InExpectedPlayerCount, float InW
 
 void UD1MatchFlowComponent::NotifyPlayerJoined()
 {
-	// 이미 시작했거나 게이트 비활성(PIE·솔로)이면 시작 게이트 카운트 생략.
-	if (!HasServerAuthority() || HasMatchStarted() || ExpectedPlayerCount <= 1)
+	// 게이트를 열기 전(맵 빌드 실패로 셧다운 유예 중 입장 등), 이미 시작했거나
+	// 게이트 비활성(PIE·솔로)이면 시작 게이트 카운트 생략.
+	if (!HasServerAuthority() || !bIsMatchGateStarted || HasMatchStarted() || ExpectedPlayerCount <= 1)
 	{
 		return;
 	}
@@ -196,7 +208,8 @@ void UD1MatchFlowComponent::MarkNoShowUsers()
 
 void UD1MatchFlowComponent::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 {
-	if (!HasServerAuthority() || IsMatchEnded() || !DeadPS)
+	// 게이트를 열기 전 사망은 매치가 성립하지 않은 것 — 정산·보고 경로에 태우지 않는다.
+	if (!HasServerAuthority() || !bIsMatchGateStarted || IsMatchEnded() || !DeadPS)
 	{
 		return;
 	}
@@ -217,7 +230,7 @@ void UD1MatchFlowComponent::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 
 void UD1MatchFlowComponent::NotifyPlayerLeft(AD1BomberPlayerState* LeftPS)
 {
-	if (!HasServerAuthority() || IsMatchEnded() || !LeftPS)
+	if (!HasServerAuthority() || !bIsMatchGateStarted || IsMatchEnded() || !LeftPS)
 	{
 		return;
 	}
