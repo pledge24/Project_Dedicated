@@ -157,20 +157,25 @@ void AD1BomberGameMode::BeginPlay()
 
 	// 매치 흐름·킥·탈주는 GameState의 컴포넌트가 소유. 설정을 push하고 시작 게이트를 위임.
 	// 명단도 함께 넘긴다 — 끝까지 입장하지 않은 유저를 결과에 채우려면 "와야 할 사람"을 알아야 한다.
-	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
+	// GameStateClass 미스컨피그의 최조기 검출기 — 조용히 스킵하면 게이트·킥 폴링·결과 보고가
+	// 전부 미장전된 DS가 Waiting에 영구 잔류한다.
+	AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
+	if (!ensureMsgf(GS, TEXT("[Match] GameStateClass가 AD1BomberGameState 계열이 아님")))
 	{
-		if (UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval())
-		{
-			Removal->SetupForMatch(MatchConfig.ExpectedPlayerCount, MatchConfig.MatchId, MatchConfig.ServerToken);
-		}
+		return;
+	}
 
-		if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
-		{
-			TArray<FD1JoinEntry> ExpectedRoster;
-			MatchConfig.Roster.GenerateValueArray(ExpectedRoster);
-			Flow->SetupForMatch(MatchConfig.ExpectedPlayerCount, WaitForPlayersTimeoutSec, ShutdownGraceSec,
-				MatchConfig.MatchId, MatchConfig.ServerToken, ExpectedRoster);
-		}
+	if (UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval())
+	{
+		Removal->SetupForMatch(MatchConfig.ExpectedPlayerCount, MatchConfig.MatchId, MatchConfig.ServerToken);
+	}
+
+	if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
+	{
+		TArray<FD1JoinEntry> ExpectedRoster;
+		MatchConfig.Roster.GenerateValueArray(ExpectedRoster);
+		Flow->SetupForMatch(MatchConfig.ExpectedPlayerCount, WaitForPlayersTimeoutSec, ShutdownGraceSec,
+			MatchConfig.MatchId, MatchConfig.ServerToken, ExpectedRoster);
 	}
 }
 

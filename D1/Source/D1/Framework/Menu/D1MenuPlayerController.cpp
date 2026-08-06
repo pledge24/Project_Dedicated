@@ -87,7 +87,7 @@ void AD1MenuPlayerController::ShowInitialWidgetFromGameMode()
 	AD1MenuGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AD1MenuGameMode>() : nullptr;
 	if (!GM)
 	{
-		UE_LOG(LogD1, Warning, TEXT("[Menu] AD1MenuGameMode를 찾지 못함 (서버 컨텍스트 아님)"));
+		UE_LOG(LogD1, Warning, TEXT("[Menu] AD1MenuGameMode를 찾지 못함 — 맵의 GameMode 클래스 확인 필요"));
 		return;
 	}
 

@@ -36,8 +36,13 @@ void UD1UWMatchResult::NativeConstruct()
 
 void UD1UWMatchResult::SetResults(const TArray<FD1MatchResultEntry>& Results)
 {
-	if (!ResultListPanel || !RowWidgetClass)
+	if (!ResultListPanel)
 	{
+		return;
+	}
+	if (!RowWidgetClass)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[MatchResult] RowWidgetClass가 비어있음 (디테일 패널에서 지정 필요)"));
 		return;
 	}
 

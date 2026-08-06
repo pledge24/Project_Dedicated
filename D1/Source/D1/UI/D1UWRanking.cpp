@@ -54,8 +54,13 @@ void UD1UWRanking::HandleRankingCompleted(const FBackendResponse& Response, cons
 
 void UD1UWRanking::PopulateRows(const FD1RankingResult& Result)
 {
-	if (!RankingScrollBox || !RowWidgetClass)
+	if (!RankingScrollBox)
 	{
+		return;
+	}
+	if (!RowWidgetClass)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Ranking] RowWidgetClass가 비어있음 (디테일 패널에서 지정 필요)"));
 		return;
 	}
 

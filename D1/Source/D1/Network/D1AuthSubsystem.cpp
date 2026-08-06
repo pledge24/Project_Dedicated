@@ -64,7 +64,10 @@ void UD1AuthSubsystem::HandleAuthResponse(const FHttpResponsePtr& Res, bool bSuc
 	Data->TryGetStringField(TEXT("token"), Token);
 	if (!Token.IsEmpty())
 	{
-		if (UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance()))
+		// 조용히 스킵하면 "로그인 성공인데 세션 없음"이 되어 이후 전 인증 요청이 무너진다.
+		// GameInstanceClass 미스컨피그의 최조기 검출기(매 세션 첫 로그인 경로).
+		UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance());
+		if (ensureMsgf(GI, TEXT("[Auth] GameInstanceClass가 UD1GameInstance 아님 — 세션 저장 불가")))
 		{
 			GI->SetSession(Token, User);
 		}

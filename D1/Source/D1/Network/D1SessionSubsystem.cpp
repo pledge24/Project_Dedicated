@@ -118,19 +118,19 @@ bool UD1SessionSubsystem::ShowNotice(const FText& Title, const FText& Message)
 		return false;
 	}
 
-	NoticeWidget = CreateWidget<UUserWidget>(PC, NoticeClass);
-	if (!NoticeWidget)
+	// 확인 델리게이트 없는 모달은 FInputModeUIOnly와 함께 영구 소프트락 —
+	// 파생 확인 전엔 아무것도 띄우지 않고 false 반환(호출자의 즉시 복귀 폴백 발동).
+	UD1UWSystemNotice* Notice = Cast<UD1UWSystemNotice>(CreateWidget<UUserWidget>(PC, NoticeClass));
+	if (!ensureMsgf(Notice, TEXT("[Session] SystemNoticeWidgetClass가 UD1UWSystemNotice 파생이 아님")))
 	{
 		return false;
 	}
 
-	NoticeWidget->AddToViewport(D1UILayer::Modal);
+	Notice->SetNotice(Title, Message);
+	Notice->OnSystemNoticeConfirmed.AddDynamic(this, &UD1SessionSubsystem::HandleNoticeConfirmed);
 
-	if (UD1UWSystemNotice* Notice = Cast<UD1UWSystemNotice>(NoticeWidget))
-	{
-		Notice->SetNotice(Title, Message);
-		Notice->OnSystemNoticeConfirmed.AddDynamic(this, &UD1SessionSubsystem::HandleNoticeConfirmed);
-	}
+	NoticeWidget = Notice;
+	NoticeWidget->AddToViewport(D1UILayer::Modal);
 
 	// 모달 조작을 위해 UI 입력 + 커서 (인게임 GameOnly 상태에서도 확인 클릭 가능).
 	PC->SetShowMouseCursor(true);

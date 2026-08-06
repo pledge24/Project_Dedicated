@@ -113,23 +113,27 @@ void UD1MatchFlowComponent::StartMatch()
 		return;
 	}
 
+	// 여기서 못 멈추면 phase 미전이·매치 타이머 미장전인 채 아래 "매치 시작" 로그까지 진행된다.
+	AD1BomberGameState* GS = GetBomberGameState();
+	if (!ensureMsgf(GS, TEXT("[Match] StartMatch: GameState 없음 — 시작 불가")))
+	{
+		return;
+	}
+
 	UWorld* World = GetWorld();
 	if (World)
 	{
 		World->GetTimerManager().ClearTimer(WaitForPlayersTimerHandle);
 	}
 
-	if (AD1BomberGameState* GS = GetBomberGameState())
-	{
-		GS->SetMatchStartServerTime(GS->GetServerWorldTimeSeconds());
-		GS->SetMatchPhase(EBomberMatchPhase::Playing);
+	GS->SetMatchStartServerTime(GS->GetServerWorldTimeSeconds());
+	GS->SetMatchPhase(EBomberMatchPhase::Playing);
 
-		if (World)
-		{
-			World->GetTimerManager().SetTimer(
-				MatchTimerHandle, this, &UD1MatchFlowComponent::EndMatchByTimeout,
-				GS->GetMatchDurationSec(), /*bLoop=*/false);
-		}
+	if (World)
+	{
+		World->GetTimerManager().SetTimer(
+			MatchTimerHandle, this, &UD1MatchFlowComponent::EndMatchByTimeout,
+			GS->GetMatchDurationSec(), /*bLoop=*/false);
 	}
 
 	// 시작 게이트 해제 — 입장 시 서버가 잠근 이동(Restart의 MOVE_None) 일괄 재개.
@@ -344,26 +348,25 @@ void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndR
 		return;
 	}
 
-	FlushPendingDeaths(); // 시간만료/탈주 등 다른 경로 종료 시에도 대기 사망자 등수 확정
-
 	AD1BomberGameState* GS = GetBomberGameState();
 	UD1PlayerRemovalComponent* Removal = GS ? GS->GetPlayerRemoval() : nullptr;
+	// 서두 단일 게이트 — 중간에 멈추면 phase 전이 후 결과 스냅샷·보고·셧다운이 부분 유실된다.
+	if (!ensureMsgf(GS && Removal, TEXT("[Match] EndMatch: GameState/RemovalComp 없음 — 정산 불가")))
+	{
+		return;
+	}
+
+	FlushPendingDeaths(); // 시간만료/탈주 등 다른 경로 종료 시에도 대기 사망자 등수 확정
 
 	// 종료 확정 — 이후 kick은 재입장 거절·통지만 남도록 폴링 중지(킥·탈주 소유는 RemovalComp).
-	if (Removal)
-	{
-		Removal->StopKickPolling();
-	}
+	Removal->StopKickPolling();
 
 	if (WinnerPS && WinnerPS->GetPlacement() <= 0)
 	{
 		WinnerPS->SetPlacement(1);
 	}
 
-	if (GS)
-	{
-		GS->SetMatchPhase(EBomberMatchPhase::Finished);
-	}
+	GS->SetMatchPhase(EBomberMatchPhase::Finished);
 
 	UE_LOG(LogD1, Log, TEXT("Match ended (%s). Winner=%s (Placement=%d)"),
 		EndReasonToString(Reason),
@@ -380,11 +383,6 @@ void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndR
 				PC->DisableInput(PC);
 			}
 		}
-	}
-
-	if (!GS || !Removal)
-	{
-		return;
 	}
 
 	// 미배정 생존자(시간 만료/무승부)는 공동 1위로 보정 — 백엔드는 placement 1~N만 허용.

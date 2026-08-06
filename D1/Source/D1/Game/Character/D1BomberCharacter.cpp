@@ -103,17 +103,27 @@ void AD1BomberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent);
+	if (!ensureMsgf(EIC, TEXT("[Input] EnhancedInputComponent 아님 — 입력 바인딩 전체 스킵")))
 	{
-		if (MoveAction)
-		{
-			EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AD1BomberCharacter::OnMoveInput);
-		}
-		if (PlaceBombAction && BombPlacementComp)
-		{
-			EIC->BindAction(PlaceBombAction, ETriggerEvent::Started,
-				BombPlacementComp.Get(), &UD1BombPlacementComponent::ServerTryPlaceBomb);
-		}
+		return;
+	}
+
+	// 액션 에셋 미지정은 "캐릭터가 안 움직임"으로만 나타난다 — 로그로 표면화.
+	if (!MoveAction || !PlaceBombAction)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Input] 미지정 입력 액션 있음 (Move=%d, PlaceBomb=%d)"),
+			MoveAction != nullptr, PlaceBombAction != nullptr);
+	}
+
+	if (MoveAction)
+	{
+		EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AD1BomberCharacter::OnMoveInput);
+	}
+	if (PlaceBombAction && BombPlacementComp)
+	{
+		EIC->BindAction(PlaceBombAction, ETriggerEvent::Started,
+			BombPlacementComp.Get(), &UD1BombPlacementComponent::ServerTryPlaceBomb);
 	}
 }
 

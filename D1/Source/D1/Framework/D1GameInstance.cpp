@@ -68,6 +68,16 @@ void UD1GameInstance::ClearSession()
 
 void UD1GameInstance::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString)
 {
+	// DS도 클라 타임아웃 시 이 전역 이벤트를 받는다 — 아래 복구(로비/로그인 travel)는 클라 전용이라
+	// 서버에서 실행되면 진행 중인 매치 맵을 통째로 버린다. 서버의 클라 이탈은 GameMode::Logout 소관.
+	if (IsRunningDedicatedServer())
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Net] DS 네트워크 실패 무시 type=%s msg=%s"),
+			ENetworkFailure::ToString(FailureType), *ErrorString);
+
+		return;
+	}
+
 	UE_LOG(LogD1, Warning, TEXT("[Net] 네트워크 실패 type=%s msg=%s"),
 		ENetworkFailure::ToString(FailureType), *ErrorString);
 
@@ -80,6 +90,15 @@ void UD1GameInstance::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver,
 
 void UD1GameInstance::HandleTravelFailure(UWorld* World, ETravelFailure::Type FailureType, const FString& ErrorString)
 {
+	// HandleNetworkFailure와 동일 — DS에서 클라 전용 복구 travel 금지.
+	if (IsRunningDedicatedServer())
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Net] DS Travel 실패 무시 type=%s msg=%s"),
+			ETravelFailure::ToString(FailureType), *ErrorString);
+
+		return;
+	}
+
 	UE_LOG(LogD1, Warning, TEXT("[Net] Travel 실패 type=%s msg=%s"),
 		ETravelFailure::ToString(FailureType), *ErrorString);
 
