@@ -28,8 +28,9 @@ void UD1BombPlacementComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 
 void UD1BombPlacementComponent::ServerTryPlaceBomb_Implementation()
 {
+	// Server RPC + 서버 봇 직접 호출뿐이라 권위는 보장 — 남는 실패 원인은 오부착(비캐릭터 소유)뿐.
 	AD1BomberCharacter* OwnerChar = GetBomberOwner();
-	if (!OwnerChar || !OwnerChar->HasAuthority())
+	if (!ensureMsgf(OwnerChar, TEXT("BombPlacement: 소유자가 AD1BomberCharacter 아님")))
 	{
 		return;
 	}
@@ -59,13 +60,7 @@ void UD1BombPlacementComponent::ServerTryPlaceBomb_Implementation()
 
 void UD1BombPlacementComponent::ServerPlaceBombForAI()
 {
-	const AD1BomberCharacter* OwnerChar = GetBomberOwner();
-	if (!OwnerChar || !OwnerChar->HasAuthority())
-	{
-		return;
-	}
-
-	// 봇 컨트롤러는 서버에만 존재 → RPC 왕복 없이 impl 직접 호출. 검증은 impl 내부 CanPlaceBombAt 재사용.
+	// 봇 컨트롤러는 서버에만 존재 → RPC 왕복 없이 impl 직접 호출. 검증은 impl 내부가 담당.
 	ServerTryPlaceBomb_Implementation();
 }
 
