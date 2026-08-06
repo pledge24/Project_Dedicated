@@ -34,7 +34,7 @@ public:
 	void RefreshLocalHighlight();
 
 private:
-	/** 깜빡임 시작: 가시화 리셋 + 토글 타이머 arm. 무적·사망 연출 공용. */
+	/** 깜빡임 시작: 가시화 리셋 + 토글 타이머 가동. 무적·사망 연출 공용. */
 	void StartBlink();
 	void TickBlink();
 
@@ -44,7 +44,7 @@ private:
 	/** 캐릭터 머리 위 NameTag 등 위젯 컴포넌트 일괄 숨김. */
 	void HideNameTags();
 
-	/** 렌더 없는 데디 서버는 전 기능 스킵. */
+	/** 렌더 없는 데디 서버는 전 기능 생략. */
 	bool ShouldRun() const;
 
 	ACharacter* GetCharacterOwner() const;

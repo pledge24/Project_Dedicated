@@ -56,7 +56,7 @@ void UD1MatchFlowComponent::SetupForMatch(const FD1MatchSetupParams& Params)
 
 void UD1MatchFlowComponent::StartMatchGate()
 {
-	// 설정 없이 게이트만 열리면 정원 0으로 즉시 시작하고 토큰 없이 결과 보고를 스킵한다 — 무음 오작동.
+	// 설정 없이 게이트만 열리면 정원 0으로 즉시 시작하고 토큰 없이 결과 보고를 생략한다 — 무음 오작동.
 	if (!ensureMsgf(bIsSetupForMatch, TEXT("[Match] 시작 게이트 가동 전 SetupForMatch 누락")))
 	{
 		return;
@@ -65,7 +65,7 @@ void UD1MatchFlowComponent::StartMatchGate()
 	bIsMatchGateStarted = true;
 
 	// 맵 빌드·봇 스폰 완료 → 백엔드에 "플레이어 받을 준비됨" 통지(토큰 있는 실 DS만).
-	// 백엔드는 이 콜백을 받고 클라에 match:found(입장 패킷) 전송. PIE/standalone은 토큰 없어 스킵.
+	// 백엔드는 이 콜백을 받고 클라에 match:found(입장 패킷) 전송. PIE/standalone은 토큰 없어 생략.
 	if (UD1DsApiSubsystem* DsApi = GetDsApi())
 	{
 		DsApi->ReportDsReady(CurrentMatchId, CurrentServerToken);
@@ -121,7 +121,7 @@ void UD1MatchFlowComponent::StartMatch()
 		return;
 	}
 
-	// 여기서 못 멈추면 phase 미전이·매치 타이머 미장전인 채 아래 "매치 시작" 로그까지 진행된다.
+	// 여기서 못 멈추면 MatchPhase도 안 바뀌고 매치 타이머도 안 걸린 채 아래 "매치 시작" 로그만 찍힌다.
 	AD1BomberGameState* GS = GetBomberGameState();
 	if (!ensureMsgf(GS, TEXT("[Match] StartMatch: GameState 없음 — 시작 불가")))
 	{
@@ -343,7 +343,7 @@ void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndR
 
 	AD1BomberGameState* GS = GetBomberGameState();
 	UD1PlayerRemovalComponent* Removal = GS ? GS->GetPlayerRemoval() : nullptr;
-	// 서두 단일 게이트 — 중간에 멈추면 phase 전이 후 결과 스냅샷·보고·셧다운이 부분 유실된다.
+	// 서두 단일 게이트 — 중간에 멈추면 MatchPhase 전이 후 최종 결과·보고·셧다운이 부분 유실된다.
 	if (!ensureMsgf(GS && Removal, TEXT("[Match] EndMatch: GameState/RemovalComp 없음 — 정산 불가")))
 	{
 		return;
@@ -386,8 +386,8 @@ void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndR
 		}
 	}
 
-	// 최종 결과 스냅샷(UI 원자 복제) + 백엔드 보고 페이로드 — 조립은 정산 헬퍼에 위임.
-	// 탈주 캡처·kick 명단은 RemovalComp 소유 — 여기서 병합만 한다.
+	// 최종 결과(UI 원자 복제) + 백엔드 보고 본문 — 조립은 정산 헬퍼에 위임.
+	// 탈주 기록·kick 명단은 RemovalComp 소유 — 여기서 병합만 한다.
 	TArray<FD1MatchResultEntry> Entries;
 	TArray<FMatchResultPlayer> ResultPlayers;
 	D1MatchSettlement::BuildFinalResults(*GS, Removal->GetKickedUserIds(),
@@ -396,7 +396,7 @@ void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndR
 
 	GS->SetFinalResults(Entries);
 
-	// 백엔드가 띄운 DS일 때만 결과 보고(토큰 없으면 PIE/standalone → 스킵).
+	// 백엔드가 띄운 DS일 때만 결과 보고(토큰 없으면 PIE/standalone → 생략).
 	UD1DsApiSubsystem* DsApi = GetDsApi();
 	if (!DsApi || !World)
 	{

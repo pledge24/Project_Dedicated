@@ -127,7 +127,7 @@ void AD1BotController::Think(AD1BomberCharacter* Bot, const AD1BomberGameState* 
 		}
 	}
 
-	// (b-2) 근거리 안전 아이템이 있으면 우선 획득(확률 스킵 없이 확정 — 강한 의지). 안전 경로·근거리 한정.
+	// (b-2) 근거리 안전 아이템이 있으면 우선 획득(확률로 거르지 않고 확정 — 강한 의지). 안전 경로·근거리 한정.
 	auto ItemGoal = [this, GS](FIntPoint C)
 	{
 		return IsCellPassable(GS, C) && !DangerCells.Contains(C) && ItemCells.Contains(C);

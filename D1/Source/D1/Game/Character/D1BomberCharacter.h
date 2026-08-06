@@ -160,11 +160,11 @@ private:
 
 //~ PS 바인딩·이름표
 protected:
-	/** PS OnPlayerNameChanged 핸들러. 이름표 재푸시 위해 OnPlayerStateReady 재호출. */
+	/** PS OnPlayerNameChanged 핸들러. 이름표를 다시 갱신하려고 OnPlayerStateReady 재호출. */
 	UFUNCTION()
 	void HandlePlayerNameRefreshed();
 
-	/** PS 최초 확보 + 이름 갱신마다 호출. BP에서 이름표 등 UI 푸시용. */
+	/** PS 최초 확보 + 이름 갱신마다 호출. BP에서 이름표 등 UI 갱신용. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Bomber|Events", meta = (DisplayName = "On Player State Ready"))
 	void OnPlayerStateReady();
 

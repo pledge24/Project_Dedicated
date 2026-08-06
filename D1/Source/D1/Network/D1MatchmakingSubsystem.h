@@ -10,7 +10,7 @@
 class IWebSocket;
 
 /**
- *  매칭 전담 Subsystem (클라). /ws/match WebSocket로 큐 입장·매칭 성사 푸시를 처리.
+ *  매칭 전담 Subsystem (클라). /ws/match WebSocket로 큐 입장·매칭 성사 통지를 처리.
  *  match:found 시 할당된 DS로 ClientTravel. Subsystem은 travel을 가로질러 살아남는다.
  */
 UCLASS()
@@ -59,7 +59,7 @@ private:
 public:
 	/**
 	 *  진행 중이던 매치가 있으면 그 DS로 되돌아간다(GET /api/match/current).
-	 *  match:found 푸시는 1회성이라 그 순간 끊기면 복구 수단이 없다 — 로비 진입 시 1회 확인이 그 창을 메운다.
+	 *  match:found 통지는 1회성이라 그 순간 끊기면 복구 수단이 없다 — 로비 진입 시 1회 확인이 그 창을 메운다.
 	 *  백엔드가 "결과 미저장 + 탈주 미정산"인 매치만 알려주므로 끝난 경기로 되돌아가지 않는다.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Backend|Match")

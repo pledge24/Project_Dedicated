@@ -105,7 +105,7 @@ bool UD1SessionSubsystem::ShowNotice(const FText& Title, const FText& Message)
 	APlayerController* PC = GI ? GI->GetFirstLocalPlayerController() : nullptr;
 	if (!PC)
 	{
-		// DS·travel 과도기 — 정상 부재. 호출자의 즉시 복귀 폴백이 담당.
+		// DS·travel 과도기 — 정상 부재. 호출자의 즉시 복귀 경로가 담당.
 		return false;
 	}
 
@@ -127,7 +127,7 @@ bool UD1SessionSubsystem::ShowNotice(const FText& Title, const FText& Message)
 	}
 
 	// 확인 델리게이트 없는 모달은 FInputModeUIOnly와 함께 영구 소프트락 —
-	// 파생 확인 전엔 아무것도 띄우지 않고 false 반환(호출자의 즉시 복귀 폴백 발동).
+	// 파생 확인 전엔 아무것도 띄우지 않고 false 반환(호출자의 즉시 복귀 경로 발동).
 	UD1UWSystemNotice* Notice = Cast<UD1UWSystemNotice>(CreateWidget<UUserWidget>(PC, NoticeClass));
 	if (!ensureMsgf(Notice, TEXT("[Session] SystemNoticeWidgetClass가 UD1UWSystemNotice 파생이 아님")))
 	{
@@ -183,7 +183,7 @@ void UD1SessionSubsystem::OpenLobbyMap()
 	}
 
 	// 로비 맵이 없으면 세션이 살아있어도 갈 곳이 없다 — 로그인 화면으로라도 내보낸다(갇힘 방지).
-	UE_LOG(LogD1, Error, TEXT("[Session] LobbyMap 미설정 — 로그인 화면으로 폴백 (Project Settings > D1 > Session)"));
+	UE_LOG(LogD1, Error, TEXT("[Session] LobbyMap 미설정 — 로그인 화면으로 대체 (Project Settings > D1 > Session)"));
 	ReturnToLogin();
 }
 

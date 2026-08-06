@@ -11,7 +11,7 @@ void UD1GameInstance::Init()
 	Super::Init();
 
 	// 넷드라이버 실패는 엔진 전역 이벤트로만 통보된다 — DS가 게임 중 죽어도 클라가 알 길이 이것뿐이다.
-	// (백엔드 매칭 WS는 match:found 직후 닫혀 있어 푸시를 받을 채널이 없다.)
+	// (백엔드 매칭 WS는 match:found 직후 닫혀 있어 통지를 받을 채널이 없다.)
 	if (GEngine)
 	{
 		NetworkFailureHandle = GEngine->OnNetworkFailure().AddUObject(this, &UD1GameInstance::HandleNetworkFailure);

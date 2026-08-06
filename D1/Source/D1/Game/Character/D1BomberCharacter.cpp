@@ -104,7 +104,7 @@ void AD1BomberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
 	UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent);
-	if (!ensureMsgf(EIC, TEXT("[Input] EnhancedInputComponent 아님 — 입력 바인딩 전체 스킵")))
+	if (!ensureMsgf(EIC, TEXT("[Input] EnhancedInputComponent 아님 — 입력 바인딩 전체 생략")))
 	{
 		return;
 	}
@@ -224,7 +224,7 @@ void AD1BomberCharacter::ReceiveExplosionHit()
 
 void AD1BomberCharacter::OnRep_bIsInvulnerable()
 {
-	// Start/EndInvulnerability의 수동 OnRep 호출로 서버(리슨 호스트)에서도 불린다 — DS 스킵은 컴포넌트가 담당.
+	// Start/EndInvulnerability의 수동 OnRep 호출로 서버(리슨 호스트)에서도 불린다 — DS에서 거르는 건 컴포넌트가 담당.
 	if (bIsInvulnerable)
 	{
 		CosmeticComp->PlayHitReaction(/*bWithAnim=*/!bDeathHandled);

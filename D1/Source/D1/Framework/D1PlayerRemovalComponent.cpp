@@ -70,7 +70,7 @@ void UD1PlayerRemovalComponent::NotifyPlayerDisconnected(AController* Exiting)
 
 void UD1PlayerRemovalComponent::StartKickPolling()
 {
-	// 설정 없이 폴링만 돌면 토큰이 비어 매번 조용히 스킵된다 — kick이 영영 반영되지 않는 무음 실패.
+	// 설정 없이 폴링만 돌면 토큰이 비어 매번 조용히 넘어간다 — kick이 영영 반영되지 않는 무음 실패.
 	if (!ensureMsgf(bIsSetupForMatch, TEXT("[Match] kick 폴링 시작 전 SetupForMatch 누락")))
 	{
 		return;
@@ -170,7 +170,7 @@ void UD1PlayerRemovalComponent::RemoveLeaver(AD1BomberPlayerState* Target, bool 
 
 	const int64 UserId = Target->GetBackendUserId();
 
-	// 탈주 처리(사망과 별개). 전원 꼴등(정원 고정), 캐릭터 사라짐, 결과 캡처(Logout로 빠지기 전).
+	// 탈주 처리(사망과 별개). 전원 꼴등(정원 고정), 캐릭터 사라짐, 결과 기록(Logout로 빠지기 전).
 	const int32 LastPlacement = FMath::Max(ExpectedPlayerCount, GS->PlayerArray.Num());
 	Target->SetPlacement(LastPlacement);
 	Target->SetLeft(); // bLeft 복제 → 캐릭터 사라짐 + 카드 "탈주"
@@ -201,7 +201,7 @@ void UD1PlayerRemovalComponent::RemoveLeaver(AD1BomberPlayerState* Target, bool 
 
 	// 종료 판정은 심판(MatchFlow) 소유 — 생존 목록 제외·다음 틱 평가 예약을 위임.
 	// 한 배치(kick 폴링 응답)·한 프레임의 탈주를 심판이 모아 한 번만 판정 → 앞 탈주가 매치를 끝내
-	// 뒤 탈주가 스킵되던 순서 의존 제거. 전원 탈주는 생존 0 → Draw로 정확 판정.
+	// 뒤 탈주가 누락되던 순서 의존 제거. 전원 탈주는 생존 0 → Draw로 정확 판정.
 	if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
 	{
 		Flow->NotifyPlayerLeft(Target);

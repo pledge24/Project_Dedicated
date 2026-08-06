@@ -76,11 +76,11 @@ private:
 	/** 서버 전용. */
 	void SpawnExplosionHazard(const TArray<FIntPoint>& Cells);
 
-	/** 폭발 셀마다 스폰하는 FX 액터. 미지정 시 C++ 클래스로 폴백. */
+	/** 폭발 셀마다 스폰하는 FX 액터. 미지정 시 C++ 클래스로 대체. */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	TSubclassOf<AD1ExplosionFX> ExplosionFXClass;
 
-	/** 폭발 지속 피해용 서버 전용 위험 액터. 미지정 시 C++ 클래스로 폴백. */
+	/** 폭발 지속 피해용 서버 전용 위험 액터. 미지정 시 C++ 클래스로 대체. */
 	UPROPERTY(EditDefaultsOnly, Category = "Bomber")
 	TSubclassOf<AD1ExplosionHazard> ExplosionHazardClass;
 

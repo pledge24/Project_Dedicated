@@ -75,7 +75,7 @@ namespace D1BackendHttp
 	//~ DTO 파싱 (서버 camelCase 키 계약을 한 곳에)
 	/** data 객체 → 유저 프로필 (login/register/me 응답 공통 모양). */
 	void ParseAuthUser(const TSharedPtr<FJsonObject>& Data, FAuthUserDTO& OutUser);
-	/** data 객체 → 매치 성사 정보 (match:found 푸시·재입장 응답 공통 모양). */
+	/** data 객체 → 매치 성사 정보 (match:found 통지·재입장 응답 공통 모양). */
 	void ParseMatchFound(const TSharedPtr<FJsonObject>& Data, FMatchFoundDTO& OutMatch);
 
 	//~ JSON 헬퍼

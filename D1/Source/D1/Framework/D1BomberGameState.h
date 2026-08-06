@@ -131,7 +131,7 @@ private:
 
 //~ 매치 종료·결과
 public:
-	/** 서버 전용: 결과 스냅샷 설정 + OnMatchFinished 방송(리슨 서버 자기 클라 포함). */
+	/** 서버 전용: 최종 결과 설정 + OnMatchFinished 방송(리슨 서버 자기 클라 포함). */
 	void SetFinalResults(const TArray<FD1MatchResultEntry>& InResults);
 
 	/** 서버 전용: 페이즈 전이. */

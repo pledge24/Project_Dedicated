@@ -56,7 +56,7 @@ void AD1BomberGameMode::InitGame(const FString& MapName, const FString& Options,
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
 
-	// 매치 식별자/토큰/명단/봇 좌석 적재. 아무것도 없으면 PIE/standalone(결과 POST 스킵).
+	// 매치 식별자/토큰/명단/봇 좌석 적재. 아무것도 없으면 PIE/standalone(결과 POST 생략).
 	// PreLogin·InitNewPlayer가 이 값으로 접속 신원을 판정하므로 접속 수락보다 앞서 채워야 한다 —
 	// 비어 있으면 실 DS를 PIE로 오판해 신원 검증이 통째로 열린다.
 	MatchConfig = FD1MatchConfig::Load();
@@ -68,8 +68,8 @@ void AD1BomberGameMode::InitGameState()
 
 	// 매치 흐름·킥·탈주는 GameState의 컴포넌트가 소유. 여기선 설정만 주입하고 가동(준비 통지·게이트·
 	// 폴링)은 맵과 봇이 준비된 BeginPlay에서 건다.
-	// GameStateClass 미스컨피그의 최조기 검출기 — 조용히 스킵하면 게이트·킥 폴링·결과 보고가
-	// 전부 미장전된 DS가 Waiting에 영구 잔류한다.
+	// 여기서 조용히 넘어가면 시작 게이트도 킥 폴링도 결과 보고도 걸리지 않은 DS가
+	// Waiting 상태로 영원히 남는다. GameStateClass를 잘못 지정했을 때 여기서 걸린다.
 	AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
 	if (!ensureMsgf(GS, TEXT("[Match] GameStateClass가 AD1BomberGameState 계열이 아님")))
 	{
@@ -154,7 +154,7 @@ void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 
 void AD1BomberGameMode::Logout(AController* Exiting)
 {
-	// 매치 진행 중 이탈(접속 끊김/나가기)은 탈주로 처리 — Super가 PS를 제거하기 전에 캡처.
+	// 매치 진행 중 이탈(접속 끊김/나가기)은 탈주로 처리 — Super가 PS를 제거하기 전에 기록.
 	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
 	{
 		if (UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval())

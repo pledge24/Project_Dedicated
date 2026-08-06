@@ -7,11 +7,11 @@
 
 /**
  *  DS 매치 설정 — 백엔드 설정 파일(JSON) 또는 커맨드라인 스위치에서 적재.
- *  전부 비어 있으면 PIE/standalone(결과 POST 스킵).
+ *  전부 비어 있으면 PIE/standalone(결과 POST 생략).
  */
 struct FD1MatchConfig
 {
-	/** 결과 POST 인증용(비면 스킵 = PIE/standalone). */
+	/** 결과 POST 인증용(비면 생략 = PIE/standalone). */
 	FString MatchId;
 	FString ServerToken;
 
@@ -35,6 +35,6 @@ private:
 	/** 설정 파일(JSON) 파싱. 성공 시 true. 읽은 파일은 즉시 지운다 — 토큰이 디스크에 남는 창을 줄인다. */
 	bool LoadFromFile(const FString& FilePath);
 
-	/** -MatchConfig= 파일이 없을 때의 폴백(PIE·수동 실행) — -MatchId/-ServerToken/-Roster/-Bots 스위치에서 직접 파싱. */
+	/** -MatchConfig= 파일이 없을 때의 대체 경로(PIE·수동 실행) — -MatchId/-ServerToken/-Roster/-Bots 스위치에서 직접 파싱. */
 	void LoadFromCommandLine();
 };

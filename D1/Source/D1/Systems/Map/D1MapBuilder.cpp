@@ -93,7 +93,7 @@ bool UD1MapBuilder::Build(UWorld* World, AD1BomberGameState* GS, const FD1MapBui
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 	// 벽(복제) — 메시·콜리전은 액터 생성자에 있어 클라도 동일 구성.
-	// 클래스 미지정 시 셀 판정 데이터(위 SetGridData)만 남고 액터 없는 맵이 된다 — 무음 스킵 금지.
+	// 클래스 미지정 시 셀 판정 데이터(위 SetGridData)만 남고 액터 없는 맵이 된다 — 무음 생략 금지.
 	if (ensureMsgf(MapToUse->GetWallBlockClass() != nullptr, TEXT("[Map] WallBlockClass 미지정: %s"), *MapToUse->GetName()))
 	{
 		for (const FIntPoint& Cell : Layout.WallCells)

@@ -14,7 +14,7 @@ class UD1DsApiSubsystem;
 
 /**
  *  매치 흐름 담당 컴포넌트 (GameState 부착·서버 전용).
- *  시작 게이트 → 사망 등수 → 승패 판정 → 결과 스냅샷/백엔드 보고 → DS 셧다운을 소유.
+ *  시작 게이트 → 사망 등수 → 승패 판정 → 최종 결과/백엔드 보고 → DS 셧다운을 소유.
  *  복제 상태는 GameState가 계속 소유(MatchPhase/FinalResults 등), 여기는 로직·서버 상태만.
  */
 UCLASS()
@@ -31,7 +31,7 @@ public:
 	void SetupForMatch(const FD1MatchSetupParams& Params);
 
 	/**
-	 * 서버 전용: GameMode::BeginPlay가 맵 빌드·봇 스폰 후 호출. DS 준비 통지 + 시작 게이트 arm.
+	 * 서버 전용: GameMode::BeginPlay가 맵 빌드·봇 스폰 후 호출. DS 준비 통지 + 시작 게이트 가동.
 	 * SetupForMatch와 분리한 이유 — 맵·PlayerStart·봇이 없는 상태에서 게이트가 즉시 시작(정원 0/1)하면
 	 * 빈 월드로 매치가 돌고, 준비 통지가 클라를 미완성 월드로 불러들인다.
 	 */
@@ -132,7 +132,7 @@ private:
 	/** 소유 GameState. 없으면 nullptr. */
 	AD1BomberGameState* GetBomberGameState() const;
 
-	/** DS API 클라이언트. 토큰 없으면(PIE/standalone) nullptr — 호출측은 보고 스킵. */
+	/** DS API 클라이언트. 토큰 없으면(PIE/standalone) nullptr — 호출측은 보고 생략. */
 	UD1DsApiSubsystem* GetDsApi() const;
 
 	/** 서버 권위 여부. 모든 진입점 방어 가드. */

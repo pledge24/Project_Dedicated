@@ -10,7 +10,7 @@ namespace
 {
 	/**
 	 * 한 번도 입장하지 않은 roster 인원을 최하위 미입장자로 결과에 채운다.
-	 * 이들은 PlayerState가 생긴 적이 없어 PlayerArray에도 탈주 캡처에도 없다 — 보정하지 않으면
+	 * 이들은 PlayerState가 생긴 적이 없어 PlayerArray에도 탈주 기록에도 없다 — 보정하지 않으면
 	 * 백엔드 roster와 인원이 어긋나 정상 플레이한 나머지 인원의 결과까지 통째로 거부된다.
 	 */
 	void AppendNoShowResults(const TArray<FD1JoinEntry>& ExpectedRoster, int32 SlotCount,
@@ -83,7 +83,7 @@ void D1MatchSettlement::BuildFinalResults(const AD1BomberGameState& GS, const TS
 	{
 		if (const AD1BomberPlayerState* B = Cast<AD1BomberPlayerState>(PS))
 		{
-			// 탈주 유저는 이미 LeftPlayers/Entries로 캡처됨 — PlayerArray쪽 중복 방지.
+			// 탈주 유저는 이미 LeftPlayers/Entries에 기록됨 — PlayerArray쪽 중복 방지.
 			// (Logout 지연으로 아직 PlayerArray에 남아있을 수 있다.)
 			if (SkipUserIds.Contains(B->GetBackendUserId()))
 			{

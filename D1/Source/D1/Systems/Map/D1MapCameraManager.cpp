@@ -55,7 +55,7 @@ void AD1MapCameraManager::ApplyGridFraming(FMinimalViewInfo& POV) const
 	const FIntPoint Grid = GS->GetGridSize();
 	if (Grid.X <= 0 || Grid.Y <= 0)
 	{
-		// 아직 GridSize 복제 전 → 태그 액터 그대로(폴백).
+		// 아직 GridSize 복제 전 → 태그 액터 그대로(대체).
 		return;
 	}
 

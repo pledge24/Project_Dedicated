@@ -33,14 +33,14 @@ struct FD1JoinEntry
 
 /**
  *  GameMode가 InitGameState에서 GameState 컴포넌트들에 주입하는 매치 설정 묶음.
- *  MatchFlow와 PlayerRemoval이 같은 아이덴티티(정원·MatchId·ServerToken)를 공유해 한 덩어리로 넘긴다.
+ *  MatchFlow와 PlayerRemoval이 같은 값(정원·MatchId·ServerToken)을 쓰므로 한 덩어리로 넘긴다.
  */
 struct FD1MatchSetupParams
 {
 	/** 시작 정원(0/1=즉시 시작). */
 	int32 ExpectedPlayerCount = 0;
 
-	/** 결과 POST·kick 조회 인증값. 비면 PIE/standalone(백엔드 호출 전부 스킵). */
+	/** 결과 POST·kick 조회 인증값. 비면 PIE/standalone(백엔드 호출 전부 생략). */
 	FString MatchId;
 	FString ServerToken;
 
