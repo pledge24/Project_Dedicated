@@ -30,7 +30,7 @@ public:
 //~ 킥·탈주
 public:
 	/** 서버 전용: GameMode::BeginPlay가 설정 push. 토큰 있는 실 DS면 kick 폴링 시작. */
-	void InitializeRemoval(int32 InExpectedPlayerCount, const FString& InMatchId, const FString& InServerToken);
+	void SetupForMatch(int32 InExpectedPlayerCount, const FString& InMatchId, const FString& InServerToken);
 
 	/**
 	 * 서버 전용: 시작 게이트 통과 시 MatchFlow가 호출 — 끝내 입장하지 않은 유저를 재입장 거절 대상으로 확정.
@@ -65,7 +65,7 @@ private:
 
 	FTimerHandle KickPollTimerHandle;
 
-	/** GameMode가 InitializeRemoval로 주입. 탈주 최하위 등수 산정과 kick 조회·즉시 정산 인증값. */
+	/** GameMode가 SetupForMatch로 주입. 탈주 최하위 등수 산정과 kick 조회·즉시 정산 인증값. */
 	int32 ExpectedPlayerCount = 0;
 	FString CurrentMatchId;
 	FString CurrentServerToken;

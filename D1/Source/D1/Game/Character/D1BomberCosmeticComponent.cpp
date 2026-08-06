@@ -14,7 +14,7 @@
 
 void UD1BomberCosmeticComponent::PlayHitReaction(bool bWithAnim)
 {
-	if (!ShouldRunCosmetics())
+	if (!ShouldRun())
 	{
 		return;
 	}
@@ -39,7 +39,7 @@ void UD1BomberCosmeticComponent::PlayHitReaction(bool bWithAnim)
 
 void UD1BomberCosmeticComponent::StopHitReaction()
 {
-	if (!ShouldRunCosmetics())
+	if (!ShouldRun())
 	{
 		return;
 	}
@@ -52,9 +52,9 @@ void UD1BomberCosmeticComponent::StopHitReaction()
 	}
 }
 
-void UD1BomberCosmeticComponent::PlayDeathCosmetics()
+void UD1BomberCosmeticComponent::PlayDeath()
 {
-	if (!ShouldRunCosmetics())
+	if (!ShouldRun())
 	{
 		return;
 	}
@@ -92,9 +92,9 @@ void UD1BomberCosmeticComponent::PlayDeathCosmetics()
 		&UD1BomberCosmeticComponent::FinishDeath, HideAfter, false);
 }
 
-void UD1BomberCosmeticComponent::PlayLeftCosmetics()
+void UD1BomberCosmeticComponent::PlayLeft()
 {
-	if (!ShouldRunCosmetics())
+	if (!ShouldRun())
 	{
 		return;
 	}
@@ -110,7 +110,7 @@ void UD1BomberCosmeticComponent::PlayLeftCosmetics()
 
 void UD1BomberCosmeticComponent::RefreshLocalHighlight()
 {
-	if (!ShouldRunCosmetics())
+	if (!ShouldRun())
 	{
 		return;
 	}
@@ -175,7 +175,7 @@ void UD1BomberCosmeticComponent::HideNameTags()
 	}
 }
 
-bool UD1BomberCosmeticComponent::ShouldRunCosmetics() const
+bool UD1BomberCosmeticComponent::ShouldRun() const
 {
 	return GetNetMode() != NM_DedicatedServer;
 }

@@ -182,7 +182,7 @@ void AD1Bomb::SpawnExplosionHazard(const TArray<FIntPoint>& Cells)
 	UClass* HazardClass = ExplosionHazardClass ? ExplosionHazardClass.Get() : AD1ExplosionHazard::StaticClass();
 	if (AD1ExplosionHazard* Hazard = World->SpawnActor<AD1ExplosionHazard>(HazardClass, GetActorLocation(), FRotator::ZeroRotator, Params))
 	{
-		Hazard->Initialize(Cells, ExplosionLingerDurationSec);
+		Hazard->SetupCells(Cells, ExplosionLingerDurationSec);
 	}
 }
 

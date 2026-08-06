@@ -19,7 +19,7 @@ UD1PlayerRemovalComponent::UD1PlayerRemovalComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UD1PlayerRemovalComponent::InitializeRemoval(int32 InExpectedPlayerCount, const FString& InMatchId, const FString& InServerToken)
+void UD1PlayerRemovalComponent::SetupForMatch(int32 InExpectedPlayerCount, const FString& InMatchId, const FString& InServerToken)
 {
 	if (!HasServerAuthority())
 	{

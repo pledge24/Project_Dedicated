@@ -31,13 +31,13 @@ AD1BomberCharacter::AD1BomberCharacter(const FObjectInitializer& ObjectInitializ
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
-		Move->bOrientRotationToMovement = true;
-		Move->RotationRate = FRotator(0.f, 500.f, 0.f);
-		Move->MaxWalkSpeed = BaseWalkSpeed;
-		Move->MinAnalogWalkSpeed = 20.f;
-		Move->BrakingDecelerationWalking = 2000.f;
+		Movement->bOrientRotationToMovement = true;
+		Movement->RotationRate = FRotator(0.f, 500.f, 0.f);
+		Movement->MaxWalkSpeed = BaseWalkSpeed;
+		Movement->MinAnalogWalkSpeed = 20.f;
+		Movement->BrakingDecelerationWalking = 2000.f;
 	}
 
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
@@ -286,7 +286,7 @@ void AD1BomberCharacter::HandleDeath()
 		GetWorldTimerManager().ClearTimer(InvulnTimerHandle);
 	}
 
-	CosmeticComp->PlayDeathCosmetics();
+	CosmeticComp->PlayDeath();
 }
 
 void AD1BomberCharacter::HandlePlayerAliveStateChanged()
@@ -319,7 +319,7 @@ void AD1BomberCharacter::HandleLeft()
 		}
 	}
 
-	CosmeticComp->PlayLeftCosmetics();
+	CosmeticComp->PlayLeft();
 }
 
 void AD1BomberCharacter::HandlePlayerLeftChanged()

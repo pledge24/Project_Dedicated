@@ -28,7 +28,7 @@ public:
 //~ 시작 게이트
 public:
 	/** 서버 전용: GameMode::BeginPlay가 cmdline 파싱·맵빌드 후 호출. 설정을 받고 시작 게이트를 arm. */
-	void InitializeMatch(int32 InExpectedPlayerCount, float InWaitTimeoutSec, float InShutdownGraceSec,
+	void SetupForMatch(int32 InExpectedPlayerCount, float InWaitTimeoutSec, float InShutdownGraceSec,
 		const FString& InMatchId, const FString& InServerToken, const TArray<FD1JoinEntry>& InExpectedRoster);
 
 	/** 서버 전용: GameMode::PostLogin이 호출. 예상 인원 도달 시 매치 시작. */
@@ -42,7 +42,7 @@ private:
 
 	FTimerHandle WaitForPlayersTimerHandle;
 
-	/** GameMode가 InitializeMatch로 주입. 시작 정원(0/1=즉시)과 게이트 타임아웃. */
+	/** GameMode가 SetupForMatch로 주입. 시작 정원(0/1=즉시)과 게이트 타임아웃. */
 	int32 ExpectedPlayerCount = 0;
 	float WaitForPlayersTimeoutSec = 20.f;
 
@@ -95,7 +95,7 @@ private:
 	FTimerHandle MatchTimerHandle;
 	FTimerHandle ResultReportHardCapTimerHandle;
 
-	/** GameMode가 InitializeMatch로 주입. 셧다운 유예와 결과 POST 인증값. */
+	/** GameMode가 SetupForMatch로 주입. 셧다운 유예와 결과 POST 인증값. */
 	float ShutdownGraceSec = 30.f;
 	FString CurrentMatchId;
 	FString CurrentServerToken;

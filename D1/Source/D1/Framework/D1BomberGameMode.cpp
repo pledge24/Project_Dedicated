@@ -161,14 +161,14 @@ void AD1BomberGameMode::BeginPlay()
 	{
 		if (UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval())
 		{
-			Removal->InitializeRemoval(MatchConfig.ExpectedPlayerCount, MatchConfig.MatchId, MatchConfig.ServerToken);
+			Removal->SetupForMatch(MatchConfig.ExpectedPlayerCount, MatchConfig.MatchId, MatchConfig.ServerToken);
 		}
 
 		if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
 		{
 			TArray<FD1JoinEntry> ExpectedRoster;
 			MatchConfig.Roster.GenerateValueArray(ExpectedRoster);
-			Flow->InitializeMatch(MatchConfig.ExpectedPlayerCount, WaitForPlayersTimeoutSec, ShutdownGraceSec,
+			Flow->SetupForMatch(MatchConfig.ExpectedPlayerCount, WaitForPlayersTimeoutSec, ShutdownGraceSec,
 				MatchConfig.MatchId, MatchConfig.ServerToken, ExpectedRoster);
 		}
 	}

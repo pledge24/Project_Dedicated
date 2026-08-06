@@ -38,7 +38,7 @@ UD1MatchFlowComponent::UD1MatchFlowComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayerCount, float InWaitTimeoutSec, float InShutdownGraceSec,
+void UD1MatchFlowComponent::SetupForMatch(int32 InExpectedPlayerCount, float InWaitTimeoutSec, float InShutdownGraceSec,
 	const FString& InMatchId, const FString& InServerToken, const TArray<FD1JoinEntry>& InExpectedRoster)
 {
 	if (!HasServerAuthority())
