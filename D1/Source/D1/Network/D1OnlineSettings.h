@@ -24,6 +24,7 @@ public:
 	virtual FName GetCategoryName() const override { return TEXT("D1"); }
 	//~ End UDeveloperSettings Interface
 
+	/** 백엔드 base URL. 실행 인자 `-BackendUrl=`이 있으면 그쪽이 이긴다(백엔드가 띄운 DS·PIE·QA). */
 	UPROPERTY(Config, EditAnywhere, Category="Backend", meta=(DisplayName="Base URL"))
 	FString BaseUrl = TEXT("http://127.0.0.1:3000");
 

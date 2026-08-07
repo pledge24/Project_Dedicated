@@ -7,6 +7,8 @@
 #include "Framework/D1GameInstance.h"
 #include "HttpModule.h"
 #include "Interfaces/IHttpResponse.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Network/D1OnlineSettings.h"
 #include "Network/D1SessionSubsystem.h"
 #include "Policies/CondensedJsonPrintPolicy.h"
@@ -42,9 +44,29 @@ namespace D1BackendHttp
 		}
 	}
 
-	const FString& GetBaseUrl()
+	FString GetBaseUrl()
 	{
-		return GetDefault<UD1OnlineSettings>()->BaseUrl;
+		// 커맨드라인은 프로세스 수명 내 불변이라 1회만 파싱한다. 미지정이면 설정값을 매번 읽어
+		// 에디터에서 Project Settings 편집이 재시작 없이 반영되는 동작을 유지한다.
+		static const FString CommandLineBaseUrl = []()
+		{
+			FString Value;
+			if (FParse::Value(FCommandLine::Get(), TEXT("BackendUrl="), Value) && !Value.IsEmpty())
+			{
+				UE_LOG(LogD1, Log, TEXT("[Backend] BaseUrl 커맨드라인 지정: %s"), *Value);
+			}
+
+			return Value;
+		}();
+
+		FString Resolved = CommandLineBaseUrl.IsEmpty()
+			? GetDefault<UD1OnlineSettings>()->BaseUrl
+			: CommandLineBaseUrl;
+
+		// Path가 "/api/…"로 시작하므로 끝 슬래시를 남기면 "//api/…"가 되고 백엔드 라우트에 안 걸린다.
+		Resolved.RemoveFromEnd(TEXT("/"));
+
+		return Resolved;
 	}
 
 	FString MakeBearer(const FString& Token)

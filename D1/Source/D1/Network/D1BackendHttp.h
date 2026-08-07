@@ -37,8 +37,8 @@ namespace D1BackendHttp
 		Superseded
 	};
 
-	/** UD1OnlineSettings의 BaseUrl. */
-	const FString& GetBaseUrl();
+	/** 백엔드 base URL — 커맨드라인 `-BackendUrl=`이 UD1OnlineSettings::BaseUrl보다 우선. 끝 슬래시는 제거해 반환. */
+	FString GetBaseUrl();
 
 	/** "Bearer <token>". */
 	FString MakeBearer(const FString& Token);

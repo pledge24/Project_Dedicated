@@ -186,7 +186,9 @@ function spawnOnPort(port: number, matchId: string, serverToken: string, expecte
         bots: bots.map((b) => ({ userId: b.userId, nickname: b.nickname })),
     });
 
-    const args = [ds.map, `-port=${port}`, `-MatchConfig=${configPath}`, '-log'];
+    // BackendUrl은 비밀이 아니다 — 토큰을 파일로 뺀 위 근거(노출 시 결과 위조·신원 도용)가
+    // 주소에는 적용되지 않으므로 커맨드라인에 둔다. 넘기지 않으면 DS가 컴파일 시점 기본값을 쓴다.
+    const args = [ds.map, `-port=${port}`, `-MatchConfig=${configPath}`, `-BackendUrl=${ds.backendUrl}`, '-log'];
     const child = spawn(ds.exePath, args, { stdio: 'ignore', windowsHide: false });
     scheduleConfigCleanup(configPath, matchId);
 
