@@ -1,6 +1,6 @@
 // 매칭 큐 — 순수 알고리즘. 트랜스포트(WS)와 비결합이라 단위 테스트가 쉽다.
 // score 오름차순 정렬 유지 + joinedAt(동률 seq)로 선착순 우대.
-import { AppError, Codes } from '../common/errors.js';
+import { AppError, Codes } from '../../common/errors.js';
 
 /** Queue 단위. ref는 불투명 핸들(WS 레이어의 소켓 등) */
 export interface QueueEntry<Ref = unknown>

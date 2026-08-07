@@ -18,8 +18,9 @@ import type { AddressInfo } from 'node:net';
 import buildApp from '../src/app.js';
 import { config } from '../src/common/config.js';
 import { closePool, getPool } from '../src/common/db.js';
-import * as ds from '../src/match/ds.js';
-import * as roster from '../src/match/roster.service.js';
+import * as ds from '../src/match/ds/ds.js';
+import { deleteMatchConfigs } from '../src/match/ds/dsMatchConfig.js';
+import * as roster from '../src/match/roster/roster.service.js';
 
 const MAP = 'default map';
 
@@ -122,7 +123,7 @@ async function checkDsLifetimeSeparation(): Promise<boolean>
 
         // 프로세스와 같은 이유로 설정 파일도 남기지 않는다. 여기 DS는 부팅 전에 죽어 스스로
         // 지울 기회가 없고, 백엔드의 안전망 타이머는 unref라 이 스크립트가 먼저 끝나면 안 돈다.
-        ds.deleteMatchConfigs();
+        deleteMatchConfigs();
     }
 }
 

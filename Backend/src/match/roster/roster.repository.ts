@@ -2,7 +2,7 @@
 // 백엔드 재시작을 건너 살아남은 DS의 serverToken을 검증하기 위한 영속 사본.
 import type { RowDataPacket } from 'mysql2';
 
-import { getPool } from '../common/db.js';
+import { getPool } from '../../common/db.js';
 import type { MatchRoster, RosterPlayer } from './roster.types.js';
 
 interface RosterRow extends RowDataPacket

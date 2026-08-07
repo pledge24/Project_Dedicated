@@ -2,15 +2,15 @@
 // 서버 권위 모델: DS만 매치당 serverToken으로 접근한다.
 import { timingSafeEqual } from 'node:crypto';
 
-import { isDuplicateKeyError } from '../common/db.js';
-import { AppError, Codes } from '../common/errors.js';
-import { logger } from '../common/logger.js';
-import type { MatchResultRequest, MatchResultResponse } from '../common/types.js';
-import * as state from './dsApi.state.js';
+import { isDuplicateKeyError } from '../../common/db.js';
+import { AppError, Codes } from '../../common/errors.js';
+import { logger } from '../../common/logger.js';
+import type { MatchResultRequest, MatchResultResponse } from '../../common/types.js';
+import type { SettledLeaver } from '../result/result.repository.js';
+import * as repo from '../result/result.repository.js';
+import * as rosters from '../roster/roster.service.js';
+import * as pendingKicks from './pendingKicks.js';
 import * as readiness from './readiness.js';
-import type { SettledLeaver } from './result.repository.js';
-import * as repo from './result.repository.js';
-import * as rosters from './roster.service.js';
 
 /**
  * DS 통지(POST /ready): 서버 토큰 검증 후 준비 대기 gate를 resolve(멱등).
@@ -56,7 +56,7 @@ export async function submitResult(serverToken: string, req: MatchResultRequest)
 
         // 매치 종료 — kick 대기열 정리. 재제출은 client_match_id UNIQUE로 멱등(409)이라 무해.
         // (탈주 이중 정산은 원장 match_leaver_settlements가 막으므로 resultSubmitted 플래그 불필요.)
-        state.clear(req.matchId);
+        pendingKicks.clear(req.matchId);
 
         return {
             matchId: req.matchId,
@@ -83,7 +83,7 @@ export function listPendingKicks(serverToken: string, matchId: string): number[]
 {
     assertServerToken(serverToken, matchId);
 
-    return state.listKicks(matchId);
+    return pendingKicks.listKicks(matchId);
 }
 
 /** DS 통지(POST /leaver): 탈주자 점수를 최하위 확정값으로 즉시 정산(멱등). */

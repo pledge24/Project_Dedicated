@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeFfaEloDeltas } from '../src/match/elo.js';
+import { computeFfaEloDeltas } from '../src/match/result/elo.js';
 
 const K = 32;
 

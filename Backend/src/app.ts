@@ -9,8 +9,8 @@ import { pingDb } from './common/db.js';
 import { fail, ok } from './common/envelope.js';
 import { AppError, Codes } from './common/errors.js';
 import { logger } from './common/logger.js';
-import dsApiRouter from './match/dsApi.router.js';
-import matchmakingRouter from './match/matchmaking.router.js';
+import dsApiRouter from './match/ds/dsApi.router.js';
+import matchmakingRouter from './match/matchmaking/matchmaking.router.js';
 import rankingRouter from './ranking/ranking.router.js';
 
 export default function buildApp(): Express
