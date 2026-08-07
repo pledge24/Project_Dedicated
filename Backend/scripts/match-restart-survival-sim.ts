@@ -119,6 +119,10 @@ async function checkDsLifetimeSeparation(): Promise<boolean>
                 killPid(pid);
             }
         }
+
+        // 프로세스와 같은 이유로 설정 파일도 남기지 않는다. 여기 DS는 부팅 전에 죽어 스스로
+        // 지울 기회가 없고, 백엔드의 안전망 타이머는 unref라 이 스크립트가 먼저 끝나면 안 돈다.
+        ds.deleteMatchConfigs();
     }
 }
 

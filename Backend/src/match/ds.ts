@@ -38,6 +38,8 @@ const running = new Map<number, DsProcess>(); // port → 프로세스
 // 포트 프로브가 비동기라 "프로브 통과 → running.set" 사이에 다른 allocate가 끼어들 수 있다.
 // runMatchCycle이 handleMatch를 동시에 여러 개 띄우므로(ws.ts) 후보 포트를 동기적으로 선점해 둔다.
 const reserved = new Set<number>();
+// 이 프로세스가 쓴 매치 설정 파일. 지워지면(DS가 읽고 삭제·안전망 타이머·명시 정리) 빠진다.
+const writtenConfigPaths = new Set<string>();
 
 /** 빈 포트에 DS spawn → 즉시 {host, port}. 준비 완료는 호출측이 readiness로 대기. 포트 고갈 시 throw. */
 export async function allocate(matchId: string, serverToken: string, expectedPlayers: number, roster: { joinToken: string; userId: number; nickname: string }[], bots: { userId: number; nickname: string }[] = []): Promise<{ host: string; port: number }>
@@ -126,6 +128,20 @@ export function release(matchId: string): void
 
             return;
         }
+    }
+}
+
+/**
+ * 이 프로세스가 쓴 매치 설정 파일을 남김없이 지운다.
+ * scheduleConfigCleanup의 안전망 타이머는 unref라 이벤트 루프를 붙잡지 않는다 — 서버는 오래 살아
+ * 제때 돌지만, DS를 띄우고 곧장 끝나는 스크립트는 그 전에 종료돼 토큰이 든 파일이 %TEMP%에 쌓인다.
+ * DS를 spawn하는 하네스가 종료 직전에 부른다.
+ */
+export function deleteMatchConfigs(): void
+{
+    for (const filePath of [...writtenConfigPaths])
+    {
+        deleteMatchConfig(filePath);
     }
 }
 
@@ -237,8 +253,33 @@ function writeMatchConfig(matchId: string, cfg: MatchConfigFile): string
 {
     const filePath = path.join(os.tmpdir(), `d1-match-${matchId}.json`);
     writeFileSync(filePath, JSON.stringify(cfg), { encoding: 'utf8', mode: 0o600 });
+    writtenConfigPaths.add(filePath);
 
     return filePath;
+}
+
+/** 설정 파일 하나를 지우고 추적에서 뺀다. 이미 없으면(DS가 읽고 삭제) 조용히 넘어간다. */
+function deleteMatchConfig(filePath: string): boolean
+{
+    writtenConfigPaths.delete(filePath);
+
+    try
+    {
+        if (!existsSync(filePath))
+        {
+            return false;
+        }
+
+        unlinkSync(filePath);
+
+        return true;
+    }
+    catch (err)
+    {
+        logger.warn({ err, filePath }, '매치 설정 파일 정리 실패');
+
+        return false;
+    }
 }
 
 /**
@@ -249,17 +290,9 @@ function scheduleConfigCleanup(filePath: string, matchId: string): void
 {
     const timer = setTimeout(() =>
     {
-        try
+        if (deleteMatchConfig(filePath))
         {
-            if (existsSync(filePath))
-            {
-                unlinkSync(filePath);
-                logger.warn({ matchId, filePath }, 'DS가 매치 설정 파일을 지우지 않음 — 백엔드가 정리');
-            }
-        }
-        catch (err)
-        {
-            logger.warn({ err, matchId, filePath }, '매치 설정 파일 정리 실패');
+            logger.warn({ matchId, filePath }, 'DS가 매치 설정 파일을 지우지 않음 — 백엔드가 정리');
         }
     }, ds.readyTimeoutMs * 2);
     timer.unref();
