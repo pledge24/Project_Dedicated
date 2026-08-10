@@ -159,10 +159,10 @@ struct FMatchResultPlayer
 /** 회원가입/로그인 완료 콜백 (1회성 pass-in). */
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FOnAuthCompleted, const FBackendResponse&, Response, const FAuthUserDTO&, User);
 
-/** 매칭 성사 푸시 (서버 발신 — 멀티캐스트). */
+/** 매칭 성사 통지 (서버 발신 — 멀티캐스트). */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMatchFound, const FMatchFoundDTO&, Match);
 
-/** 큐 입장 확정 푸시. */
+/** 큐 입장 확정 통지. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnQueueJoined);
 
 /** 매칭 에러(연결 실패/거부/끊김). */

@@ -13,14 +13,9 @@ void UD1UWLogin::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	if (LoginButton)
-	{
-		LoginButton->OnClicked.AddDynamic(this, &UD1UWLogin::OnLoginClicked);
-	}
-	if (GotoRegisterButton)
-	{
-		GotoRegisterButton->OnClicked.AddDynamic(this, &UD1UWLogin::OnGotoRegisterClicked);
-	}
+	// 필수 BindWidget — WBP 컴파일러가 누락을 에러로 차단하므로 null 불가.
+	LoginButton->OnClicked.AddDynamic(this, &UD1UWLogin::OnLoginClicked);
+	GotoRegisterButton->OnClicked.AddDynamic(this, &UD1UWLogin::OnGotoRegisterClicked);
 }
 
 void UD1UWLogin::OnLoginClicked()
@@ -31,8 +26,8 @@ void UD1UWLogin::OnLoginClicked()
 		return;
 	}
 
-	const FString LoginId = LoginIdTextBox ? LoginIdTextBox->GetText().ToString() : FString();
-	const FString Password = PasswordTextBox ? PasswordTextBox->GetText().ToString() : FString();
+	const FString LoginId = LoginIdTextBox->GetText().ToString();
+	const FString Password = PasswordTextBox->GetText().ToString();
 
 	BeginAuthSubmit();
 

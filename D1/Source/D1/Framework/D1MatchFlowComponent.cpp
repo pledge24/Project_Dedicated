@@ -38,23 +38,34 @@ UD1MatchFlowComponent::UD1MatchFlowComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayerCount, float InWaitTimeoutSec, float InShutdownGraceSec,
-	const FString& InMatchId, const FString& InServerToken, const TArray<FD1JoinEntry>& InExpectedRoster)
+void UD1MatchFlowComponent::SetupForMatch(const FD1MatchSetupParams& Params)
 {
 	if (!HasServerAuthority())
 	{
 		return;
 	}
 
-	ExpectedPlayerCount      = InExpectedPlayerCount;
-	WaitForPlayersTimeoutSec = InWaitTimeoutSec;
-	ShutdownGraceSec         = InShutdownGraceSec;
-	CurrentMatchId           = InMatchId;
-	CurrentServerToken       = InServerToken;
-	ExpectedRoster           = InExpectedRoster;
+	ExpectedPlayerCount      = Params.ExpectedPlayerCount;
+	WaitForPlayersTimeoutSec = Params.WaitForPlayersTimeoutSec;
+	ShutdownGraceSec         = Params.ShutdownGraceSec;
+	CurrentMatchId           = Params.MatchId;
+	CurrentServerToken       = Params.ServerToken;
+	ExpectedRoster           = Params.ExpectedRoster;
+	bIsSetupForMatch         = true;
+}
 
-	// 맵 빌드·시작 게이트 준비 완료 → 백엔드에 "플레이어 받을 준비됨" 통지(토큰 있는 실 DS만).
-	// 백엔드는 이 콜백을 받고 클라에 match:found(입장 패킷) 전송. PIE/standalone은 토큰 없어 스킵.
+void UD1MatchFlowComponent::StartMatchGate()
+{
+	// 설정 없이 게이트만 열리면 정원 0으로 즉시 시작하고 토큰 없이 결과 보고를 생략한다 — 무음 오작동.
+	if (!ensureMsgf(bIsSetupForMatch, TEXT("[Match] 시작 게이트 가동 전 SetupForMatch 누락")))
+	{
+		return;
+	}
+
+	bIsMatchGateStarted = true;
+
+	// 맵 빌드·봇 스폰 완료 → 백엔드에 "플레이어 받을 준비됨" 통지(토큰 있는 실 DS만).
+	// 백엔드는 이 콜백을 받고 클라에 match:found(입장 패킷) 전송. PIE/standalone은 토큰 없어 생략.
 	if (UD1DsApiSubsystem* DsApi = GetDsApi())
 	{
 		DsApi->ReportDsReady(CurrentMatchId, CurrentServerToken);
@@ -65,9 +76,9 @@ void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayerCount, float I
 	{
 		StartMatch();
 	}
-	else if (UWorld* World = GetWorld())
+	else
 	{
-		World->GetTimerManager().SetTimer(
+		GetWorld()->GetTimerManager().SetTimer(
 			WaitForPlayersTimerHandle, this, &UD1MatchFlowComponent::StartMatchOnGateTimeout,
 			WaitForPlayersTimeoutSec, /*bLoop=*/false);
 		UE_LOG(LogD1, Log, TEXT("[Match] 시작 게이트 대기 — 예상 %d명 (타임아웃 %.0fs)"),
@@ -77,17 +88,14 @@ void UD1MatchFlowComponent::InitializeMatch(int32 InExpectedPlayerCount, float I
 
 void UD1MatchFlowComponent::NotifyPlayerJoined()
 {
-	// 이미 시작했거나 게이트 비활성(PIE·솔로)이면 시작 게이트 카운트 생략.
-	if (!HasServerAuthority() || HasMatchStarted() || ExpectedPlayerCount <= 1)
+	// 게이트를 열기 전(맵 빌드 실패로 셧다운 유예 중 입장 등), 이미 시작했거나
+	// 게이트 비활성(PIE·솔로)이면 시작 게이트 카운트 생략.
+	if (!HasServerAuthority() || !bIsMatchGateStarted || HasMatchStarted() || ExpectedPlayerCount <= 1)
 	{
 		return;
 	}
 
 	AD1BomberGameState* GS = GetBomberGameState();
-	if (!GS)
-	{
-		return;
-	}
 
 	int32 Connected = 0;
 	for (const APlayerState* PS : GS->PlayerArray)
@@ -113,35 +121,30 @@ void UD1MatchFlowComponent::StartMatch()
 		return;
 	}
 
+	// 여기서 못 멈추면 MatchPhase도 안 바뀌고 매치 타이머도 안 걸린 채 아래 "매치 시작" 로그만 찍힌다.
+	AD1BomberGameState* GS = GetBomberGameState();
+	if (!ensureMsgf(GS, TEXT("[Match] StartMatch: GameState 없음 — 시작 불가")))
+	{
+		return;
+	}
+
 	UWorld* World = GetWorld();
-	if (World)
-	{
-		World->GetTimerManager().ClearTimer(WaitForPlayersTimerHandle);
-	}
+	World->GetTimerManager().ClearTimer(WaitForPlayersTimerHandle);
 
-	if (AD1BomberGameState* GS = GetBomberGameState())
-	{
-		GS->SetMatchStartServerTime(GS->GetServerWorldTimeSeconds());
-		GS->SetMatchPhase(EBomberMatchPhase::Playing);
+	GS->SetMatchStartServerTime(GS->GetServerWorldTimeSeconds());
+	GS->SetMatchPhase(EBomberMatchPhase::Playing);
 
-		if (World)
-		{
-			World->GetTimerManager().SetTimer(
-				MatchTimerHandle, this, &UD1MatchFlowComponent::EndMatchByTimeout,
-				GS->GetMatchDurationSec(), /*bLoop=*/false);
-		}
-	}
+	World->GetTimerManager().SetTimer(
+		MatchTimerHandle, this, &UD1MatchFlowComponent::EndMatchByTimeout,
+		GS->GetMatchDurationSec(), /*bLoop=*/false);
 
 	// 시작 게이트 해제 — 입장 시 서버가 잠근 이동(Restart의 MOVE_None) 일괄 재개.
-	if (World)
+	for (AD1BomberCharacter* Character : TActorRange<AD1BomberCharacter>(World))
 	{
-		for (AD1BomberCharacter* Character : TActorRange<AD1BomberCharacter>(World))
+		UCharacterMovementComponent* Move = Character->GetCharacterMovement();
+		if (Move && Move->MovementMode == MOVE_None)
 		{
-			UCharacterMovementComponent* Move = Character->GetCharacterMovement();
-			if (Move && Move->MovementMode == MOVE_None)
-			{
-				Move->SetMovementMode(MOVE_Walking);
-			}
+			Move->SetMovementMode(MOVE_Walking);
 		}
 	}
 
@@ -169,12 +172,13 @@ void UD1MatchFlowComponent::StartMatchOnGateTimeout()
 
 void UD1MatchFlowComponent::MarkNoShowUsers()
 {
-	AD1BomberGameState* GS = GetBomberGameState();
-	UD1PlayerRemovalComponent* Removal = GS ? GS->GetPlayerRemoval() : nullptr;
-	if (!GS || !Removal || ExpectedRoster.Num() == 0)
+	if (ExpectedRoster.Num() == 0)
 	{
 		return; // PIE/standalone은 명단이 없어 판정 기준 자체가 없다.
 	}
+
+	AD1BomberGameState* GS = GetBomberGameState();
+	UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval();
 
 	TSet<int64> JoinedUserIds;
 	for (const APlayerState* PS : GS->PlayerArray)
@@ -204,7 +208,8 @@ void UD1MatchFlowComponent::MarkNoShowUsers()
 
 void UD1MatchFlowComponent::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 {
-	if (!HasServerAuthority() || IsMatchEnded() || !DeadPS)
+	// 게이트를 열기 전 사망은 매치가 성립하지 않은 것 — 정산·보고 경로에 태우지 않는다.
+	if (!HasServerAuthority() || !bIsMatchGateStarted || IsMatchEnded() || !DeadPS)
 	{
 		return;
 	}
@@ -225,7 +230,7 @@ void UD1MatchFlowComponent::NotifyPlayerDied(AD1BomberPlayerState* DeadPS)
 
 void UD1MatchFlowComponent::NotifyPlayerLeft(AD1BomberPlayerState* LeftPS)
 {
-	if (!HasServerAuthority() || IsMatchEnded() || !LeftPS)
+	if (!HasServerAuthority() || !bIsMatchGateStarted || IsMatchEnded() || !LeftPS)
 	{
 		return;
 	}
@@ -244,11 +249,6 @@ void UD1MatchFlowComponent::EnsureAliveListInitialized()
 	}
 
 	AD1BomberGameState* GS = GetBomberGameState();
-	if (!GS)
-	{
-		return;
-	}
-
 	for (APlayerState* PS : GS->PlayerArray)
 	{
 		if (AD1BomberPlayerState* BPS = Cast<AD1BomberPlayerState>(PS))
@@ -270,12 +270,9 @@ void UD1MatchFlowComponent::RequestEndEvaluation()
 	{
 		return; // 프레임 내 다중 사망 → 타이머 1개만
 	}
-	if (UWorld* World = GetWorld())
-	{
-		bEndEvaluationPending = true;
-		World->GetTimerManager().SetTimerForNextTick(
-			this, &UD1MatchFlowComponent::EvaluateEndCondition);
-	}
+	bEndEvaluationPending = true;
+	GetWorld()->GetTimerManager().SetTimerForNextTick(
+		this, &UD1MatchFlowComponent::EvaluateEndCondition);
 }
 
 void UD1MatchFlowComponent::EvaluateEndCondition()
@@ -344,26 +341,25 @@ void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndR
 		return;
 	}
 
-	FlushPendingDeaths(); // 시간만료/탈주 등 다른 경로 종료 시에도 대기 사망자 등수 확정
-
 	AD1BomberGameState* GS = GetBomberGameState();
 	UD1PlayerRemovalComponent* Removal = GS ? GS->GetPlayerRemoval() : nullptr;
+	// 서두 단일 게이트 — 중간에 멈추면 MatchPhase 전이 후 최종 결과·보고·셧다운이 부분 유실된다.
+	if (!ensureMsgf(GS && Removal, TEXT("[Match] EndMatch: GameState/RemovalComp 없음 — 정산 불가")))
+	{
+		return;
+	}
+
+	FlushPendingDeaths(); // 시간만료/탈주 등 다른 경로 종료 시에도 대기 사망자 등수 확정
 
 	// 종료 확정 — 이후 kick은 재입장 거절·통지만 남도록 폴링 중지(킥·탈주 소유는 RemovalComp).
-	if (Removal)
-	{
-		Removal->StopKickPolling();
-	}
+	Removal->StopKickPolling();
 
 	if (WinnerPS && WinnerPS->GetPlacement() <= 0)
 	{
 		WinnerPS->SetPlacement(1);
 	}
 
-	if (GS)
-	{
-		GS->SetMatchPhase(EBomberMatchPhase::Finished);
-	}
+	GS->SetMatchPhase(EBomberMatchPhase::Finished);
 
 	UE_LOG(LogD1, Log, TEXT("Match ended (%s). Winner=%s (Placement=%d)"),
 		EndReasonToString(Reason),
@@ -371,20 +367,12 @@ void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndR
 		WinnerPS ? WinnerPS->GetPlacement() : 0);
 
 	UWorld* World = GetWorld();
-	if (World)
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 	{
-		for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+		if (APlayerController* PC = It->Get())
 		{
-			if (APlayerController* PC = It->Get())
-			{
-				PC->DisableInput(PC);
-			}
+			PC->DisableInput(PC);
 		}
-	}
-
-	if (!GS || !Removal)
-	{
-		return;
 	}
 
 	// 미배정 생존자(시간 만료/무승부)는 공동 1위로 보정 — 백엔드는 placement 1~N만 허용.
@@ -398,8 +386,8 @@ void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndR
 		}
 	}
 
-	// 최종 결과 스냅샷(UI 원자 복제) + 백엔드 보고 페이로드 — 조립은 정산 헬퍼에 위임.
-	// 탈주 캡처·kick 명단은 RemovalComp 소유 — 여기서 병합만 한다.
+	// 최종 결과(UI 원자 복제) + 백엔드 보고 본문 — 조립은 정산 헬퍼에 위임.
+	// 탈주 기록·kick 명단은 RemovalComp 소유 — 여기서 병합만 한다.
 	TArray<FD1MatchResultEntry> Entries;
 	TArray<FMatchResultPlayer> ResultPlayers;
 	D1MatchSettlement::BuildFinalResults(*GS, Removal->GetKickedUserIds(),
@@ -408,7 +396,7 @@ void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndR
 
 	GS->SetFinalResults(Entries);
 
-	// 백엔드가 띄운 DS일 때만 결과 보고(토큰 없으면 PIE/standalone → 스킵).
+	// 백엔드가 띄운 DS일 때만 결과 보고(토큰 없으면 PIE/standalone → 생략).
 	UD1DsApiSubsystem* DsApi = GetDsApi();
 	if (!DsApi || !World)
 	{
@@ -443,30 +431,21 @@ void UD1MatchFlowComponent::EndMatch(AD1BomberPlayerState* WinnerPS, EBomberEndR
 void UD1MatchFlowComponent::BeginShutdownAfterReport()
 {
 	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
 	World->GetTimerManager().ClearTimer(ResultReportHardCapTimerHandle);
 
 	// 클라들이 결과 화면 카운트다운 후 ClientTravel로 빠지면 DS가 스스로 종료.
 	// 확정 콜백과 하드캡이 모두 도달할 수 있지만 BeginShutdownWatch가 멱등이라 첫 호출만 유효하다.
-	if (UD1DsShutdownSubsystem* DsShutdown = World->GetSubsystem<UD1DsShutdownSubsystem>())
-	{
-		DsShutdown->BeginShutdownWatch(ShutdownGraceSec);
-	}
+	World->GetSubsystem<UD1DsShutdownSubsystem>()->BeginShutdownWatch(ShutdownGraceSec);
 }
 
 bool UD1MatchFlowComponent::HasMatchStarted() const
 {
-	const AD1BomberGameState* GS = GetBomberGameState();
-	return GS && GS->GetMatchPhase() != EBomberMatchPhase::Waiting;
+	return GetBomberGameState()->GetMatchPhase() != EBomberMatchPhase::Waiting;
 }
 
 bool UD1MatchFlowComponent::IsMatchEnded() const
 {
-	const AD1BomberGameState* GS = GetBomberGameState();
-	return GS && GS->GetMatchPhase() == EBomberMatchPhase::Finished;
+	return GetBomberGameState()->GetMatchPhase() == EBomberMatchPhase::Finished;
 }
 
 AD1BomberGameState* UD1MatchFlowComponent::GetBomberGameState() const
@@ -481,13 +460,10 @@ UD1DsApiSubsystem* UD1MatchFlowComponent::GetDsApi() const
 		return nullptr;
 	}
 
-	UWorld* World = GetWorld();
-	UGameInstance* GI = World ? World->GetGameInstance() : nullptr;
-	return GI ? GI->GetSubsystem<UD1DsApiSubsystem>() : nullptr;
+	return GetWorld()->GetGameInstance()->GetSubsystem<UD1DsApiSubsystem>();
 }
 
 bool UD1MatchFlowComponent::HasServerAuthority() const
 {
-	const AActor* Owner = GetOwner();
-	return Owner && Owner->HasAuthority();
+	return GetOwner()->HasAuthority();
 }

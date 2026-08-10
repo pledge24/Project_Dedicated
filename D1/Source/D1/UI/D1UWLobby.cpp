@@ -76,12 +76,9 @@ void UD1UWLobby::NativeConstruct()
 	}
 
 	// 로비 상주 동안 세션 유효성 주기 확인 — 다른 기기 로그인 감지(대체 시 로그인 화면 복귀).
-	if (UWorld* World = GetWorld())
-	{
-		const float Interval = FMath::Max(5.f, GetDefault<UD1OnlineSettings>()->HeartbeatIntervalSec);
-		World->GetTimerManager().SetTimer(
-			SessionHeartbeatTimerHandle, this, &UD1UWLobby::SendSessionHeartbeat, Interval, /*bLoop=*/true);
-	}
+	const float Interval = FMath::Max(5.f, GetDefault<UD1OnlineSettings>()->HeartbeatIntervalSec);
+	GetWorld()->GetTimerManager().SetTimer(
+		SessionHeartbeatTimerHandle, this, &UD1UWLobby::SendSessionHeartbeat, Interval, /*bLoop=*/true);
 }
 
 void UD1UWLobby::NativeDestruct()
@@ -118,12 +115,7 @@ void UD1UWLobby::HandleProfileUpdated()
 
 void UD1UWLobby::ApplyProfileToLabels()
 {
-	const UD1GameInstance* GI = GetGameInstance<UD1GameInstance>();
-	if (!GI)
-	{
-		return;
-	}
-	const FAuthUserDTO& User = GI->GetCurrentUser();
+	const FAuthUserDTO& User = GetGameInstance<UD1GameInstance>()->GetCurrentUser();
 
 	if (NicknameLabel)
 	{
@@ -215,12 +207,9 @@ void UD1UWLobby::HandleQueueJoined()
 		MatchStatusLabel->SetText(NSLOCTEXT("Lobby", "MatchSearching", "상대를 찾는 중..."));
 	}
 
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().SetTimer(
-			MatchmakingElapsedTimerHandle, this,
-			&UD1UWLobby::UpdateMatchmakingElapsed, 1.f, /*bLoop=*/true);
-	}
+	GetWorld()->GetTimerManager().SetTimer(
+		MatchmakingElapsedTimerHandle, this,
+		&UD1UWLobby::UpdateMatchmakingElapsed, 1.f, /*bLoop=*/true);
 }
 
 void UD1UWLobby::HandleMatchFound(const FMatchFoundDTO& Match)

@@ -1,7 +1,7 @@
 // 매칭 도메인의 DB 쿼리 (repository 레이어).
 import type { RowDataPacket } from 'mysql2';
 
-import { queryOne } from '../common/db.js';
+import { queryOne } from '../../common/db.js';
 
 interface ScoreRow extends RowDataPacket
 {

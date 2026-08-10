@@ -74,6 +74,11 @@ void AD1BomberGameState::SetGridData(const FIntPoint& InGridSize, const TArray<F
 
 void AD1BomberGameState::RemoveSoftBlockCell(const FIntPoint& Cell)
 {
+	if (!HasAuthority())
+	{
+		return;
+	}
+
 	SoftBlockCells.Remove(Cell);
 }
 

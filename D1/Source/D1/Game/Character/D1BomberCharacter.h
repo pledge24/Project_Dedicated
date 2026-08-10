@@ -132,7 +132,7 @@ private:
 public:
 	/**
 	 *  사망 정리. bIsAlive 복제로 서버·각 클라에서 1회씩 실행(bDeathHandled=인스턴스 재진입 가드).
-	 *  서버(권위 전용): 콜리전/이동 차단·무적타이머 취소(죽은 폰 유일 teardown). 이동은 복제로 클라 수렴.
+	 *  서버(권위 전용): 콜리전/이동 차단·무적 타이머 취소(죽은 폰 유일 teardown). 이동은 복제로 클라 수렴.
 	 *  연출(몽타주/점멸/이름표)은 CosmeticComp가 담당(DS no-op).
 	 */
 	void HandleDeath();
@@ -160,11 +160,11 @@ private:
 
 //~ PS 바인딩·이름표
 protected:
-	/** PS OnPlayerNameChanged 핸들러. 이름표 재푸시 위해 OnPlayerStateReady 재호출. */
+	/** PS OnPlayerNameChanged 핸들러. 이름표를 다시 갱신하려고 OnPlayerStateReady 재호출. */
 	UFUNCTION()
 	void HandlePlayerNameRefreshed();
 
-	/** PS 최초 확보 + 이름 갱신마다 호출. BP에서 이름표 등 UI 푸시용. */
+	/** PS 최초 확보 + 이름 갱신마다 호출. BP에서 이름표 등 UI 갱신용. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Bomber|Events", meta = (DisplayName = "On Player State Ready"))
 	void OnPlayerStateReady();
 

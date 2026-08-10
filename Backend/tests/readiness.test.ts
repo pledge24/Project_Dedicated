@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fail, signal, waitForReady } from '../src/match/readiness.js';
+import { fail, signal, waitForReady } from '../src/match/ds/readiness.js';
 
 describe('readiness gate', () =>
 {

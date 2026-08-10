@@ -1,7 +1,7 @@
 // 플레이어용 매치 요청 어댑터 (handler 레이어). DS용은 dsApi.* 로 분리돼 있다.
 import type { Request, Response } from 'express';
 
-import { ok } from '../common/envelope.js';
+import { ok } from '../../common/envelope.js';
 import * as service from './matchmaking.service.js';
 
 /**

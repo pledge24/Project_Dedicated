@@ -93,7 +93,8 @@ bool UD1MapBuilder::Build(UWorld* World, AD1BomberGameState* GS, const FD1MapBui
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
 	// 벽(복제) — 메시·콜리전은 액터 생성자에 있어 클라도 동일 구성.
-	if (MapToUse->GetWallBlockClass())
+	// 클래스 미지정 시 셀 판정 데이터(위 SetGridData)만 남고 액터 없는 맵이 된다 — 무음 생략 금지.
+	if (ensureMsgf(MapToUse->GetWallBlockClass() != nullptr, TEXT("[Map] WallBlockClass 미지정: %s"), *MapToUse->GetName()))
 	{
 		for (const FIntPoint& Cell : Layout.WallCells)
 		{
@@ -103,8 +104,12 @@ bool UD1MapBuilder::Build(UWorld* World, AD1BomberGameState* GS, const FD1MapBui
 	}
 
 	// 소프트블록(복제) — 파괴 중 상태는 자체 복제.
+	// PickupClass 미지정이면 배정 자체를 걸러야 한다 — null 클래스로 배정하면 아래 "아이템 N" 로그가
+	// 성공을 주장하고 실제 드롭 시점에만 조용히 사라진다.
+	const bool bCanAssignItems = Cfg.PickupClass != nullptr;
+	ensureMsgf(bCanAssignItems, TEXT("[Map] PickupClass 미지정 — 아이템 사전 배정 안 함 (GameMode의 PowerupPickupClass)"));
 	int32 AssignedItems = 0;
-	if (MapToUse->GetSoftBlockClass())
+	if (ensureMsgf(MapToUse->GetSoftBlockClass() != nullptr, TEXT("[Map] SoftBlockClass 미지정: %s"), *MapToUse->GetName()))
 	{
 		for (const FIntPoint& Cell : Layout.SoftBlockCells)
 		{
@@ -113,7 +118,7 @@ bool UD1MapBuilder::Build(UWorld* World, AD1BomberGameState* GS, const FD1MapBui
 			if (Block)
 			{
 				EPowerupType HeldType;
-				if (RollPowerupType(Cfg, HeldType))
+				if (bCanAssignItems && RollPowerupType(Cfg, HeldType))
 				{
 					Block->SetHeldItem(HeldType, Cfg.PickupClass, Cfg.PowerupZ);
 					++AssignedItems;

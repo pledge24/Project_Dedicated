@@ -28,8 +28,9 @@ void UD1BombPlacementComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 
 void UD1BombPlacementComponent::ServerTryPlaceBomb_Implementation()
 {
+	// Server RPC + 서버 봇 직접 호출뿐이라 권위는 보장 — 남는 실패 원인은 오부착(비캐릭터 소유)뿐.
 	AD1BomberCharacter* OwnerChar = GetBomberOwner();
-	if (!OwnerChar || !OwnerChar->HasAuthority())
+	if (!ensureMsgf(OwnerChar, TEXT("BombPlacement: 소유자가 AD1BomberCharacter 아님")))
 	{
 		return;
 	}
@@ -52,23 +53,14 @@ void UD1BombPlacementComponent::ServerTryPlaceBomb_Implementation()
 		return;
 	}
 
-	if (PS)
-	{
-		Bomb->SetRange(PS->GetFirePower());
-	}
+	Bomb->SetRange(PS->GetFirePower()); // PS null은 CanPlaceBombAt이 이미 거부
 	ActiveBombs.Add(Bomb);
 	// 폭탄이 BeginPlay에서 겹친 캐릭터(소유자 포함)를 모두 IgnoredBombs에 등록함. 여기선 슬롯만 추적.
 }
 
 void UD1BombPlacementComponent::ServerPlaceBombForAI()
 {
-	const AD1BomberCharacter* OwnerChar = GetBomberOwner();
-	if (!OwnerChar || !OwnerChar->HasAuthority())
-	{
-		return;
-	}
-
-	// 봇 컨트롤러는 서버에만 존재 → RPC 왕복 없이 impl 직접 호출. 검증은 impl 내부 CanPlaceBombAt 재사용.
+	// 봇 컨트롤러는 서버에만 존재 → RPC 왕복 없이 impl 직접 호출. 검증은 impl 내부가 담당.
 	ServerTryPlaceBomb_Implementation();
 }
 
@@ -113,8 +105,19 @@ bool UD1BombPlacementComponent::CanPlaceBombAt(const FIntPoint& Cell, AD1BomberP
 		return false;
 	}
 
-	const int32 BombCap = PS ? PS->GetBombCapacity() : 1;
-	if (GetActiveBombCount() >= BombCap)
+	// 서버 검증부 — 판정 기준이 없으면 통과가 아니라 거부(fail-closed).
+	// PS는 언포제스 직후 잔류 RPC로 잠시 없을 수 있어 조용히 거부, 서버에서 GS 부재는 불가능한 에러.
+	if (!PS)
+	{
+		return false;
+	}
+	const AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
+	if (!ensureMsgf(GS, TEXT("BombPlacement: GameState 없음 — 설치 거부")))
+	{
+		return false;
+	}
+
+	if (GetActiveBombCount() >= PS->GetBombCapacity())
 	{
 		return false;
 	}
@@ -124,20 +127,19 @@ bool UD1BombPlacementComponent::CanPlaceBombAt(const FIntPoint& Cell, AD1BomberP
 		return false;
 	}
 
-	const AD1BomberGameState* GS = GetWorld() ? GetWorld()->GetGameState<AD1BomberGameState>() : nullptr;
-	if (GS && GS->GetMatchPhase() != EBomberMatchPhase::Playing)
+	if (GS->GetMatchPhase() != EBomberMatchPhase::Playing)
 	{
 		return false;
 	}
-	if (PS && !PS->IsAlive())
+	if (!PS->IsAlive())
 	{
 		return false;
 	}
-	if (GS && !GS->IsInsideGrid(Cell))
+	if (!GS->IsInsideGrid(Cell))
 	{
 		return false;
 	}
-	if (GS && GS->IsWallCell(Cell))
+	if (GS->IsWallCell(Cell))
 	{
 		return false;
 	}

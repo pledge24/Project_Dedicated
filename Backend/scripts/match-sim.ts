@@ -2,10 +2,10 @@
 // 실행: npm run match:sim  (전부 PASS여야 머지 — CLAUDE.md '알고리즘은 테스트 도구로 검증 후 머지')
 import assert from 'node:assert/strict';
 
-import { createBotOpponents } from '../src/match/bots.js';
-import { selectRequeue } from '../src/match/formation.js';
-import { MatchQueue } from '../src/match/queue.js';
-import type { MatchQueueParams } from '../src/match/queue.js';
+import { createBotOpponents } from '../src/match/matchmaking/bots.js';
+import { selectRequeue } from '../src/match/matchmaking/formation.js';
+import { MatchQueue } from '../src/match/matchmaking/queue.js';
+import type { MatchQueueParams } from '../src/match/matchmaking/queue.js';
 
 // config 디폴트와 동일한 파라미터.
 const PARAMS: MatchQueueParams = { playersPerMatch: 4, baseWindow: 200, expandRate: 50, maxWindow: 2000 };

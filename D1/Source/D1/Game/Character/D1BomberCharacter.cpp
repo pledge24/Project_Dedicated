@@ -31,13 +31,13 @@ AD1BomberCharacter::AD1BomberCharacter(const FObjectInitializer& ObjectInitializ
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
-		Move->bOrientRotationToMovement = true;
-		Move->RotationRate = FRotator(0.f, 500.f, 0.f);
-		Move->MaxWalkSpeed = BaseWalkSpeed;
-		Move->MinAnalogWalkSpeed = 20.f;
-		Move->BrakingDecelerationWalking = 2000.f;
+		Movement->bOrientRotationToMovement = true;
+		Movement->RotationRate = FRotator(0.f, 500.f, 0.f);
+		Movement->MaxWalkSpeed = BaseWalkSpeed;
+		Movement->MinAnalogWalkSpeed = 20.f;
+		Movement->BrakingDecelerationWalking = 2000.f;
 	}
 
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
@@ -103,17 +103,27 @@ void AD1BomberCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent);
+	if (!ensureMsgf(EIC, TEXT("[Input] EnhancedInputComponent 아님 — 입력 바인딩 전체 생략")))
 	{
-		if (MoveAction)
-		{
-			EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AD1BomberCharacter::OnMoveInput);
-		}
-		if (PlaceBombAction && BombPlacementComp)
-		{
-			EIC->BindAction(PlaceBombAction, ETriggerEvent::Started,
-				BombPlacementComp.Get(), &UD1BombPlacementComponent::ServerTryPlaceBomb);
-		}
+		return;
+	}
+
+	// 액션 에셋 미지정은 "캐릭터가 안 움직임"으로만 나타난다 — 로그로 표면화.
+	if (!MoveAction || !PlaceBombAction)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[Input] 미지정 입력 액션 있음 (Move=%d, PlaceBomb=%d)"),
+			MoveAction != nullptr, PlaceBombAction != nullptr);
+	}
+
+	if (MoveAction)
+	{
+		EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AD1BomberCharacter::OnMoveInput);
+	}
+	if (PlaceBombAction && BombPlacementComp)
+	{
+		EIC->BindAction(PlaceBombAction, ETriggerEvent::Started,
+			BombPlacementComp.Get(), &UD1BombPlacementComponent::ServerTryPlaceBomb);
 	}
 }
 
@@ -214,7 +224,7 @@ void AD1BomberCharacter::ReceiveExplosionHit()
 
 void AD1BomberCharacter::OnRep_bIsInvulnerable()
 {
-	// Start/EndInvulnerability의 수동 OnRep 호출로 서버(리슨 호스트)에서도 불린다 — DS 스킵은 컴포넌트가 담당.
+	// Start/EndInvulnerability의 수동 OnRep 호출로 서버(리슨 호스트)에서도 불린다 — DS에서 거르는 건 컴포넌트가 담당.
 	if (bIsInvulnerable)
 	{
 		CosmeticComp->PlayHitReaction(/*bWithAnim=*/!bDeathHandled);
@@ -227,10 +237,6 @@ void AD1BomberCharacter::OnRep_bIsInvulnerable()
 
 void AD1BomberCharacter::StartInvulnerability(float DurationSec)
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
 	bIsInvulnerable = true;
 	GetWorldTimerManager().SetTimer(InvulnTimerHandle, this,
 		&AD1BomberCharacter::EndInvulnerability, DurationSec, false);
@@ -239,20 +245,12 @@ void AD1BomberCharacter::StartInvulnerability(float DurationSec)
 
 void AD1BomberCharacter::EndInvulnerability()
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
 	bIsInvulnerable = false;
 	OnRep_bIsInvulnerable();
 }
 
 void AD1BomberCharacter::ApplyHitStun()
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
 	bStunned = true;
 	GetWorldTimerManager().SetTimer(StunTimerHandle, this,
 		&AD1BomberCharacter::EndStun, StunDurationSec, false);
@@ -286,7 +284,7 @@ void AD1BomberCharacter::HandleDeath()
 		GetWorldTimerManager().ClearTimer(InvulnTimerHandle);
 	}
 
-	CosmeticComp->PlayDeathCosmetics();
+	CosmeticComp->PlayDeath();
 }
 
 void AD1BomberCharacter::HandlePlayerAliveStateChanged()
@@ -319,7 +317,7 @@ void AD1BomberCharacter::HandleLeft()
 		}
 	}
 
-	CosmeticComp->PlayLeftCosmetics();
+	CosmeticComp->PlayLeft();
 }
 
 void AD1BomberCharacter::HandlePlayerLeftChanged()

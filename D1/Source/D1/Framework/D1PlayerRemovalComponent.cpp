@@ -19,19 +19,17 @@ UD1PlayerRemovalComponent::UD1PlayerRemovalComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UD1PlayerRemovalComponent::InitializeRemoval(int32 InExpectedPlayerCount, const FString& InMatchId, const FString& InServerToken)
+void UD1PlayerRemovalComponent::SetupForMatch(const FD1MatchSetupParams& Params)
 {
 	if (!HasServerAuthority())
 	{
 		return;
 	}
 
-	ExpectedPlayerCount = InExpectedPlayerCount;
-	CurrentMatchId      = InMatchId;
-	CurrentServerToken   = InServerToken;
-
-	// 게임중 강제 회수(다른 기기 로그인) 폴링 시작 — 토큰 있는 실 DS에서만.
-	StartKickPolling();
+	ExpectedPlayerCount = Params.ExpectedPlayerCount;
+	CurrentMatchId      = Params.MatchId;
+	CurrentServerToken  = Params.ServerToken;
+	bIsSetupForMatch    = true;
 }
 
 void UD1PlayerRemovalComponent::NotifyNoShow(int64 UserId)
@@ -72,26 +70,26 @@ void UD1PlayerRemovalComponent::NotifyPlayerDisconnected(AController* Exiting)
 
 void UD1PlayerRemovalComponent::StartKickPolling()
 {
+	// 설정 없이 폴링만 돌면 토큰이 비어 매번 조용히 넘어간다 — kick이 영영 반영되지 않는 무음 실패.
+	if (!ensureMsgf(bIsSetupForMatch, TEXT("[Match] kick 폴링 시작 전 SetupForMatch 누락")))
+	{
+		return;
+	}
+
 	// 백엔드가 띄운 DS(토큰 보유)에서만 — PIE/standalone은 폴링 없음.
 	if (CurrentServerToken.IsEmpty())
 	{
 		return;
 	}
 
-	if (UWorld* World = GetWorld())
-	{
-		const float Interval = FMath::Max(1.f, GetDefault<UD1OnlineSettings>()->KickPollIntervalSec);
-		World->GetTimerManager().SetTimer(
-			KickPollTimerHandle, this, &UD1PlayerRemovalComponent::PollKicks, Interval, /*bLoop=*/true);
-	}
+	const float Interval = FMath::Max(1.f, GetDefault<UD1OnlineSettings>()->KickPollIntervalSec);
+	GetWorld()->GetTimerManager().SetTimer(
+		KickPollTimerHandle, this, &UD1PlayerRemovalComponent::PollKicks, Interval, /*bLoop=*/true);
 }
 
 void UD1PlayerRemovalComponent::StopKickPolling()
 {
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(KickPollTimerHandle);
-	}
+	GetWorld()->GetTimerManager().ClearTimer(KickPollTimerHandle);
 }
 
 void UD1PlayerRemovalComponent::PollKicks()
@@ -127,10 +125,6 @@ void UD1PlayerRemovalComponent::KickUser(int64 UserId)
 	}
 
 	AD1BomberGameState* GS = GetBomberGameState();
-	if (!GS)
-	{
-		return;
-	}
 
 	AD1BomberPlayerState* Target = nullptr;
 	for (APlayerState* PS : GS->PlayerArray)
@@ -168,15 +162,15 @@ void UD1PlayerRemovalComponent::KickUser(int64 UserId)
 
 void UD1PlayerRemovalComponent::RemoveLeaver(AD1BomberPlayerState* Target, bool bNotifyClient)
 {
-	AD1BomberGameState* GS = GetBomberGameState();
-	if (!GS || !Target)
+	if (!Target)
 	{
 		return;
 	}
+	AD1BomberGameState* GS = GetBomberGameState();
 
 	const int64 UserId = Target->GetBackendUserId();
 
-	// 탈주 처리(사망과 별개). 전원 꼴등(정원 고정), 캐릭터 사라짐, 결과 캡처(Logout로 빠지기 전).
+	// 탈주 처리(사망과 별개). 전원 꼴등(정원 고정), 캐릭터 사라짐, 결과 기록(Logout로 빠지기 전).
 	const int32 LastPlacement = FMath::Max(ExpectedPlayerCount, GS->PlayerArray.Num());
 	Target->SetPlacement(LastPlacement);
 	Target->SetLeft(); // bLeft 복제 → 캐릭터 사라짐 + 카드 "탈주"
@@ -207,7 +201,7 @@ void UD1PlayerRemovalComponent::RemoveLeaver(AD1BomberPlayerState* Target, bool 
 
 	// 종료 판정은 심판(MatchFlow) 소유 — 생존 목록 제외·다음 틱 평가 예약을 위임.
 	// 한 배치(kick 폴링 응답)·한 프레임의 탈주를 심판이 모아 한 번만 판정 → 앞 탈주가 매치를 끝내
-	// 뒤 탈주가 스킵되던 순서 의존 제거. 전원 탈주는 생존 0 → Draw로 정확 판정.
+	// 뒤 탈주가 누락되던 순서 의존 제거. 전원 탈주는 생존 0 → Draw로 정확 판정.
 	if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
 	{
 		Flow->NotifyPlayerLeft(Target);
@@ -216,14 +210,12 @@ void UD1PlayerRemovalComponent::RemoveLeaver(AD1BomberPlayerState* Target, bool 
 
 bool UD1PlayerRemovalComponent::HasMatchStarted() const
 {
-	const AD1BomberGameState* GS = GetBomberGameState();
-	return GS && GS->GetMatchPhase() != EBomberMatchPhase::Waiting;
+	return GetBomberGameState()->GetMatchPhase() != EBomberMatchPhase::Waiting;
 }
 
 bool UD1PlayerRemovalComponent::IsMatchEnded() const
 {
-	const AD1BomberGameState* GS = GetBomberGameState();
-	return GS && GS->GetMatchPhase() == EBomberMatchPhase::Finished;
+	return GetBomberGameState()->GetMatchPhase() == EBomberMatchPhase::Finished;
 }
 
 AD1BomberGameState* UD1PlayerRemovalComponent::GetBomberGameState() const
@@ -238,13 +230,10 @@ UD1DsApiSubsystem* UD1PlayerRemovalComponent::GetDsApi() const
 		return nullptr;
 	}
 
-	UWorld* World = GetWorld();
-	UGameInstance* GI = World ? World->GetGameInstance() : nullptr;
-	return GI ? GI->GetSubsystem<UD1DsApiSubsystem>() : nullptr;
+	return GetWorld()->GetGameInstance()->GetSubsystem<UD1DsApiSubsystem>();
 }
 
 bool UD1PlayerRemovalComponent::HasServerAuthority() const
 {
-	const AActor* Owner = GetOwner();
-	return Owner && Owner->HasAuthority();
+	return GetOwner()->HasAuthority();
 }

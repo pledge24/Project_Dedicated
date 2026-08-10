@@ -55,6 +55,9 @@ export const config = Object.freeze({
             exePath:       process.env.MATCH_DS_EXE || '',  // 머신별 절대경로 — DS 사용 시 .env에서 지정
             map:           process.env.MATCH_DS_MAP || '/Game/D1/Maps/MP_Ingame', // 쿡되지 않은 빌드에선 /Game/Maps/MP_Test로 임시 교체
             host:          process.env.MATCH_DS_HOST || '127.0.0.1',
+            // spawn된 DS가 보고를 보낼 백엔드 주소. 기본값을 PORT에서 파생시켜야 PORT를 바꿨을 때
+            // DS만 옛 포트를 때리는 불일치가 안 생긴다(DS 쪽 기본값은 컴파일 시점에 박힌다).
+            backendUrl:    process.env.MATCH_DS_BACKEND_URL || `http://127.0.0.1:${asNumber('PORT', 3000)}`,
             portMin:       asNumber('MATCH_DS_PORT_MIN', 7777),
             portMax:       asNumber('MATCH_DS_PORT_MAX', 7787),
             readyTimeoutMs: asNumber('MATCH_DS_READY_TIMEOUT_MS', 30_000),  // DS가 준비 콜백(POST /ready)을 보낼 상한. 최악 콜드부팅보다 넉넉해야 함

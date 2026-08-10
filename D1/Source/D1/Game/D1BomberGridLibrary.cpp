@@ -30,11 +30,12 @@ void UD1BomberGridLibrary::TraceExplosionCells(
 	OutCells.Reset();
 	OutSoftBlockHits.Reset();
 
-	if (!GameState)
+	// 무음이면 호출자(폭발·봇 위험 지도)가 "폭발 셀 0개"를 정상 결과로 받는다.
+	if (!ensureMsgf(GameState, TEXT("[Grid] TraceExplosionCells: GameState 없음 — 폭발 셀 계산 불가")))
 	{
-		return;	
+		return;
 	}
-	
+
 	OutCells.Insert(Origin, 0);
 
 	for (const FIntPoint& Dir : NeighborDirs)

@@ -13,7 +13,7 @@ import buildApp from '../src/app.js';
 import { closePool } from '../src/common/db.js';
 import { sign as signJwt } from '../src/common/jwt.js';
 import { fetchCurrentTokenVersion } from '../src/common/session.js';
-import * as roster from '../src/match/roster.service.js';
+import * as roster from '../src/match/roster/roster.service.js';
 
 const PASSWORD = 'rejointest123';
 const MAP = 'default map';

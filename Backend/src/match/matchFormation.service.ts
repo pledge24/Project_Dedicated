@@ -1,4 +1,4 @@
-// 매치 성사 처리 (handler 레이어) — WS 사이클이 그룹을 넘기면 여기서 한 판을 조립한다.
+// 매치 성사 처리 (service 레이어) — WS 사이클이 그룹을 넘기면 여기서 한 판을 조립한다.
 // ws.ts에서 분리한 이유: 토큰 발급·roster 등록·확정 창 방어는 도메인 결정이지 소켓 배관이 아니다.
 //
 // 여기가 하는 일 — 실패하면 어디까지 되돌리는지가 이 파일의 전부다:
@@ -11,13 +11,13 @@ import { WebSocket } from 'ws';
 
 import { config } from '../common/config.js';
 import { logger } from '../common/logger.js';
-import type { BotOpponent } from './bots.js';
-import { createBotOpponents } from './bots.js';
-import { allocator } from './dsAllocator.js';
-import * as dsApiState from './dsApi.state.js';
-import * as service from './matchmaking.service.js';
-import type { MatchGroup, QueueEntry } from './queue.js';
-import * as roster from './roster.service.js';
+import { allocator } from './ds/dsAllocator.js';
+import * as pendingKicks from './ds/pendingKicks.js';
+import type { BotOpponent } from './matchmaking/bots.js';
+import { createBotOpponents } from './matchmaking/bots.js';
+import * as service from './matchmaking/matchmaking.service.js';
+import type { MatchGroup, QueueEntry } from './matchmaking/queue.js';
+import * as roster from './roster/roster.service.js';
 import { send } from './wsSend.js';
 
 /**
@@ -156,7 +156,7 @@ async function assembleMatch(entries: QueueEntry<WebSocket>[], bots: BotOpponent
 async function rollbackMatch(matchId: string, entries: QueueEntry<WebSocket>[], removeRoster: boolean): Promise<number>
 {
     allocator.release(matchId);
-    dsApiState.clear(matchId);
+    pendingKicks.clear(matchId);
     const requeued = service.abortFormation(entries);
     if (removeRoster)
     {

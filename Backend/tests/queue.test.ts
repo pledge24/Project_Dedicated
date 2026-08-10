@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MatchQueue } from '../src/match/queue.js';
+import { MatchQueue } from '../src/match/matchmaking/queue.js';
 
 const PARAMS = { playersPerMatch: 4, baseWindow: 200, expandRate: 50, maxWindow: 2000 };
 

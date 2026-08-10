@@ -6,9 +6,9 @@
 // 다중 프로세스로 나갈 때 여기만 async로 바꾸면 되고, 호출부(dsApi)는 그때 함께 옮긴다.
 // 멱등성은 DB의 client_match_id UNIQUE로 일원화하므로 결과 확정 시 roster를 지우지 않는다.
 // (지우면 재제출이 404가 되어 409와 의미가 갈림.) 대신 만료분만 add 시 청소한다.
-import { config } from '../common/config.js';
-import { logger } from '../common/logger.js';
-import * as resultRepo from './result.repository.js';
+import { config } from '../../common/config.js';
+import { logger } from '../../common/logger.js';
+import * as resultRepo from '../result/result.repository.js';
 import * as repo from './roster.repository.js';
 import type { MatchRoster } from './roster.types.js';
 

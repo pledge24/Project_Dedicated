@@ -1,8 +1,9 @@
 // DS 확보 경계(seam) — "매치를 실행할 서버를 어디서 얻는가"를 이 인터페이스 하나로 추상화한다.
 // ws.ts는 로컬 프로세스인지 stub인지 알 필요가 없다(이전엔 config.match.ds.enabled 분기가 6곳 흩어져 있었다).
 // 확장 지점: 머신 여러 대로 나갈 때 Agones/GameLift 구현체를 여기에 추가하면 ws.ts는 그대로 둔다.
-import { config } from '../common/config.js';
+import { config } from '../../common/config.js';
 import * as ds from './ds.js';
+import * as dsPorts from './dsPorts.js';
 import * as readiness from './readiness.js';
 
 interface DsServer
@@ -56,7 +57,7 @@ const localAllocator: DsAllocator = {
     commit: (matchId) => ds.commit(matchId),
     release: (matchId) => ds.release(matchId),
     shutdownUncommitted: () => ds.shutdownUncommitted(),
-    reapOrphans: () => ds.reapOrphans(),
+    reapOrphans: () => dsPorts.reapOrphans(),
 };
 
 /**

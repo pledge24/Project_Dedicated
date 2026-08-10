@@ -9,6 +9,7 @@
 #include "Systems/Map/D1MapBuilder.h"
 #include "Systems/Map/D1MapData.h"
 #include "Framework/D1MatchTypes.h"
+#include "Network/D1DsShutdownSubsystem.h"
 #include "Core/D1LogChannels.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerStart.h"
@@ -49,6 +50,50 @@ AD1BomberGameMode::AD1BomberGameMode()
 	GameStateClass = AD1BomberGameState::StaticClass();
 	PlayerStateClass = AD1BomberPlayerState::StaticClass();
 	BotControllerClass = AD1BotController::StaticClass();
+}
+
+void AD1BomberGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+{
+	Super::InitGame(MapName, Options, ErrorMessage);
+
+	// 매치 식별자/토큰/명단/봇 좌석 적재. 아무것도 없으면 PIE/standalone(결과 POST 생략).
+	// PreLogin·InitNewPlayer가 이 값으로 접속 신원을 판정하므로 접속 수락보다 앞서 채워야 한다 —
+	// 비어 있으면 실 DS를 PIE로 오판해 신원 검증이 통째로 열린다.
+	MatchConfig = FD1MatchConfig::Load();
+}
+
+void AD1BomberGameMode::InitGameState()
+{
+	Super::InitGameState();
+
+	// 매치 흐름·킥·탈주는 GameState의 컴포넌트가 소유. 여기선 설정만 주입하고 가동(준비 통지·게이트·
+	// 폴링)은 맵과 봇이 준비된 BeginPlay에서 건다.
+	// 여기서 조용히 넘어가면 시작 게이트도 킥 폴링도 결과 보고도 걸리지 않은 DS가
+	// Waiting 상태로 영원히 남는다. GameStateClass를 잘못 지정했을 때 여기서 걸린다.
+	AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
+	if (!ensureMsgf(GS, TEXT("[Match] GameStateClass가 AD1BomberGameState 계열이 아님")))
+	{
+		return;
+	}
+
+	// 명단도 함께 넘긴다 — 끝까지 입장하지 않은 유저를 결과에 채우려면 "와야 할 사람"을 알아야 한다.
+	FD1MatchSetupParams Params;
+	Params.ExpectedPlayerCount      = MatchConfig.ExpectedPlayerCount;
+	Params.MatchId                  = MatchConfig.MatchId;
+	Params.ServerToken              = MatchConfig.ServerToken;
+	Params.WaitForPlayersTimeoutSec = WaitForPlayersTimeoutSec;
+	Params.ShutdownGraceSec         = ShutdownGraceSec;
+	MatchConfig.Roster.GenerateValueArray(Params.ExpectedRoster);
+
+	if (UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval())
+	{
+		Removal->SetupForMatch(Params);
+	}
+
+	if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
+	{
+		Flow->SetupForMatch(Params);
+	}
 }
 
 void AD1BomberGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
@@ -109,7 +154,7 @@ void AD1BomberGameMode::PostLogin(APlayerController* NewPlayer)
 
 void AD1BomberGameMode::Logout(AController* Exiting)
 {
-	// 매치 진행 중 이탈(접속 끊김/나가기)은 탈주로 처리 — Super가 PS를 제거하기 전에 캡처.
+	// 매치 진행 중 이탈(접속 끊김/나가기)은 탈주로 처리 — Super가 PS를 제거하기 전에 기록.
 	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
 	{
 		if (UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval())
@@ -133,9 +178,6 @@ void AD1BomberGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// 매치 식별자/토큰/명단/봇 좌석 적재. 아무것도 없으면 PIE/standalone(결과 POST 스킵).
-	MatchConfig = FD1MatchConfig::Load();
-
 	// 맵 빌드는 전용 헬퍼로 위임(GameMode는 config만 보유·전달).
 	FD1MapBuildConfig MapCfg;
 	MapCfg.DefaultMap  = MapData;
@@ -150,27 +192,40 @@ void AD1BomberGameMode::BeginPlay()
 	if (!UD1MapBuilder::Build(GetWorld(), GetGameState<AD1BomberGameState>(), MapCfg, MapErr))
 	{
 		UE_LOG(LogD1, Error, TEXT("[Map] 빌드 실패: %s"), *MapErr);
+
+		// 실 DS는 벽·스폰 없는 맵으로 매치를 돌릴 수 없다 — 결과 보고 없이 종료하면 백엔드 sweep이
+		// 점수 무변동 abort로 기록한다(/result는 빈 결과를 거부하므로 결과를 지어내지 않는다).
+		// 유예 중 입장한 클라는 종료와 함께 끊긴다. PIE/standalone은 빈 맵 관찰을 위해 계속 진행.
+		if (!MatchConfig.MatchId.IsEmpty() && !MatchConfig.ServerToken.IsEmpty())
+		{
+			if (UD1DsShutdownSubsystem* Shutdown = GetWorld()->GetSubsystem<UD1DsShutdownSubsystem>())
+			{
+				Shutdown->BeginShutdownWatch(ShutdownGraceSec);
+			}
+
+			return;
+		}
 	}
 
 	// 봇전: PlayerStart가 준비된(맵 빌드 후) 다음, 시작 게이트 전에 봇을 스폰해 PlayerArray를 채운다.
 	SpawnBots();
 
-	// 매치 흐름·킥·탈주는 GameState의 컴포넌트가 소유. 설정을 push하고 시작 게이트를 위임.
-	// 명단도 함께 넘긴다 — 끝까지 입장하지 않은 유저를 결과에 채우려면 "와야 할 사람"을 알아야 한다.
-	if (AD1BomberGameState* GS = GetGameState<AD1BomberGameState>())
+	// 설정 주입은 InitGameState에서 끝났다 — 여기선 가동만. 맵·PlayerStart·봇이 준비된 뒤라야
+	// 준비 통지가 사실이 되고, 정원 0/1(PIE·솔로)의 즉시 시작이 빈 월드에서 일어나지 않는다.
+	AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
+	if (!ensureMsgf(GS, TEXT("[Match] 매치 가동 불가 — GameState 없음")))
 	{
-		if (UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval())
-		{
-			Removal->InitializeRemoval(MatchConfig.ExpectedPlayerCount, MatchConfig.MatchId, MatchConfig.ServerToken);
-		}
+		return;
+	}
 
-		if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
-		{
-			TArray<FD1JoinEntry> ExpectedRoster;
-			MatchConfig.Roster.GenerateValueArray(ExpectedRoster);
-			Flow->InitializeMatch(MatchConfig.ExpectedPlayerCount, WaitForPlayersTimeoutSec, ShutdownGraceSec,
-				MatchConfig.MatchId, MatchConfig.ServerToken, ExpectedRoster);
-		}
+	if (UD1PlayerRemovalComponent* Removal = GS->GetPlayerRemoval())
+	{
+		Removal->StartKickPolling();
+	}
+
+	if (UD1MatchFlowComponent* Flow = GS->GetMatchFlow())
+	{
+		Flow->StartMatchGate();
 	}
 }
 
@@ -268,9 +323,7 @@ bool AD1BomberGameMode::IsJoinAfterMatchStart() const
 		return false;
 	}
 
-	const AD1BomberGameState* GS = GetGameState<AD1BomberGameState>();
-
-	return GS && GS->GetMatchPhase() != EBomberMatchPhase::Waiting;
+	return GetGameState<AD1BomberGameState>()->GetMatchPhase() != EBomberMatchPhase::Waiting;
 }
 
 void AD1BomberGameMode::SpawnBots()
@@ -281,9 +334,9 @@ void AD1BomberGameMode::SpawnBots()
 	}
 
 	UWorld* World = GetWorld();
-	if (!World || !BotControllerClass)
+	if (!BotControllerClass)
 	{
-		UE_LOG(LogD1, Warning, TEXT("[Bot] 스폰 생략 — World/BotControllerClass 없음"));
+		UE_LOG(LogD1, Warning, TEXT("[Bot] 스폰 생략 — BotControllerClass 없음"));
 		return;
 	}
 

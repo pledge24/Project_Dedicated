@@ -3,9 +3,9 @@
 // 여기는 requireAuth(유저 JWT), 저기는 매치별 serverToken. 경로가 겹치지 않도록 이 라우터를 먼저 태운다.
 import express from 'express';
 
-import { requireAuth } from '../common/authMiddleware.js';
-import { config } from '../common/config.js';
-import { createRateLimiter } from '../common/rateLimit.js';
+import { requireAuth } from '../../common/authMiddleware.js';
+import { config } from '../../common/config.js';
+import { createRateLimiter } from '../../common/rateLimit.js';
 import * as handler from './matchmaking.handler.js';
 
 // 로그인 직후 1회 호출이라 랭킹과 같은 한도로 충분하다.

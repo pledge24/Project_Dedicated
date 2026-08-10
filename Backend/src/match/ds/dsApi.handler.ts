@@ -1,11 +1,11 @@
 // DS→백엔드 요청 어댑터 (handler 레이어). DS만 — Authorization: Bearer <serverToken>.
 import type { Request, Response } from 'express';
 
-import { extractBearerToken } from '../common/bearer.js';
-import { ok } from '../common/envelope.js';
-import { AppError, Codes } from '../common/errors.js';
-import type { MatchEndReason, MatchResultEntryInput, MatchResultRequest } from '../common/types.js';
-import { isInt } from '../common/validate.js';
+import { extractBearerToken } from '../../common/bearer.js';
+import { ok } from '../../common/envelope.js';
+import { AppError, Codes } from '../../common/errors.js';
+import type { MatchEndReason, MatchResultEntryInput, MatchResultRequest } from '../../common/types.js';
+import { isInt } from '../../common/validate.js';
 import * as service from './dsApi.service.js';
 
 const END_REASONS: readonly MatchEndReason[] = ['winner', 'draw', 'time_expired', 'abort'];

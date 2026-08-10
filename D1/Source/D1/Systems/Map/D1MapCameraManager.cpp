@@ -45,17 +45,17 @@ AActor* AD1MapCameraManager::ResolveMapCamera()
 
 void AD1MapCameraManager::ApplyGridFraming(FMinimalViewInfo& POV) const
 {
-	const UWorld* World = GetWorld();
-	const AD1BomberGameState* GS = World ? World->GetGameState<AD1BomberGameState>() : nullptr;
+	const AD1BomberGameState* GS = GetWorld()->GetGameState<AD1BomberGameState>();
 	if (!GS)
 	{
+		// 클라 접속 초기 GameState 복제 전 — 매 프레임 재호출이 자연 재시도.
 		return;
 	}
 
 	const FIntPoint Grid = GS->GetGridSize();
 	if (Grid.X <= 0 || Grid.Y <= 0)
 	{
-		// 아직 GridSize 복제 전 → 태그 액터 그대로(폴백).
+		// 아직 GridSize 복제 전 → 태그 액터 그대로(대체).
 		return;
 	}
 

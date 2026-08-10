@@ -1,6 +1,6 @@
 // 매칭 WebSocket 네트워크 레이어 — 소켓 수명만 다룬다.
 // 같은 http.Server를 공유(noServer) → upgrade 헤더에서 JWT 인증 후 handleUpgrade.
-// 매치가 성사된 뒤의 조립(토큰 발급·DS 할당·roster 등록)은 matchFormation.handler가 맡는다.
+// 매치가 성사된 뒤의 조립(토큰 발급·DS 할당·roster 등록)은 matchFormation.service가 맡는다.
 import type { Server as HttpServer, IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocket, WebSocketServer } from 'ws';
@@ -13,10 +13,10 @@ import * as jwt from '../common/jwt.js';
 import { logger } from '../common/logger.js';
 import { fetchCurrentTokenVersion, onSuperseded } from '../common/session.js';
 import type { AuthedUser } from '../common/types.js';
-import { allocator } from './dsAllocator.js';
-import { handleBotMatch, handleMatch } from './matchFormation.handler.js';
-import * as service from './matchmaking.service.js';
-import type { ClientMessage } from './protocol.js';
+import { allocator } from './ds/dsAllocator.js';
+import { handleBotMatch, handleMatch } from './matchFormation.service.js';
+import * as service from './matchmaking/matchmaking.service.js';
+import type { ClientMessage } from './protocol.types.js';
 import { send, sendError } from './wsSend.js';
 
 const WS_PATH = '/ws/match';

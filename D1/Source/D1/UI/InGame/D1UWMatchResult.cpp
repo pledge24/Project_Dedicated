@@ -27,17 +27,19 @@ void UD1UWMatchResult::NativeConstruct()
 		CountdownLabel->SetText(FText::AsNumber(RemainingSec));
 	}
 
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().SetTimer(
-			CountdownTimerHandle, this, &UD1UWMatchResult::TickReturnCountdown, 1.f, /*bLoop=*/true);
-	}
+	GetWorld()->GetTimerManager().SetTimer(
+		CountdownTimerHandle, this, &UD1UWMatchResult::TickReturnCountdown, 1.f, /*bLoop=*/true);
 }
 
 void UD1UWMatchResult::SetResults(const TArray<FD1MatchResultEntry>& Results)
 {
-	if (!ResultListPanel || !RowWidgetClass)
+	if (!ResultListPanel)
 	{
+		return;
+	}
+	if (!RowWidgetClass)
+	{
+		UE_LOG(LogD1, Warning, TEXT("[MatchResult] RowWidgetClass가 비어있음 (디테일 패널에서 지정 필요)"));
 		return;
 	}
 
@@ -87,20 +89,19 @@ void UD1UWMatchResult::ReturnToLobby()
 	{
 		return;
 	}
-	bReturning = true;
 
-	if (UWorld* World = GetWorld())
+	// 래치·타이머 정리는 이동이 확정된 뒤에만 — 먼저 잠그면 실패 시 버튼·카운트다운이 다 죽어 갇힌다.
+	UD1SessionSubsystem* Session = GetGameInstance()->GetSubsystem<UD1SessionSubsystem>();
+	if (!Session)
 	{
-		World->GetTimerManager().ClearTimer(CountdownTimerHandle);
-	}
-
-	// 이동이 DS 연결을 끊는다 — SessionSubsystem이 의도한 이탈 표시 후 로비 맵(설정 단일 출처)을 연다.
-	if (UD1SessionSubsystem* Session = GetGameInstance() ? GetGameInstance()->GetSubsystem<UD1SessionSubsystem>() : nullptr)
-	{
-		Session->TravelToLobby();
+		UE_LOG(LogD1, Error, TEXT("[MatchResult] SessionSubsystem 없음 — 로비 복귀 불가"));
 
 		return;
 	}
 
-	UE_LOG(LogD1, Error, TEXT("[MatchResult] SessionSubsystem 없음 — 로비 복귀 불가"));
+	bReturning = true;
+	GetWorld()->GetTimerManager().ClearTimer(CountdownTimerHandle);
+
+	// 이동이 DS 연결을 끊는다 — SessionSubsystem이 의도한 이탈 표시 후 로비 맵(설정 단일 출처)을 연다.
+	Session->TravelToLobby();
 }

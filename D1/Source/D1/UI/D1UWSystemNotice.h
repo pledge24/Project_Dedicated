@@ -43,7 +43,8 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> MessageLabel;
 
-	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	/** 유일한 닫기 수단 — 없으면 모달이 입력을 영구 잠근다. 필수 바인딩으로 WBP 컴파일에서 강제. */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UButton> ConfirmButton;
 
 private:

@@ -69,7 +69,7 @@ private:
 		FSimpleDelegate OnSettled;
 	};
 
-	/** 준비/결과 공용 전송부. Body는 회차 간 재사용해 재전송 페이로드 동일성을 보장.
+	/** 준비/결과 공용 전송부. Body는 회차 간 재사용해 재전송 본문 동일성을 보장.
 	 *  일시 실패(전송 실패·0·5xx·429)는 정책 백오프로 자기 재호출. */
 	void SendReport(const FString& Path, const FString& ServerToken, const TSharedRef<FJsonObject>& Body,
 		int32 Attempt, const FD1ReportPolicy& Policy, FTimerHandle& RetryTimerHandle);
@@ -77,4 +77,7 @@ private:
 	FTimerHandle ServerReadyRetryTimerHandle;
 	FTimerHandle MatchStartedRetryTimerHandle;
 	FTimerHandle MatchResultRetryTimerHandle;
+
+	/** kick 폴링 연속 실패 수 — 임계(5회) 도달 시 1회 Warning으로 영구 실패 가시화, 성공 시 리셋. */
+	int32 KickPollFailStreak = 0;
 };

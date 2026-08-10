@@ -36,7 +36,7 @@ void AD1SoftBlock::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 
 void AD1SoftBlock::StartDestroying()
 {
-	if (!HasAuthority() || bDestroying)
+	if (bDestroying)
 	{
 		return;
 	}
@@ -53,11 +53,6 @@ void AD1SoftBlock::StartDestroying()
 
 void AD1SoftBlock::OnRep_bDestroying()
 {
-	if (!bDestroying)
-	{
-		return;
-	}
-
 	// 반투명 머티리얼로 교체만. 콜리전은 건드리지 않음(파괴 중에도 통과 불가).
 	if (DestroyingMaterial)
 	{
@@ -71,13 +66,10 @@ void AD1SoftBlock::CompleteDestruction()
 	const FIntPoint Cell = UD1BomberGridLibrary::WorldToCell(GetActorLocation());
 
 	// 이제서야 폭발 차단/통과 차단을 해제 — 셀 목록에서 빼고 액터 제거(복제로 클라 정리).
-	if (AD1BomberGameState* GS = World ? World->GetGameState<AD1BomberGameState>() : nullptr)
-	{
-		GS->RemoveSoftBlockCell(Cell);
-	}
+	World->GetGameState<AD1BomberGameState>()->RemoveSoftBlockCell(Cell);
 
-	// 빌드 시 사전 배정된 아이템이 있으면 직접 스폰(서버 권위). 파괴 시점 굴림 없음.
-	if (bHasItem && PickupClass && World)
+	// 빌드 시 사전 배정된 아이템이 있으면 직접 스폰(서버 권위, SetHeldItem이 클래스 유효를 보증).
+	if (bHasItem)
 	{
 		FActorSpawnParameters Params;
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -94,6 +86,11 @@ void AD1SoftBlock::CompleteDestruction()
 void AD1SoftBlock::SetHeldItem(EPowerupType InType, TSubclassOf<AD1PowerupPickup> InPickupClass, float InDropZ)
 {
 	if (!HasAuthority())
+	{
+		return;
+	}
+	// null 클래스로 bHasItem을 세우면 드롭이 스폰 지점에서 조용히 소실된다 — 배정 자체를 거부.
+	if (!InPickupClass)
 	{
 		return;
 	}

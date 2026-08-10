@@ -16,13 +16,8 @@ AD1ExplosionHazard::AD1ExplosionHazard()
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 }
 
-void AD1ExplosionHazard::Initialize(const TArray<FIntPoint>& InCells, float InDurationSec)
+void AD1ExplosionHazard::SetupCells(const TArray<FIntPoint>& InCells, float InDurationSec)
 {
-	if (!HasAuthority())
-	{
-		return;
-	}
-
 	HazardCells = InCells;
 	HazardDurationSec = InDurationSec;
 	ElapsedSec = 0.f;

@@ -23,6 +23,10 @@ public:
 	AD1BomberGameMode();
 
 	//~ Begin AGameModeBase Interface
+	/** 매치 설정(식별자·토큰·명단·봇 좌석) 적재 — 접속 신원 판정보다 확실히 앞서야 한다. */
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
+	/** GameState 컴포넌트에 매치 설정 주입. 가동은 BeginPlay(맵·봇 준비 후). */
+	virtual void InitGameState() override;
 	/** 재입장 거절 — 이미 kick된(다른 기기 로그인) 유저의 연결 거부. */
 	virtual void PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 	/** 예상 인원 다 모이면 매치 시작(시작 게이트). */
@@ -84,7 +88,7 @@ private:
 	 */
 	bool IsJoinAfterMatchStart() const;
 
-	/** BeginPlay에서 FD1MatchConfig::Load()로 적재 — 매치 식별자/토큰/명단/봇 좌석. */
+	/** InitGame에서 FD1MatchConfig::Load()로 적재 — 매치 식별자/토큰/명단/봇 좌석. */
 	FD1MatchConfig MatchConfig;
 
 //~ 슬롯 배정

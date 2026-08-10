@@ -50,8 +50,8 @@ void UD1MatchmakingSubsystem::StartMatchmaking()
 	const FString Url = BuildMatchWsUrl();
 	MatchSocket = FWebSocketsModule::Get().CreateWebSocket(Url, TArray<FString>(), UpgradeHeaders);
 
-	// CreateWebSocket은 스킴 미지원 URL(BaseUrl 오설정 등)에 null을 반환한다 — 바로 역참조하면
-	// 매칭 버튼 한 번으로 클라가 죽는다. 에러로 표면화한다(상태는 아직 Idle).
+	// 5.7.4의 CreateWebSocket 전 체인은 TSharedRef 반환이라 현재 null이 불가능하다 —
+	// 엔진 계약 변화 대비 방어로만 유지(스킴 오류 등 실제 연결 실패는 OnConnectionError가 받는다).
 	if (!MatchSocket.IsValid())
 	{
 		FBackendResponse Err;
@@ -159,10 +159,7 @@ void UD1MatchmakingSubsystem::HandleSocketMessage(const FString& Message)
 		// 다른 기기 로그인으로 세션 대체 — 곧 서버가 close(4001). Idle로 만들어 뒤이은 close를 정상 종료로 흡수
 		// (HandleSocketClosed가 NetworkError로 오탐하지 않게). 실제 화면 복귀는 SessionSubsystem이 담당(멱등).
 		MatchmakingState = EMatchmakingState::Idle;
-		if (UD1SessionSubsystem* Session = GetGameInstance()->GetSubsystem<UD1SessionSubsystem>())
-		{
-			Session->NotifySessionSuperseded();
-		}
+		GetGameInstance()->GetSubsystem<UD1SessionSubsystem>()->NotifySessionSuperseded();
 		return;
 	}
 
@@ -181,12 +178,25 @@ void UD1MatchmakingSubsystem::HandleSocketMessage(const FString& Message)
 
 	if (Type == TEXT("match:found"))
 	{
-		FMatchFoundDTO Match;
 		const TSharedPtr<FJsonObject>* DataObj = nullptr;
-		if (D1BackendHttp::GetObjectField(Root, TEXT("data"), DataObj))
+		if (!D1BackendHttp::GetObjectField(Root, TEXT("data"), DataObj))
 		{
-			D1BackendHttp::ParseMatchFound(*DataObj, Match);
+			// 빈 DTO로 Matched에 들어가면 travel 실패 후 재시도 불가 상태로 갇힌다 —
+			// Idle 복귀 후 에러 표면화(Idle 선행이라 아래 close는 정상 종료로 처리됨).
+			UE_LOG(LogD1, Warning, TEXT("[Match] match:found에 data 없음 — 매칭 중단"));
+			MatchmakingState = EMatchmakingState::Idle;
+			CloseMatchSocket();
+
+			FBackendResponse Err;
+			Err.bOk = false;
+			Err.ErrorCode = EBackendErrorCode::Unknown;
+			Err.ErrorMessage = TEXT("매칭 응답이 올바르지 않습니다.");
+			OnMatchmakingError.Broadcast(Err);
+			return;
 		}
+
+		FMatchFoundDTO Match;
+		D1BackendHttp::ParseMatchFound(*DataObj, Match);
 
 		MatchmakingState = EMatchmakingState::Matched;
 		UE_LOG(LogD1, Log, TEXT("[Match] 매칭 성사 matchId=%s server=%s:%d"),
@@ -291,22 +301,34 @@ void UD1MatchmakingSubsystem::FetchRejoinableMatch()
 
 void UD1MatchmakingSubsystem::HandleRejoinResponse(const FString& Body)
 {
+	// 형식 불량(파싱 실패·필드 부재)과 "진행 중 매치 없음"(정상)을 로그로 구분 — 전부 무음이면
+	// 재입장이 안 되는 원인을 추적할 수 없다.
 	TSharedPtr<FJsonObject> Root;
 	if (!D1BackendHttp::DeserializeJson(Body, Root))
 	{
+		UE_LOG(LogD1, Warning, TEXT("[Match] 재입장 응답 파싱 실패 — 형식 불량"));
+
 		return;
 	}
 
 	const TSharedPtr<FJsonObject>* DataObj = nullptr;
 	if (!D1BackendHttp::GetObjectField(Root, TEXT("data"), DataObj))
 	{
+		UE_LOG(LogD1, Warning, TEXT("[Match] 재입장 응답에 data 없음 — 형식 불량"));
+
 		return;
 	}
 
 	bool bActive = false;
-	if (!(*DataObj)->TryGetBoolField(TEXT("active"), bActive) || !bActive)
+	if (!(*DataObj)->TryGetBoolField(TEXT("active"), bActive))
 	{
+		UE_LOG(LogD1, Warning, TEXT("[Match] 재입장 응답에 active 없음 — 형식 불량"));
+
 		return;
+	}
+	if (!bActive)
+	{
+		return; // 진행 중 매치 없음 — 정상.
 	}
 
 	FMatchFoundDTO Match;

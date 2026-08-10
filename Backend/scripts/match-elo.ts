@@ -2,7 +2,7 @@
 // 실행: npm run match:elo  (전부 PASS여야 머지 — CLAUDE.md '알고리즘은 테스트 도구로 검증 후 머지')
 import assert from 'node:assert/strict';
 
-import { computeFfaEloDeltas } from '../src/match/elo.js';
+import { computeFfaEloDeltas } from '../src/match/result/elo.js';
 
 const K = 32;
 

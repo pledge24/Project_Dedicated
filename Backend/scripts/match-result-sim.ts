@@ -11,7 +11,7 @@ import type { AddressInfo } from 'node:net';
 import buildApp from '../src/app.js';
 import { config } from '../src/common/config.js';
 import { closePool, getPool } from '../src/common/db.js';
-import * as roster from '../src/match/roster.service.js';
+import * as roster from '../src/match/roster/roster.service.js';
 
 const PASSWORD = 'resulttest123';
 const MAP = 'default map'; // DS가 보고하는 논리 맵 이름(레벨 경로 아님)과 동일 형태

@@ -14,7 +14,7 @@ class UD1DsApiSubsystem;
 
 /**
  *  매치 흐름 담당 컴포넌트 (GameState 부착·서버 전용).
- *  시작 게이트 → 사망 등수 → 승패 판정 → 결과 스냅샷/백엔드 보고 → DS 셧다운을 소유.
+ *  시작 게이트 → 사망 등수 → 승패 판정 → 최종 결과/백엔드 보고 → DS 셧다운을 소유.
  *  복제 상태는 GameState가 계속 소유(MatchPhase/FinalResults 등), 여기는 로직·서버 상태만.
  */
 UCLASS()
@@ -27,9 +27,15 @@ public:
 
 //~ 시작 게이트
 public:
-	/** 서버 전용: GameMode::BeginPlay가 cmdline 파싱·맵빌드 후 호출. 설정을 받고 시작 게이트를 arm. */
-	void InitializeMatch(int32 InExpectedPlayerCount, float InWaitTimeoutSec, float InShutdownGraceSec,
-		const FString& InMatchId, const FString& InServerToken, const TArray<FD1JoinEntry>& InExpectedRoster);
+	/** 서버 전용: GameMode::InitGameState가 설정만 주입. 가동은 StartMatchGate가 따로 한다. */
+	void SetupForMatch(const FD1MatchSetupParams& Params);
+
+	/**
+	 * 서버 전용: GameMode::BeginPlay가 맵 빌드·봇 스폰 후 호출. DS 준비 통지 + 시작 게이트 가동.
+	 * SetupForMatch와 분리한 이유 — 맵·PlayerStart·봇이 없는 상태에서 게이트가 즉시 시작(정원 0/1)하면
+	 * 빈 월드로 매치가 돌고, 준비 통지가 클라를 미완성 월드로 불러들인다.
+	 */
+	void StartMatchGate();
 
 	/** 서버 전용: GameMode::PostLogin이 호출. 예상 인원 도달 시 매치 시작. */
 	void NotifyPlayerJoined();
@@ -42,7 +48,7 @@ private:
 
 	FTimerHandle WaitForPlayersTimerHandle;
 
-	/** GameMode가 InitializeMatch로 주입. 시작 정원(0/1=즉시)과 게이트 타임아웃. */
+	/** GameMode가 SetupForMatch로 주입. 시작 정원(0/1=즉시)과 게이트 타임아웃. */
 	int32 ExpectedPlayerCount = 0;
 	float WaitForPlayersTimeoutSec = 20.f;
 
@@ -52,6 +58,16 @@ private:
 	 * 봇전 봇은 -Bots= 로 따로 오고 PlayerArray에 편입되므로 여기 없다.
 	 */
 	TArray<FD1JoinEntry> ExpectedRoster;
+
+	/** SetupForMatch 완료 여부 — 설정만 되고 가동 안 된 중간 상태를 StartMatchGate가 잡아낸다. */
+	bool bIsSetupForMatch = false;
+
+	/**
+	 * StartMatchGate 통과 여부. 설정 주입(InitGameState)이 가동(BeginPlay)보다 앞서므로, 그 사이에
+	 * 들어온 매치 이벤트는 정원·정산에서 제외해야 한다 — 맵 빌드 실패로 셧다운 유예 중인 DS가
+	 * 시작해버리거나 성립한 적 없는 매치의 결과를 보고하는 것을 막는다.
+	 */
+	bool bIsMatchGateStarted = false;
 
 //~ 사망·등수
 public:
@@ -95,7 +111,7 @@ private:
 	FTimerHandle MatchTimerHandle;
 	FTimerHandle ResultReportHardCapTimerHandle;
 
-	/** GameMode가 InitializeMatch로 주입. 셧다운 유예와 결과 POST 인증값. */
+	/** GameMode가 SetupForMatch로 주입. 셧다운 유예와 결과 POST 인증값. */
 	float ShutdownGraceSec = 30.f;
 	FString CurrentMatchId;
 	FString CurrentServerToken;
@@ -116,7 +132,7 @@ private:
 	/** 소유 GameState. 없으면 nullptr. */
 	AD1BomberGameState* GetBomberGameState() const;
 
-	/** DS API 클라이언트. 토큰 없으면(PIE/standalone) nullptr — 호출측은 보고 스킵. */
+	/** DS API 클라이언트. 토큰 없으면(PIE/standalone) nullptr — 호출측은 보고 생략. */
 	UD1DsApiSubsystem* GetDsApi() const;
 
 	/** 서버 권위 여부. 모든 진입점 방어 가드. */

@@ -64,7 +64,10 @@ void UD1AuthSubsystem::HandleAuthResponse(const FHttpResponsePtr& Res, bool bSuc
 	Data->TryGetStringField(TEXT("token"), Token);
 	if (!Token.IsEmpty())
 	{
-		if (UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance()))
+		// 조용히 넘어가면 "로그인 성공인데 세션 없음"이 되어 이후 전 인증 요청이 무너진다.
+		// GameInstanceClass를 잘못 지정했을 때 여기서 걸린다 — 세션마다 첫 로그인이 반드시 지나는 길이다.
+		UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance());
+		if (ensureMsgf(GI, TEXT("[Auth] GameInstanceClass가 UD1GameInstance 아님 — 세션 저장 불가")))
 		{
 			GI->SetSession(Token, User);
 		}
@@ -103,10 +106,14 @@ void UD1AuthSubsystem::HandleProfileResponse(const FHttpResponsePtr& Res, bool b
 	FAuthUserDTO User;
 	D1BackendHttp::ParseAuthUser(Data, User);
 
-	if (UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance()))
+	// cast 실패인데 방송·성공 로그까지 가면 UI가 낡은 캐시를 최신으로 오인한다 — 도달만 차단.
+	// 설정을 잘못 지정한 경우는 로그인 경로의 ensure가 잡는다 — 거기가 근원이다.
+	UD1GameInstance* GI = Cast<UD1GameInstance>(GetGameInstance());
+	if (!GI)
 	{
-		GI->UpdateUserProfile(User);
+		return;
 	}
+	GI->UpdateUserProfile(User);
 
 	OnProfileUpdated.Broadcast();
 	UE_LOG(LogD1, Log, TEXT("[Profile] 갱신 완료 score=%d level=%d"), User.Score, User.Level);

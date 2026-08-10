@@ -7,8 +7,8 @@ import buildApp from './app.js';
 import { config } from './common/config.js';
 import { closePool } from './common/db.js';
 import { logger } from './common/logger.js';
-import { allocator } from './match/dsAllocator.js';
-import * as roster from './match/roster.service.js';
+import { allocator } from './match/ds/dsAllocator.js';
+import * as roster from './match/roster/roster.service.js';
 import { attachMatchWebSocket } from './match/ws.js';
 
 const app = buildApp();

@@ -24,6 +24,7 @@ public:
 	virtual FName GetCategoryName() const override { return TEXT("D1"); }
 	//~ End UDeveloperSettings Interface
 
+	/** 백엔드 base URL. 실행 인자 `-BackendUrl=`이 있으면 그쪽이 이긴다(백엔드가 띄운 DS·PIE·QA). */
 	UPROPERTY(Config, EditAnywhere, Category="Backend", meta=(DisplayName="Base URL"))
 	FString BaseUrl = TEXT("http://127.0.0.1:3000");
 
@@ -45,7 +46,7 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Session", meta=(DisplayName="Frontend Map"))
 	TSoftObjectPtr<UWorld> FrontendMap;
 
-	/** DS 접속이 끊겼을 때 돌아갈 로비 맵. 세션은 유지되므로 로그인 화면이 아니라 여기로 보낸다. 미설정 시 FrontendMap 폴백. */
+	/** DS 접속이 끊겼을 때 돌아갈 로비 맵. 세션은 유지되므로 로그인 화면이 아니라 여기로 보낸다. 미설정 시 FrontendMap으로 대체. */
 	UPROPERTY(Config, EditAnywhere, Category="Session", meta=(DisplayName="Lobby Map"))
 	TSoftObjectPtr<UWorld> LobbyMap;
 

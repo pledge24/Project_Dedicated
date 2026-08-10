@@ -25,16 +25,16 @@ public:
 	void StopHitReaction();
 
 	/** 사망 연출: 이름표 숨김 → 점멸 → 몽타주 → 종료 후 메시 숨김. */
-	void PlayDeathCosmetics();
+	void PlayDeath();
 
 	/** 탈주 연출 — 몽타주 없이 이름표·메시 즉시 숨김. */
-	void PlayLeftCosmetics();
+	void PlayLeft();
 
 	/** 로컬 플레이어 폰이면 오버레이 머티리얼 적용, 아니면 해제. 컨트롤러 확정마다 호출(멱등). */
 	void RefreshLocalHighlight();
 
 private:
-	/** 깜빡임 시작: 가시화 리셋 + 토글 타이머 arm. 무적·사망 연출 공용. */
+	/** 깜빡임 시작: 가시화 리셋 + 토글 타이머 가동. 무적·사망 연출 공용. */
 	void StartBlink();
 	void TickBlink();
 
@@ -44,8 +44,8 @@ private:
 	/** 캐릭터 머리 위 NameTag 등 위젯 컴포넌트 일괄 숨김. */
 	void HideNameTags();
 
-	/** 렌더 없는 데디 서버는 전 기능 스킵. */
-	bool ShouldRunCosmetics() const;
+	/** 렌더 없는 데디 서버는 전 기능 생략. */
+	bool ShouldRun() const;
 
 	ACharacter* GetCharacterOwner() const;
 

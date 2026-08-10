@@ -2,16 +2,16 @@
 // 프로세스 1개·포트 1개 가정(PROJECT_PLAN). 큐는 영속화하지 않는다.
 import { WebSocket } from 'ws';
 
-import { config } from '../common/config.js';
-import { AppError, Codes } from '../common/errors.js';
-import * as dsApiState from './dsApi.state.js';
+import { config } from '../../common/config.js';
+import { AppError, Codes } from '../../common/errors.js';
+import * as pendingKicks from '../ds/pendingKicks.js';
+import type { MatchFoundData } from '../protocol.types.js';
+import * as resultRepo from '../result/result.repository.js';
+import * as roster from '../roster/roster.service.js';
 import { selectRequeue } from './formation.js';
 import * as repo from './matchmaking.repository.js';
-import type { MatchFoundData } from './protocol.js';
 import { MatchQueue } from './queue.js';
 import type { MatchGroup, QueueEntry } from './queue.js';
-import * as resultRepo from './result.repository.js';
-import * as roster from './roster.service.js';
 
 // ref = 그 유저의 WS 소켓. 매칭 성사 시 여기로 푸시한다.
 const queue = new MatchQueue<WebSocket>({
@@ -110,7 +110,7 @@ export function kickUserFromLiveMatch(userId: number): void
     const matchId = roster.findMatchByUser(userId);
     if (matchId)
     {
-        dsApiState.markKick(matchId, userId);
+        pendingKicks.markKick(matchId, userId);
     }
 }
 

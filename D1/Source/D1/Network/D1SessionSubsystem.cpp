@@ -26,12 +26,9 @@ void UD1SessionSubsystem::NotifySessionSuperseded()
 	UE_LOG(LogD1, Warning, TEXT("[Session] 다른 기기 로그인으로 세션 대체 — 로그인 화면 복귀"));
 
 	// 큐 대기 중이면 매칭 WS 정리(로비 heartbeat가 감지한 경우 등). 이미 닫혔으면 no-op.
-	if (UGameInstance* GI = GetGameInstance())
+	if (UD1MatchmakingSubsystem* Matchmaking = GetGameInstance()->GetSubsystem<UD1MatchmakingSubsystem>())
 	{
-		if (UD1MatchmakingSubsystem* Matchmaking = GI->GetSubsystem<UD1MatchmakingSubsystem>())
-		{
-			Matchmaking->CancelMatchmaking();
-		}
+		Matchmaking->CancelMatchmaking();
 	}
 
 	if (!ShowNotice(
@@ -106,31 +103,42 @@ bool UD1SessionSubsystem::ShowNotice(const FText& Title, const FText& Message)
 	// 위젯 클래스는 온라인 설정에서 로드(C++ 하드코딩 경로 금지).
 	UGameInstance* GI = GetGameInstance();
 	APlayerController* PC = GI ? GI->GetFirstLocalPlayerController() : nullptr;
-	const UD1OnlineSettings* Settings = GetDefault<UD1OnlineSettings>();
-	if (!PC || !Settings || Settings->SystemNoticeWidgetClass.IsNull())
+	if (!PC)
 	{
+		// DS·travel 과도기 — 정상 부재. 호출자의 즉시 복귀 경로가 담당.
+		return false;
+	}
+
+	const UD1OnlineSettings* Settings = GetDefault<UD1OnlineSettings>();
+	if (Settings->SystemNoticeWidgetClass.IsNull())
+	{
+		UE_LOG(LogD1, Error, TEXT("[Session] SystemNoticeWidgetClass 미설정 — 공지 없이 복귀 (Project Settings > D1 > Session)"));
+
 		return false;
 	}
 
 	UClass* NoticeClass = Settings->SystemNoticeWidgetClass.LoadSynchronous();
 	if (!NoticeClass)
 	{
+		UE_LOG(LogD1, Error, TEXT("[Session] SystemNoticeWidgetClass 로드 실패 — 공지 없이 복귀: %s"),
+			*Settings->SystemNoticeWidgetClass.ToString());
+
 		return false;
 	}
 
-	NoticeWidget = CreateWidget<UUserWidget>(PC, NoticeClass);
-	if (!NoticeWidget)
+	// 확인 델리게이트 없는 모달은 FInputModeUIOnly와 함께 영구 소프트락 —
+	// 파생 확인 전엔 아무것도 띄우지 않고 false 반환(호출자의 즉시 복귀 경로 발동).
+	UD1UWSystemNotice* Notice = Cast<UD1UWSystemNotice>(CreateWidget<UUserWidget>(PC, NoticeClass));
+	if (!ensureMsgf(Notice, TEXT("[Session] SystemNoticeWidgetClass가 UD1UWSystemNotice 파생이 아님")))
 	{
 		return false;
 	}
 
+	Notice->SetNotice(Title, Message);
+	Notice->OnSystemNoticeConfirmed.AddDynamic(this, &UD1SessionSubsystem::HandleNoticeConfirmed);
+
+	NoticeWidget = Notice;
 	NoticeWidget->AddToViewport(D1UILayer::Modal);
-
-	if (UD1UWSystemNotice* Notice = Cast<UD1UWSystemNotice>(NoticeWidget))
-	{
-		Notice->SetNotice(Title, Message);
-		Notice->OnSystemNoticeConfirmed.AddDynamic(this, &UD1SessionSubsystem::HandleNoticeConfirmed);
-	}
 
 	// 모달 조작을 위해 UI 입력 + 커서 (인게임 GameOnly 상태에서도 확인 클릭 가능).
 	PC->SetShowMouseCursor(true);
@@ -167,7 +175,7 @@ void UD1SessionSubsystem::ReturnToLogin()
 void UD1SessionSubsystem::OpenLobbyMap()
 {
 	const UD1OnlineSettings* Settings = GetDefault<UD1OnlineSettings>();
-	if (Settings && !Settings->LobbyMap.IsNull())
+	if (!Settings->LobbyMap.IsNull())
 	{
 		UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->LobbyMap);
 
@@ -175,14 +183,14 @@ void UD1SessionSubsystem::OpenLobbyMap()
 	}
 
 	// 로비 맵이 없으면 세션이 살아있어도 갈 곳이 없다 — 로그인 화면으로라도 내보낸다(갇힘 방지).
-	UE_LOG(LogD1, Error, TEXT("[Session] LobbyMap 미설정 — 로그인 화면으로 폴백 (Project Settings > D1 > Session)"));
+	UE_LOG(LogD1, Error, TEXT("[Session] LobbyMap 미설정 — 로그인 화면으로 대체 (Project Settings > D1 > Session)"));
 	ReturnToLogin();
 }
 
 void UD1SessionSubsystem::OpenFrontendMap()
 {
 	const UD1OnlineSettings* Settings = GetDefault<UD1OnlineSettings>();
-	if (Settings && !Settings->FrontendMap.IsNull())
+	if (!Settings->FrontendMap.IsNull())
 	{
 		// TRAVEL_Absolute — DS 접속(게임중 kick)이나 로비 어디서든 프론트엔드 맵을 새로 연다.
 		UGameplayStatics::OpenLevelBySoftObjectPtr(this, Settings->FrontendMap);

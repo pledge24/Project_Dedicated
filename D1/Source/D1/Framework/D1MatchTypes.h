@@ -31,6 +31,32 @@ struct FD1JoinEntry
 	FString Nickname;
 };
 
+/**
+ *  GameMode가 InitGameState에서 GameState 컴포넌트들에 주입하는 매치 설정 묶음.
+ *  MatchFlow와 PlayerRemoval이 같은 값(정원·MatchId·ServerToken)을 쓰므로 한 덩어리로 넘긴다.
+ */
+struct FD1MatchSetupParams
+{
+	/** 시작 정원(0/1=즉시 시작). */
+	int32 ExpectedPlayerCount = 0;
+
+	/** 결과 POST·kick 조회 인증값. 비면 PIE/standalone(백엔드 호출 전부 생략). */
+	FString MatchId;
+	FString ServerToken;
+
+	/** 시작 게이트 대기 상한. */
+	float WaitForPlayersTimeoutSec = 20.f;
+
+	/** 매치 종료 후 DS 강제 종료까지의 유예. */
+	float ShutdownGraceSec = 30.f;
+
+	/**
+	 * -Roster= 로 온 휴먼 명단. 끝까지 입장하지 않은 유저를 결과에 채우려면 "와야 할 사람"을 알아야 한다.
+	 * 봇은 -Bots= 로 따로 와 PlayerArray에 편입되므로 여기 없다.
+	 */
+	TArray<FD1JoinEntry> ExpectedRoster;
+};
+
 /** 매치 종료 시 한 플레이어의 최종 결과. GameState가 배열로 원자 복제 → 결과 UI 표시용(백엔드 전송은 FMatchResultPlayer). */
 USTRUCT(BlueprintType)
 struct FD1MatchResultEntry

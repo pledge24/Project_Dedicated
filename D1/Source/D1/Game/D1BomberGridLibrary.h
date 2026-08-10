@@ -59,9 +59,10 @@ public:
 			return;
 		}
 
+		// TActorRange 기본 플래그가 SkipPendingKill — 무효 액터는 순회에 들어오지 않는다.
 		for (T* Actor : TActorRange<T>(World))
 		{
-			if (IsValid(Actor) && Cells.Contains(WorldToCell(Actor->GetActorLocation())))
+			if (Cells.Contains(WorldToCell(Actor->GetActorLocation())))
 			{
 				Visit(Actor);
 			}
