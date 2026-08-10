@@ -37,11 +37,13 @@ Top-Down 4인 **봄버맨** PvP — 언리얼 **Dedicated Server** + 자체 백�
 Project_Dedicated/
 ├── D1/                  # 언리얼 프로젝트 (클라/DS 공용 C++ 소스)
 │   ├── Source/D1/       # Core · Framework · Game · Network · Systems · UI
-│   └── Packaged/Server/ # DS 패키징 산출물 (gitignored)
+│   └── Packaged/        # 패키징 산출물 Client/ · Server/ (gitignored)
 ├── Backend/             # Node.js 백엔드
-│   ├── src/             # auth · match · ranking · common (4-레이어)
+│   ├── src/             # auth · match(matchmaking·ds·roster·result) · ranking · common (4-레이어)
 │   ├── migrations/      # 순차 SQL 마이그레이션
-│   └── scripts/         # 시나리오 테스트 하네스
+│   ├── scripts/         # 시나리오 테스트 하네스
+│   └── tests/           # vitest 단위 테스트 (DB 불필요)
+├── BackendMcp/          # 백엔드 상태 조회용 MCP 서버
 ├── assets/              # README용 다이어그램
 └── README.md
 ```
@@ -84,6 +86,11 @@ npm run dev                   # tsx watch — http://127.0.0.1:3000
 "<UE_ROOT>/Engine/Binaries/Win64/UnrealEditor.exe" "<repo>/D1/D1.uproject"
 ```
 
+클라이언트는 기본으로 `http://127.0.0.1:3000`의 백엔드에 붙는다. 다른 주소는
+`-BackendUrl=` 커맨드라인 인자, 또는 `D1/Config/DefaultGame.ini`의
+`[/Script/D1.D1OnlineSettings] BaseUrl`로 바꾼다 (우선순위: 커맨드라인 > ini > 기본값).
+ini에 적을 땐 **URL을 따옴표로 감싼다** — ini 파서가 `//` 뒤를 주석으로 잘라낸다.
+
 C++만 컴파일 검증하려면 (에디터를 켜둔 채로도 `D1Server` 타깃은 빌드된다):
 
 ```bash
@@ -117,7 +124,8 @@ C++만 컴파일 검증하려면 (에디터를 켜둔 채로도 `D1Server` 타�
 
 ## 테스트 하네스
 
-DB·프로세스를 실제로 쓰는 시나리오 하네스. `cd Backend` 후 실행.
+`cd Backend` 후 실행. 순수 로직 단위 테스트는 `npm test`(vitest — DB 불필요).
+아래 표는 DB·프로세스를 실제로 쓰는 시나리오 하네스.
 
 | 명령 | 검증 대상 |
 |---|---|
@@ -125,9 +133,10 @@ DB·프로세스를 실제로 쓰는 시나리오 하네스. `cd Backend` 후 �
 | `npm run match:elo` | ELO 계산 — 제로섬·업셋 보상·동률 처리 |
 | `npm run match:result-sim` | 결과 저장 트랜잭션·멱등성·미보고 매치 abort 기록 |
 | `npm run match:rejoin-sim` | 재입장 판정 — 끝난 매치·탈주자를 걸러내는가 |
-| `npm run match:restart-sim` | 백엔드 재시작 생존 — 죽었다 살아나도 결과를 받는가 |
+| `npm run match:restart-survival-sim` | 백엔드 재시작 생존 — 죽었다 살아나도 결과를 받는가 |
+| `npm run match:authority-demo` | 서버 권위 — 유효한 JWT로도 결과 POST가 403으로 거부되는가 |
 | `npm run ranking:sim` | 랭킹 조회·페이지네이션·동점 타이브레이크 |
-| `npm run auth:sim` | 단일 세션 강제(token_version) |
+| `npm run auth:session-sim` | 단일 세션 강제(token_version) |
 | `npm run match:bots [n]` | 테스트 계정 n명을 큐에 투입(수동 E2E용) |
 
 ---
@@ -143,5 +152,5 @@ DB·프로세스를 실제로 쓰는 시나리오 하네스. `cd Backend` 후 �
 ## 알려진 한계 (로컬 데모 기준)
 
 - **TLS 미적용** — JWT·서버 토큰이 평문으로 오간다. 원격 배포 시 리버스 프록시 종단 + `app.set('trust proxy')` 필요
-- **단일 프로세스** — 큐·준비 게이트가 인메모리라 백엔드를 수평 확장할 수 없다. 다만 진행 중인 경기는 백엔드 수명과 분리돼 있어, 백엔드가 죽어도 경기는 끝나고 결과는 저장된다(`npm run match:restart-sim`)
+- **단일 프로세스** — 큐·준비 게이트가 인메모리라 백엔드를 수평 확장할 수 없다. 다만 진행 중인 경기는 백엔드 수명과 분리돼 있어, 백엔드가 죽어도 경기는 끝나고 결과는 저장된다(`npm run match:restart-survival-sim`)
 - **DS는 같은 머신에서만 spawn** — 원격 오케스트레이터(Agones 등) 대비로 `DsAllocator` 인터페이스 뒤에 격리해 두었다

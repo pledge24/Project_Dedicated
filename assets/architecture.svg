@@ -104,9 +104,10 @@
   <path d="M 163 310 L 163 520 L 856 520 L 856 316" fill="none" stroke="#56d4dd" stroke-width="2" marker-end="url(#ar-cyan)"/>
   <text x="380" y="514" fill="#56d4dd" font-size="11">② ClientTravel  host:port?join=&lt;토큰&gt;  — 신원은 DS가 확정</text>
 
-  <!-- DS → 백엔드 result (ready 콜백과 같은 채널: HTTP + serverToken) -->
+  <!-- DS → 백엔드 dsApi 5종 (HTTP + serverToken) -->
   <path d="M 856 468 L 856 560 L 530 560 L 530 436" fill="none" stroke="#f0883e" stroke-width="2" marker-end="url(#ar-orange)"/>
-  <text x="560" y="578" fill="#f0883e" font-size="11">③ POST /api/match/result  ·  Bearer &lt;serverToken&gt;  — DS만 가능</text>
+  <text x="560" y="578" fill="#f0883e" font-size="11">③ DS API  ·  Bearer &lt;serverToken&gt;  — DS만 가능</text>
+  <text x="560" y="594" fill="#6e7681" font-size="11">ready · started · kicks · leaver · result</text>
 
   <!-- 백엔드 → DB -->
   <line x1="672" y1="400" x2="734" y2="400" stroke="#b07cf0" stroke-width="2" marker-end="url(#ar-purple)"/>

@@ -18,6 +18,7 @@
    - 스키마 변경 시 — `npm run migrate:make <name>` 으로 새 `migrations/00N_*.sql` 생성 후 작성하고 `migrate`.
      마이그레이션 SQL은 **idempotent**하게 (MySQL DDL은 암묵 커밋이라 파일 단위 원자성이 없음).
    - `npm run db:init` — **파괴적 리셋**(모든 테이블 드롭). 초기화하려면 `db:init` → `migrate` 순서.
+   - `npm run db:wipe` — 스키마는 유지하고 **데이터만** 전부 비움(TRUNCATE·AUTO_INCREMENT 리셋). 봇 오염 청소용, production에서는 거부.
 5. **서버 실행**:
    ```
    npm run dev   # tsx watch (변경 자동 재시작)
@@ -25,6 +26,9 @@
    ```
    - `GET /healthz` — 라이브니스(프로세스 생존, DB 미검사).
    - `GET /readyz` — 레디니스(DB ping 성공 시 200, 실패 시 503).
+6. **테스트**:
+   - `npm test` — vitest 단위 테스트(`tests/`, DB 불필요 순수 모듈만. watch는 `npm run test:watch`).
+   - DB·프로세스를 실제로 쓰는 시나리오 하네스는 루트 [README](../README.md)의 "테스트 하네스" 표 참조.
 
 ## 엔드포인트
 
@@ -49,6 +53,9 @@
 ### `GET /api/auth/me`  · `Authorization: Bearer <token>`
 토큰 검증 + 최신 프로필(score/level/exp) 반환.
 
+### `GET /api/auth/heartbeat`  · `Authorization: Bearer <token>`
+토큰 유효성만 확인 — `{ "ok": true, "data": { "valid": true } }` (프로필 조회 없음).
+
 ### `GET /api/ranking?limit=&offset=`  · `Authorization: Bearer <token>`
 score DESC 순위 페이지. `limit` 기본 50·최대 100(초과 시 클램프), `offset` 기본 0.
 ```json
@@ -67,8 +74,18 @@ score DESC 순위 페이지. `limit` 기본 50·최대 100(초과 시 클램프)
 매치 결과 보고. **클라이언트 직접 호출 금지** — Dedicated Server가 매치별로 발급된 serverToken으로만 호출. ELO 점수 갱신 + 멱등 처리(`matchId` UNIQUE → 재제출 시 409).
 결과가 끝내 오지 않은 매치는 만료 시 `end_reason='abort'`로 기록만 남는다(등수·점수 변동 없음).
 
+### DS 전용 매치 수명주기 API  · `Authorization: Bearer <serverToken>`
+`result`와 같은 서버 토큰 인증. DS가 매치 진행 중에 호출한다.
+
+| METHOD + PATH | 용도 |
+|---|---|
+| `POST /api/match/:matchId/ready` | DS 기동 완료 콜백 — 백엔드가 이를 받아야 4명에게 서버 주소를 푸시 |
+| `POST /api/match/:matchId/started` | 실제 플레이 시작 통지 — 이후 신규 입장 차단 |
+| `GET /api/match/:matchId/kicks` | 강퇴 대상 폴링 → `{ "userIds": [...] }` |
+| `POST /api/match/:matchId/leaver` | 탈주자 즉시 정산 — body `{ "userId" }` → `{ "userId", "scoreDelta", "scoreAfter" }` |
+
 ### `WS /ws/match`  · `Authorization: Bearer <JWT>`
-매칭 큐 WebSocket(같은 host:port에서 업그레이드). 클라 메시지 `queue:join` / `queue:cancel`, 서버 푸시 `queue:joined` / `queue:left` / `match:found` / `error`.
+매칭 큐 WebSocket(같은 host:port에서 업그레이드). 클라 메시지 `queue:join` / `queue:cancel`, 서버 푸시 `queue:joined` / `queue:left` / `match:found` / `error` / `session:invalid`(다른 곳 로그인으로 세션이 대체되면 푸시 후 close 4001).
 
 ### 에러 응답 (envelope)
 ```json
@@ -82,10 +99,12 @@ score DESC 순위 페이지. `limit` 기본 50·최대 100(초과 시 클램프)
 | `BAD_MESSAGE` | 400 | WS 메시지 형식 위반 |
 | `INVALID_CREDENTIALS` | 401 | ID/PW 불일치 |
 | `AUTH_REQUIRED` / `INVALID_TOKEN` / `TOKEN_EXPIRED` | 401 | 토큰 누락 / 위변조 / 만료 |
+| `SESSION_SUPERSEDED` | 401 | 다른 곳 로그인으로 세션 대체(단일 세션 강제) |
 | `SERVER_AUTH_REQUIRED` | 401 | 서버 토큰 누락(결과 보고) |
 | `INVALID_SERVER_TOKEN` | 403 | 서버 토큰 불일치 |
 | `NOT_FOUND` / `MATCH_NOT_FOUND` | 404 | 리소스 / 매치 없음 |
 | `DUPLICATE_LOGIN_ID` / `DUPLICATE_NICKNAME` | 409 | 회원가입 시 중복 |
+| `ALREADY_IN_QUEUE` | 409 | 이미 매칭 큐에 있음 |
 | `RESULT_ALREADY_SUBMITTED` | 409 | 이미 처리된 매치 결과 |
 | `RATE_LIMITED` | 429 | 속도 제한 |
 | `INTERNAL_ERROR` | 500 | 서버 오류 |
